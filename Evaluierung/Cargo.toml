@@ -1,0 +1,7 @@
+[package]
+name = "Evaluierung"
+version = "0.1.0"
+authors = ["Tim <tim.tannert@tu-dortmund.de>"]
+edition = "2018"
+
+[dependencies]

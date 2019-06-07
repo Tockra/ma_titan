@@ -1,5 +1,5 @@
 [package]
-name = "t"
+name = "Predecessor Datastructure for 40-, 48- and 64-Bit-Integer"
 version = "0.1.0"
 authors = ["Tim <tim.tannert@tu-dortmund.de>"]
 edition = "2018"
