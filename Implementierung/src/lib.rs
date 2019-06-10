@@ -1,12 +1,13 @@
+
+
 pub trait PredecessorList<T> {
     fn insert(&self,T);
     fn delete(&self,T);
-    fn predecessor(&self,T);
-    fn sucessor(&self,T);
-    fn minimum(&self);
-    fn maximum(&self); 
+    fn predecessor(&self,T) -> Option<T>;
+    fn sucessor(&self,T) -> Option<T>;
+    fn minimum(&self) -> Option<T>;
+    fn maximum(&self) -> Option<T>; 
 }
 
-pub mod tests {
 
-}
+struct STree<T: Num>
