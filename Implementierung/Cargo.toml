@@ -1,7 +1,8 @@
 [package]
-name = "Predecessor Datastructure for 40-, 48- and 64-Bit-Integer"
+name = "predecessor_list"
 version = "0.1.0"
 authors = ["Tim <tim.tannert@tu-dortmund.de>"]
 edition = "2018"
 
 [dependencies]
+fnv = "1.0.6"
