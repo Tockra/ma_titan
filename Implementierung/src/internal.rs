@@ -67,20 +67,22 @@ mod internal {
         }
 
         pub fn pop_back(&mut self) -> Option<T> {
-             
             if self.last.is_null() {
-                None
-            } else {
-                unsafe {
-                    if ((*(self.last)).prev).is_null() {
-                        self.first = None;
-                    } else {
-                        self.last = (*(self.last)).prev;
-                        let tmp = ((*(self.last)).next).unwrap().elem;
-                        (*(self.last)).next = None;
-                    };
-                    None
-                }
+                return None;
+            }
+
+            unsafe {
+                let node = Box::from_raw(self.last);
+                
+                if node.prev.is_null() {
+                    self.first = ptr::null_mut();
+                } else {
+                    (*node.prev).next = ptr::null_mut();
+                };
+                
+                self.last = node.prev;
+
+                Some(node.elem)
             }
         }
     }
@@ -138,7 +140,12 @@ mod internal {
             assert_eq!(l.len(), 6);
 
             let len = l.len();
-           
+            assert_eq!(l.pop_front, 0);
+            assert_eq!(l.pop_front, 10);
+            assert_eq!(l.pop_front, 20);
+            assert_eq!(l.pop_front, 30);
+            assert_eq!(l.pop_front, 40);
+            assert_eq!(l.pop_front, 50);
         }
     }
 }
