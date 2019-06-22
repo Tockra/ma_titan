@@ -75,9 +75,9 @@ mod internal {
                 let node = Box::from_raw(self.last);
                 
                 if node.prev.is_null() {
-                    self.first = ptr::null_mut();
+                    self.first = None;
                 } else {
-                    (*node.prev).next = ptr::null_mut();
+                    (*node.prev).next = None;
                 };
                 
                 self.last = node.prev;
@@ -140,12 +140,12 @@ mod internal {
             assert_eq!(l.len(), 6);
 
             let len = l.len();
-            assert_eq!(l.pop_front, 0);
-            assert_eq!(l.pop_front, 10);
-            assert_eq!(l.pop_front, 20);
-            assert_eq!(l.pop_front, 30);
-            assert_eq!(l.pop_front, 40);
-            assert_eq!(l.pop_front, 50);
+            assert_eq!(l.pop_front().unwrap(), 0);
+            assert_eq!(l.pop_front().unwrap(), 10);
+            assert_eq!(l.pop_front().unwrap(), 20);
+            assert_eq!(l.pop_front().unwrap(), 30);
+            assert_eq!(l.pop_front().unwrap(), 40);
+            assert_eq!(l.pop_front().unwrap(), 50);
         }
     }
 }
