@@ -146,6 +146,21 @@ mod internal {
             assert_eq!(l.pop_front().unwrap(), 30);
             assert_eq!(l.pop_front().unwrap(), 40);
             assert_eq!(l.pop_front().unwrap(), 50);
+
+            l.insert_at_end(0);
+            l.insert_at_end(10);
+            l.insert_at_end(20);
+            l.insert_at_end(30);
+            l.insert_at_end(40);
+            l.insert_at_end(50);
+            
+            assert_eq!(l.pop_back().unwrap(), 50);
+            assert_eq!(l.pop_back().unwrap(), 40);
+            assert_eq!(l.pop_back().unwrap(), 30);
+            assert_eq!(l.pop_back().unwrap(), 20);
+            assert_eq!(l.pop_back().unwrap(), 10);
+            assert_eq!(l.pop_back().unwrap(), 0);
+            
         }
     }
 }
