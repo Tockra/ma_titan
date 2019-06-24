@@ -57,25 +57,41 @@ impl STree<Store> {
 }
 
 impl PredecessorList<Store> for STree<Store> {
-  
-    pub fn insert(&mut self,element: T) {
+    // Diese Methode fügt ein Element vom Typ Store=i32 in die Datenstruktur ein.
+    pub fn insert(&mut self,element: Store) {
         unimplemented!();
     }
-    pub fn delete(&mut self,element: T) {
+
+    // Diese Method entfernt ein Element vom Typ Store=i32 aus der Datenstruktur.
+    pub fn delete(&mut self,element: Store) {
         unimplemented!();
     }
-    pub fn predecessor(&self,number: T) -> Option<T> {
+
+    // Diese Methode gibt den größten Wert, der echt kleiner als number ist und in der Datenstruktur enthalten ist, aus.
+    pub fn predecessor(&self,number: Store) -> Option<Store> {
         unimplemented!();
     }
-    pub fn sucessor(&self,number: T) -> Option<T> {
+
+    // Gibt den kleinsten Wert, der echt größer als number ist und in der Datenstruktur enthalten ist, aus.
+    pub fn sucessor(&self,number: Store) -> Option<Store> {
         unimplemented!();
     }
-    pub fn minimum(&self) -> Option<T> {
+
+    // Gibt den kleinsten in der Datenstruktur enthaltenen Wert zurück. Dies entspricht dem ersten Wert in der Liste.
+    pub fn minimum(&self) -> Option<Store> {
         unimplemented!();
     }
-    pub fn maximum(&self) -> Option<T> {
-        unimplemented!();
+
+    // Gibt den größten in der Datenstruktur enthaltenen Wert zurück. Dies entspricht dem letzten Wert in der Liste.
+    pub fn maximum(&self) -> Option<Store> {
+        if element_list.last.is_null() {
+            None
+        } else {
+            Some((*element_list.last).elem.copy())
+        }
     }
+
+    // Prüft ob ein Wert in der Datenstruktur enthalten ist.
     pub fn contains(&self) -> bool {
         unimplemented!();
     }
