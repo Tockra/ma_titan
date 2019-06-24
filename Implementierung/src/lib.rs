@@ -40,7 +40,7 @@ impl Level<T,Store> {
     }
 }
 
-impl PredecessorList<Store> for STree<Store> {
+impl STree<Store> {
     pub fn new() -> STree<Store> {
         STree {
             element_list: List::new(),
@@ -50,13 +50,31 @@ impl PredecessorList<Store> for STree<Store> {
             root_table: [Level<Level<i32>>::new();(8 * mem::size_of::<i32>()/2)]
         }
     }
-    pub fn insert(&mut self,element: T);
-    pub fn delete(&mut self,element: T);
-    pub fn predecessor(&self,number: T) -> Option<T>;
-    pub fn sucessor(&self,number: T) -> Option<T>;
-    pub fn minimum(&self) -> Option<T>;
-    pub fn maximum(&self) -> Option<T>; 
-    pub fn contains(&self) -> bool;
+}
+
+impl PredecessorList<Store> for STree<Store> {
+  
+    pub fn insert(&mut self,element: T) {
+        unimplemented!();
+    }
+    pub fn delete(&mut self,element: T) {
+        unimplemented!();
+    }
+    pub fn predecessor(&self,number: T) -> Option<T> {
+        unimplemented!();
+    }
+    pub fn sucessor(&self,number: T) -> Option<T> {
+        unimplemented!();
+    }
+    pub fn minimum(&self) -> Option<T> {
+        unimplemented!();
+    }
+    pub fn maximum(&self) -> Option<T> {
+        unimplemented!();
+    }
+    pub fn contains(&self) -> bool {
+        unimplemented!();
+    }
 }
 
 /* TODO :
