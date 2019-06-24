@@ -96,39 +96,26 @@ mod internal {
             }
         }
 
-        /* Verbindet das ehemals erste Element (self) mit dem neuen ersten Element 'elem'. Hier bei
-            muss beachtet werden, dass extern die Size und der First-Zeiger angepasst werden müssen.
-            self muss vom first Zeiger in diese Methode gemovet werden. */
-        pub fn connect_with_first(mut self, elem: *mut Element<T>) {
+        /* Hinter dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
+            muss beachtet werden, dass extern die Size angepasst werden muss und der Last-Zeiger evtl. angepasst werden muss. */
+        fn insert_after(&mut self, mut elem: Box<Element<T>>) {
+            elem.prev = &mut *self;
+            self.next = Some(elem);
+        }
+
+        /* Vor dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
+            muss beachtet werden, dass extern die Size angepasst werden muss und ggf. der First-Zeiger angepasst werden muss.  */
+        fn insert_before(mut self, elem: *mut Element<T>) {
             unsafe {
                 self.prev = &mut *elem;
                 (*elem).next = Some(Box::new(self));
             }
         }
-
-        /*Verbindet das ehemals letzte Element (self) mit dem neuen letzten Element 'elem'. Hier bei
-            muss beachtet werden, dass extern die Size und der First-Zeiger angepasst werden müssen.*/
-        pub fn connect_with_last(&mut self, mut elem: Box<Element<T>>) {
-            elem.prev = &mut *self;
-            self.next = Some(elem);
-        }
-
-        /* Hinter dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
-            muss beachtet werden, dass extern die Size angepasst werden müssen. */
-        fn insert_after(&mut self, elem: Box<Element<T>>) {
-            unimplemented!();
-        }
-
-        /* Vor dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
-            muss beachtet werden, dass extern die Size angepasst werden müssen.  */
-        fn insert_before(&mut self, elem: *mut Element<T>) {
-            unimplemented!();
-        }
     }
 
    // #[cfg(test)]
     pub mod tests {
-        //#[test]
+        #[test]
         pub fn test_insert_and_pop() {
             let mut l = super::List::new();
             fill_list(&mut l);
@@ -171,12 +158,12 @@ mod internal {
             l.insert_at_end(50);
         }
 
-        //#[test]
-        pub fn test_connect_with_first() {
+        #[test]
+        pub fn test_insert_before_first() {
             let mut l = super::List::new();
             fill_list(&mut l);
             let mut elem = Box::new(super::Element::new(23));
-            l.first.unwrap().connect_with_first(&mut *elem);
+            l.first.unwrap().insert_before(&mut *elem);
             // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
             l.first = Some(elem);
 
@@ -190,7 +177,7 @@ mod internal {
 
             fill_list(&mut l);
             let mut elem = Box::new(super::Element::new(23));
-            l.first.unwrap().connect_with_first(&mut *elem);
+            l.first.unwrap().insert_before(&mut *elem);
             // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
             l.first = Some(elem);
             assert_eq!(l.pop_back().unwrap(), 50);
@@ -203,7 +190,7 @@ mod internal {
 
             fill_list(&mut l);
             let mut elem = Box::new(super::Element::new(23));
-            l.first.unwrap().connect_with_first(&mut *elem);
+            l.first.unwrap().insert_before(&mut *elem);
             // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
             l.first = Some(elem);
             assert_eq!(l.pop_front().unwrap(), 23);
@@ -217,14 +204,15 @@ mod internal {
             
         }
 
-        pub fn test_connect_with_last() {
+        #[test]
+        pub fn test_insert_after_last() {
             let mut l = super::List::new();
             fill_list(&mut l);
             let mut elem = super::Element::new(23);
             let tmp = l.last;
             l.last = &mut elem;
             unsafe {
-                (*tmp).connect_with_last(Box::new(elem));
+                (*tmp).insert_after(Box::new(elem));
             }
 
             // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
@@ -242,7 +230,7 @@ mod internal {
             let tmp = l.last;
             l.last = &mut elem;
             unsafe {
-                (*tmp).connect_with_last(Box::new(elem));
+                (*tmp).insert_after(Box::new(elem));
             }
             assert_eq!(l.pop_back().unwrap(), 23);
             assert_eq!(l.pop_back().unwrap(), 50);
@@ -254,23 +242,24 @@ mod internal {
          
 
             fill_list(&mut l);
-            let mut elem = Box::new(super::Element::new(23));
-            l.first.unwrap().connect_with_first(&mut *elem);
-            // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
-            l.first = Some(elem);
+            let mut elem = super::Element::new(23);
+            let tmp = l.last;
+            l.last = &mut elem;
+            unsafe {
+                (*tmp).insert_after(Box::new(elem));
+            }
             assert_eq!(l.pop_back().unwrap(), 23);
             assert_eq!(l.pop_front().unwrap(), -20);
             assert_eq!(l.pop_front().unwrap(), 10);
             assert_eq!(l.pop_front().unwrap(), 20);
             assert_eq!(l.pop_front().unwrap(), 30);
             assert_eq!(l.pop_front().unwrap(), 40);
-            assert_eq!(l.pop_front().unwrap(), 50);
-            
-            
+            assert_eq!(l.pop_front().unwrap(), 50);  
         }
+
     }
 }
 use self::internal::tests;
     fn main() {
-        tests::test_connect_with_last();
+        //tests::test_insert_before_first();
     }
