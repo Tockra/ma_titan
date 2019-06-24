@@ -50,6 +50,10 @@ impl STree<Store> {
             root_table: [Level<Level<i32>>::new();(8 * mem::size_of::<i32>()/2)]
         }
     }
+
+    fn locate(&mut self, element: Store) -> Element<Store> {
+        unimplemented!();
+    }
 }
 
 impl PredecessorList<Store> for STree<Store> {
