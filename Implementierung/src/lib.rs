@@ -103,5 +103,4 @@ impl PredecessorList<Store> for STree<Store> {
 - prüfen wie die Datenstruktur im Vergleich zur Datenstruktur in C++ abschneidet
 - prüfen ob die 2Mbyte Initialisierungsspeicher durch Verzicht auf Pointer, einen Leistungsschub bringen 
 - herausfinden ob X86 CPUs 32-Bit oder 64-Bit Instruktionen zum Ermitteln von bestimmten Bits haben -> leading Zeros ext.
-- u32 Bit je Zelle in root_top (weniger Top Arrays evtl. in der Praxis notwendig!)
 */
