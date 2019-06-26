@@ -22,7 +22,7 @@ pub type Int = i32;
 type SecondLevel = Level<Int,Int>;
 type FirstLevel = Level<SecondLevel,Int>;
 pub struct STree {
-    root_table: [MaybeUninit<FirstLevel>;1 << (8 * mem::size_of::<Int>()/2)],
+    root_table: [FirstLevel; 1 << (8 * mem::size_of::<Int>()/2)],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 32 wegen der Fenstergröße
     root_top: [u32; 1 << (8 * mem::size_of::<Int>()/2)/32],
     l1_top: [u32; (1 << (8 * mem::size_of::<Int>()/2))/32/32],
@@ -31,6 +31,9 @@ pub struct STree {
 }
 
 // Implementiert die zwei Level unter der Root-Tabelle. Diese besitzen ein Maximum- und ein Minimumpointer und ggf. eine hash_map, wenn *minimum!= *maximum
+// Hier ext. 2 Ansätze die getestet werden müssen (abhängig vom Speicherverbrauch):
+// 1. max/min sind RAW-Pointer auf Elemente
+// 2. min/max sind u8 Werte und hashMap ist entweder ein RAW-Pointer auf eine FnvHashMap oder ein RAW Pointer auf ein Element (falls min==max) evtl. mit Union
 struct Level<T,V> {
     pub hash_map: FnvHashMap<u8,T>,
     pub maximum: *mut Element<V>,
@@ -51,14 +54,18 @@ impl<T,V> Level<T,V> {
 impl STree {
     #[inline]
     pub fn new() -> STree {
-        let mut data: [MaybeUninit<FirstLevel>; 1 << (8 * mem::size_of::<i32>()/2)] = unsafe {
-            MaybeUninit::uninit().assume_init()
-        };
-        for elem in &mut data[..] {
-            unsafe { 
-                ptr::write(elem.as_mut_ptr(), FirstLevel::new()); 
+        let data = {
+            let mut data: [MaybeUninit<FirstLevel>; 1 << (8 * mem::size_of::<i32>()/2)] = unsafe {
+                MaybeUninit::uninit().assume_init()
+            };
+            for elem in &mut data[..] {
+                unsafe { 
+                    ptr::write(elem.as_mut_ptr(), FirstLevel::new()); 
+                }
             }
-        }
+
+            unsafe { mem::transmute::<_, [FirstLevel; 1 << (8 * mem::size_of::<Int>()/2)]>(data) }
+        };
         STree {
             element_list: List::new(),
             root_top: [0; 1 << (8 * mem::size_of::<i32>()/2)/32],
@@ -72,12 +79,23 @@ impl STree {
     pub fn locate(&mut self, _element: Int) -> Element<Int> {
         unimplemented!();
     }
+
+    // Diese Methode setzt die benötigten Bits in der Root-Top-Tabelle und in L1-Top und L2-Top
+    #[inline]
+    fn insert_into_top_table(&mut self, _element: Int) {
+        unimplemented!();
+    }
+
+    #[inline]
+    fn change_bounds(&mut self, element: Int, minimum: *mut Element<Int>, maximum: *mut Element<Int>) {
+        unimplemented!();
+    }
 }
 
 impl PredecessorList<Int> for STree {
     // Diese Methode fügt ein Element vom Typ Int=i32 in die Datenstruktur ein.
     #[inline]
-    pub fn insert(&mut self,element: Int) {
+    fn insert(&mut self,element: Int) {
         let mut new_list_element = Box::new(Element::new(element));
         let pointer_to_new_element: *mut _ = &mut *new_list_element;
 
@@ -102,30 +120,26 @@ impl PredecessorList<Int> for STree {
                 unsafe {(*(*self.element_list.last).prev).insert_after(new_list_element);}
                 self.element_list.last = pointer_to_new_element;
                 self.insert(maximum);
-            } else {
-                // Die hochwertigsten 16 Bits als Root-Array-Index
-                let i = element >> 16;
-                // Die niedrigwertigsten 16 Bits
-                let low = (element & 0xFFFF)
-                // Bits 16 bis 23
-                let j = low >> 8;
-                // Die niedrigwertigsten 8 Bits
-                let k = element & 255;
+            } //else {
+            // Die hochwertigsten 16 Bits als Root-Array-Index
+            let i: usize = (element >> 16) as usize;
+            // Die niedrigwertigsten 16 Bits
+            let low = element & 0xFFFF;
+            // Bits 16 bis 23
+            let j = low >> 8;
+            // Die niedrigwertigsten 8 Bits
+            let k = element & 255;
+
+            let first_level = &mut self.root_table[i];
 
 
-
-                /* Hier kann parallelisiert werden! */
-                insert_into_top_table(element);
-            }
+            unimplemented!();
+            /* Hier kann parallelisiert werden! */
+            self.insert_into_top_table(element);
+            //}
         }
 
         self.element_list.increase_len();
-    }
-
-    // Diese Methode setzt die benötigten Bits in der Root-Top-Tabelle und in L1-Top und L2-Top
-    #[inline]
-    fn insert_into_top_table(&mut self, _element: Int) {
-        unimplemented!();
     }
 
     // Diese Method entfernt ein Element vom Typ Int=i32 aus der Datenstruktur.
