@@ -18,16 +18,16 @@ pub trait PredecessorList<T> {
     fn contains(&self) -> bool;
 }
 
-pub type Store = i32;
-type SecondLevel = Level<Store,Store>;
-type FirstLevel = Level<SecondLevel,Store>;
+pub type Int = i32;
+type SecondLevel = Level<Int,Int>;
+type FirstLevel = Level<SecondLevel,Int>;
 pub struct STree {
-    root_table: [MaybeUninit<FirstLevel>;1 << (8 * mem::size_of::<Store>()/2)],
+    root_table: [MaybeUninit<FirstLevel>;1 << (8 * mem::size_of::<Int>()/2)],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 32 wegen der Fenstergröße
-    root_top: [u32; 1 << (8 * mem::size_of::<Store>()/2)/32],
-    l1_top: [u32; (1 << (8 * mem::size_of::<Store>()/2))/32/32],
-    l2_top: [u32; ((1 << (8 * mem::size_of::<Store>()/2))/32)/32/32],
-    element_list: internal::List<Store>,
+    root_top: [u32; 1 << (8 * mem::size_of::<Int>()/2)/32],
+    l1_top: [u32; (1 << (8 * mem::size_of::<Int>()/2))/32/32],
+    l2_top: [u32; ((1 << (8 * mem::size_of::<Int>()/2))/32)/32/32],
+    element_list: internal::List<Int>,
 }
 
 // Implementiert die zwei Level unter der Root-Tabelle. Diese besitzen ein Maximum- und ein Minimumpointer und ggf. eine hash_map, wenn *minimum!= *maximum
@@ -39,7 +39,7 @@ struct Level<T,V> {
 
 impl<T,V> Level<T,V> {
     #[inline]
-    fn new() -> Level<T,Store> {
+    fn new() -> Level<T,Int> {
         Level {
             hash_map: (FnvHashMap::<u8,T>::default()),
             maximum: ptr::null_mut(),
@@ -69,39 +69,39 @@ impl STree {
     }
 
     #[inline]
-    pub fn locate(&mut self, _element: Store) -> Element<Store> {
+    pub fn locate(&mut self, _element: Int) -> Element<Int> {
         unimplemented!();
     }
 }
 
-impl PredecessorList<Store> for STree {
-    // Diese Methode fügt ein Element vom Typ Store=i32 in die Datenstruktur ein.
+impl PredecessorList<Int> for STree {
+    // Diese Methode fügt ein Element vom Typ Int=i32 in die Datenstruktur ein.
     #[inline]
-    fn insert(&mut self,_element: Store) {
+    fn insert(&mut self,_element: Int) {
         unimplemented!();
     }
 
-    // Diese Method entfernt ein Element vom Typ Store=i32 aus der Datenstruktur.
+    // Diese Method entfernt ein Element vom Typ Int=i32 aus der Datenstruktur.
     #[inline]
-    fn delete(&mut self,_element: Store) {
+    fn delete(&mut self,_element: Int) {
         unimplemented!();
     }
 
     // Diese Methode gibt den größten Wert, der echt kleiner als number ist und in der Datenstruktur enthalten ist, aus.
     #[inline]
-    fn predecessor(&self,_number: Store) -> Option<Store> {
+    fn predecessor(&self,_number: Int) -> Option<Int> {
         unimplemented!();
     }
 
     // Gibt den kleinsten Wert, der echt größer als number ist und in der Datenstruktur enthalten ist, aus.
     #[inline]
-    fn sucessor(&self,_number: Store) -> Option<Store> {
+    fn sucessor(&self,_number: Int) -> Option<Int> {
         unimplemented!();
     }
 
     // Gibt den kleinsten in der Datenstruktur enthaltenen Wert zurück. Dies entspricht dem ersten Wert in der Liste.
     #[inline]
-    fn minimum(&self) -> Option<Store> {
+    fn minimum(&self) -> Option<Int> {
         self.element_list.first.as_ref().map(|x| {
             x.elem
         })
@@ -109,7 +109,7 @@ impl PredecessorList<Store> for STree {
 
     // Gibt den größten in der Datenstruktur enthaltenen Wert zurück. Dies entspricht dem letzten Wert in der Liste.
     #[inline]
-    fn maximum(&self) -> Option<Store> {
+    fn maximum(&self) -> Option<Int> {
         if self.element_list.last.is_null() {
             None
         } else {
