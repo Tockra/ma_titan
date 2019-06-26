@@ -1,14 +1,14 @@
 use std::ptr;
 pub struct List<T> {
-    first: Option<Box<Element<T>>>,
-    last: *mut Element<T>,
-    len: usize,
+    pub first: Option<Box<Element<T>>>,
+    pub last: *mut Element<T>,
+    pub len: usize,
 }
 
 pub struct Element<T> {
-    next: Option<Box<Element<T>>>,
-    prev: *mut Element<T>,
-    elem: T,
+    pub next: Option<Box<Element<T>>>,
+    pub prev: *mut Element<T>,
+    pub elem: T,
 }
 
 impl<T> List<T> {
