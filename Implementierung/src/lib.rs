@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod internal;
 use internal::{List,Element};
 
@@ -17,34 +19,37 @@ pub trait PredecessorList<T> {
 }
 
 pub type Store = i32;
-pub type SecondLevel = Level<Store,Store>;
-pub type FirstLevel = Level<SecondLevel,Store>;
+type SecondLevel = Level<Store,Store>;
+type FirstLevel = Level<SecondLevel,Store>;
 pub struct STree<Store> {
-    pub root_table: [MaybeUninit<FirstLevel>;1 << (8 * mem::size_of::<i32>()/2)],
+    root_table: [MaybeUninit<FirstLevel>;1 << (8 * mem::size_of::<i32>()/2)],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 32 wegen der Fenstergröße
-    pub root_top: [u32; 1 << (8 * mem::size_of::<i32>()/2)/32],
-    pub l1_top: [u32; (1 << (8 * mem::size_of::<i32>()/2))/32/32],
-    pub l2_top: [u32; ((1 << (8 * mem::size_of::<i32>()/2))/32)/32/32],
-    pub element_list: internal::List<Store>,
+    root_top: [u32; 1 << (8 * mem::size_of::<i32>()/2)/32],
+    l1_top: [u32; (1 << (8 * mem::size_of::<i32>()/2))/32/32],
+    l2_top: [u32; ((1 << (8 * mem::size_of::<i32>()/2))/32)/32/32],
+    element_list: internal::List<Store>,
 }
 
+// Implementiert die zwei Level unter der Root-Tabelle. Diese besitzen ein Maximum- und ein Minimumpointer und ggf. eine hash_map, wenn *minimum!= *maximum
 struct Level<T,V> {
     pub hash_map: FnvHashMap<u8,T>,
-    pub maximum: Option<V>,
-    pub minimum: Option<V>,
+    pub maximum: *mut Element<V>,
+    pub minimum: *mut Element<V>,
 }
 
 impl<T,V> Level<T,V> {
+    #[inline]
     fn new() -> Level<T,Store> {
         Level {
             hash_map: (FnvHashMap::<u8,T>::default()),
-            maximum: None,
-            minimum: None,
+            maximum: ptr::null_mut(),
+            minimum: ptr::null_mut(),
         }
     }
 }
 
 impl STree<Store> {
+    #[inline]
     pub fn new() -> STree<Store> {
         let mut data: [MaybeUninit<FirstLevel>; 1 << (8 * mem::size_of::<i32>()/2)] = unsafe {
             MaybeUninit::uninit().assume_init()
@@ -63,38 +68,47 @@ impl STree<Store> {
         }
     }
 
-    fn locate(&mut self, element: Store) -> Element<Store> {
+    #[inline]
+    pub fn locate(&mut self, _element: Store) -> Element<Store> {
         unimplemented!();
     }
 }
 
 impl PredecessorList<Store> for STree<Store> {
     // Diese Methode fügt ein Element vom Typ Store=i32 in die Datenstruktur ein.
-    fn insert(&mut self,element: Store) {
+    #[inline]
+    fn insert(&mut self,_element: Store) {
         unimplemented!();
     }
 
     // Diese Method entfernt ein Element vom Typ Store=i32 aus der Datenstruktur.
-    fn delete(&mut self,element: Store) {
+    #[inline]
+    fn delete(&mut self,_element: Store) {
         unimplemented!();
     }
 
     // Diese Methode gibt den größten Wert, der echt kleiner als number ist und in der Datenstruktur enthalten ist, aus.
-    fn predecessor(&self,number: Store) -> Option<Store> {
+    #[inline]
+    fn predecessor(&self,_number: Store) -> Option<Store> {
         unimplemented!();
     }
 
     // Gibt den kleinsten Wert, der echt größer als number ist und in der Datenstruktur enthalten ist, aus.
-    fn sucessor(&self,number: Store) -> Option<Store> {
+    #[inline]
+    fn sucessor(&self,_number: Store) -> Option<Store> {
         unimplemented!();
     }
 
     // Gibt den kleinsten in der Datenstruktur enthaltenen Wert zurück. Dies entspricht dem ersten Wert in der Liste.
+    #[inline]
     fn minimum(&self) -> Option<Store> {
-        unimplemented!();
+        self.element_list.first.as_ref().map(|x| {
+            x.elem
+        })
     }
 
     // Gibt den größten in der Datenstruktur enthaltenen Wert zurück. Dies entspricht dem letzten Wert in der Liste.
+    #[inline]
     fn maximum(&self) -> Option<Store> {
         if self.element_list.last.is_null() {
             None
@@ -104,6 +118,7 @@ impl PredecessorList<Store> for STree<Store> {
     }
 
     // Prüft ob ein Wert in der Datenstruktur enthalten ist.
+    #[inline]
     fn contains(&self) -> bool {
         unimplemented!();
     }

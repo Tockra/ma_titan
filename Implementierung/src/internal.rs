@@ -12,6 +12,7 @@ pub struct Element<T> {
 }
 
 impl<T> List<T> {
+    #[inline]
     pub fn new() -> Self {
         List {
             first: None,
@@ -20,7 +21,8 @@ impl<T> List<T> {
         }
     }
 
-    /* Fügt am Ende der Liste ein Element mit Wert 'elem' ein.*/
+    // Fügt am Ende der Liste ein Element mit Wert 'elem' ein.
+    #[inline]
     pub fn insert_at_end(&mut self, elem: T) {
         if self.len() == 0 {
             let mut node = Box::new(Element {
@@ -51,6 +53,7 @@ impl<T> List<T> {
         self.len
     }
 
+    #[inline]
     pub fn pop_front(&mut self) -> Option<T> {
         self.first.take().map(|head| {
             let mut head = *head;
@@ -65,6 +68,7 @@ impl<T> List<T> {
         })
     }
 
+    #[inline]
     pub fn pop_back(&mut self) -> Option<T> {
         if self.last.is_null() {
             return None;
@@ -100,7 +104,8 @@ impl<T> List<T> {
 }
 
 impl<T> Element<T> {
-    fn new(elem: T) -> Self {
+    #[inline]
+    pub fn new(elem: T) -> Self {
         Element {
             next: None,
             prev: ptr::null_mut(),
@@ -110,6 +115,7 @@ impl<T> Element<T> {
 
     /* Hinter dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
         muss beachtet werden, dass extern die Size angepasst werden muss und der Last-Zeiger evtl. angepasst werden muss. */
+    #[inline]
     fn insert_after(&mut self, mut elem: Box<Element<T>>) {
         elem.prev = &mut *self;
         self.next = Some(elem);
@@ -117,6 +123,7 @@ impl<T> Element<T> {
 
     /* Vor dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
         muss beachtet werden, dass extern die Size angepasst werden muss und ggf. der First-Zeiger angepasst werden muss.  */
+    #[inline]
     fn insert_before(mut self, elem: *mut Element<T>) {
         unsafe {
             self.prev = &mut *elem;
