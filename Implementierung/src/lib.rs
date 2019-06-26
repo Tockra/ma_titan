@@ -167,3 +167,8 @@ impl PredecessorList<Int> for STree {
 - prüfen ob die 2Mbyte Initialisierungsspeicher durch Verzicht auf Pointer, einen Leistungsschub bringen 
 - herausfinden ob X86 CPUs 32-Bit oder 64-Bit Instruktionen zum Ermitteln von bestimmten Bits haben -> leading Zeros ext.
 */
+
+/* Anpassungen an der Vorlage:
+- die Minimum und Maximumwerte, die gespeichert werden, liegen immer als RAW-Pointer vor. In der Root-Ebene kann auf diese mittels element_list.{first,last} zugegriffen werden
+- Die HashMap in Level<T,V> ist kein Pointer, der im Falle |Level<V,T>| = 1 auf Element<T> und sonst auf eine HashMap zeigt. 
+  Sondern es ext. 2 RAW-Pointer im Level (Min- und Max-Pointer, die Laut Spezifikation sowieso da sein sollten) und eine HashMap.  */
