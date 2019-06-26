@@ -21,12 +21,12 @@ pub trait PredecessorList<T> {
 pub type Store = i32;
 type SecondLevel = Level<Store,Store>;
 type FirstLevel = Level<SecondLevel,Store>;
-pub struct STree<Store> {
-    root_table: [MaybeUninit<FirstLevel>;1 << (8 * mem::size_of::<i32>()/2)],
+pub struct STree {
+    root_table: [MaybeUninit<FirstLevel>;1 << (8 * mem::size_of::<Store>()/2)],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 32 wegen der Fenstergröße
-    root_top: [u32; 1 << (8 * mem::size_of::<i32>()/2)/32],
-    l1_top: [u32; (1 << (8 * mem::size_of::<i32>()/2))/32/32],
-    l2_top: [u32; ((1 << (8 * mem::size_of::<i32>()/2))/32)/32/32],
+    root_top: [u32; 1 << (8 * mem::size_of::<Store>()/2)/32],
+    l1_top: [u32; (1 << (8 * mem::size_of::<Store>()/2))/32/32],
+    l2_top: [u32; ((1 << (8 * mem::size_of::<Store>()/2))/32)/32/32],
     element_list: internal::List<Store>,
 }
 
@@ -48,9 +48,9 @@ impl<T,V> Level<T,V> {
     }
 }
 
-impl STree<Store> {
+impl STree {
     #[inline]
-    pub fn new() -> STree<Store> {
+    pub fn new() -> STree {
         let mut data: [MaybeUninit<FirstLevel>; 1 << (8 * mem::size_of::<i32>()/2)] = unsafe {
             MaybeUninit::uninit().assume_init()
         };
@@ -74,7 +74,7 @@ impl STree<Store> {
     }
 }
 
-impl PredecessorList<Store> for STree<Store> {
+impl PredecessorList<Store> for STree {
     // Diese Methode fügt ein Element vom Typ Store=i32 in die Datenstruktur ein.
     #[inline]
     fn insert(&mut self,_element: Store) {
