@@ -46,7 +46,7 @@ impl<T> List<T> {
             }
             self.last = tmp;
         }
-        self.increase_count();
+        self.increase_len();
     }
 
     pub fn len(&self) -> usize {
@@ -63,7 +63,7 @@ impl<T> List<T> {
                 self.last = ptr::null_mut();
             }
             head.prev =  ptr::null_mut();
-            self.decrease_count();
+            self.decrease_len();
             head.elem
         })
     }
@@ -84,18 +84,18 @@ impl<T> List<T> {
             };
             
             self.last = node.prev;
-            self.decrease_count();
+            self.decrease_len();
             Some(node.elem)
         }
     }
 
     #[inline]
-    fn increase_count(&mut self) {
+    pub fn increase_len(&mut self) {
         self.len += 1;
     }
 
     #[inline]
-    fn decrease_count(&mut self) {
+    pub fn decrease_len(&mut self) {
         if self.len == 0 {
             panic!("Die Länge einer internal::List kann nicht 0 unterschreiten!");
         }
@@ -116,7 +116,7 @@ impl<T> Element<T> {
     /* Hinter dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
         muss beachtet werden, dass extern die Size angepasst werden muss und der Last-Zeiger evtl. angepasst werden muss. */
     #[inline]
-    fn insert_after(&mut self, mut elem: Box<Element<T>>) {
+    pub fn insert_after(&mut self, mut elem: Box<Element<T>>) {
         elem.prev = &mut *self;
         self.next = Some(elem);
     }
@@ -124,7 +124,7 @@ impl<T> Element<T> {
     /* Vor dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
         muss beachtet werden, dass extern die Size angepasst werden muss und ggf. der First-Zeiger angepasst werden muss.  */
     #[inline]
-    fn insert_before(mut self, elem: *mut Element<T>) {
+    pub fn insert_before(mut self, elem: *mut Element<T>) {
         unsafe {
             self.prev = &mut *elem;
             (*elem).next = Some(Box::new(self));

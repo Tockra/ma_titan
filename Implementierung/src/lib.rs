@@ -77,7 +77,43 @@ impl STree {
 impl PredecessorList<Int> for STree {
     // Diese Methode fügt ein Element vom Typ Int=i32 in die Datenstruktur ein.
     #[inline]
-    fn insert(&mut self,_element: Int) {
+    pub fn insert(&mut self,element: Int) {
+        let mut new_list_element = Box::new(Element::new(element));
+        let pointer_to_new_element: *mut _ = &mut *new_list_element;
+
+        if self.element_list.len() == 0 {
+            self.element_list.last = pointer_to_new_element;
+            self.element_list.first = Some(new_list_element);
+        } else {
+            let minimum = self.minimum().unwrap();
+            let maximum = self.maximum().unwrap();
+
+            if element < minimum {
+                let mut old_first = mem::replace(&mut self.element_list.first, Some(new_list_element)).unwrap();
+                let second = mem::replace(&mut old_first.next, None);
+                match second {
+                    Some(x) => {
+                        x.insert_before(pointer_to_new_element);
+                    }
+                    _ => {}
+                }
+                self.insert(minimum);
+            } else if element > maximum {
+                unsafe {(*(*self.element_list.last).prev).insert_after(new_list_element);}
+                self.element_list.last = pointer_to_new_element;
+                self.insert(maximum);
+            } else {
+                /* Der wirklich interessante Insert Stuff */
+                insert_into_top_table(element);
+            }
+        }
+
+        self.element_list.increase_len();
+    }
+
+    // Diese Methode setzt die benötigten Bits in der Root-Top-Tabelle und in L1-Top und L2-Top
+    #[inline]
+    fn insert_into_top_table(&mut self, _element: Int) {
         unimplemented!();
     }
 
