@@ -103,7 +103,18 @@ impl PredecessorList<Int> for STree {
                 self.element_list.last = pointer_to_new_element;
                 self.insert(maximum);
             } else {
-                /* Der wirklich interessante Insert Stuff */
+                // Die hochwertigsten 16 Bits als Root-Array-Index
+                let i = element >> 16;
+                // Die niedrigwertigsten 16 Bits
+                let low = (element & 0xFFFF)
+                // Bits 16 bis 23
+                let j = low >> 8;
+                // Die niedrigwertigsten 8 Bits
+                let k = element & 255;
+
+
+
+                /* Hier kann parallelisiert werden! */
                 insert_into_top_table(element);
             }
         }
@@ -172,3 +183,8 @@ impl PredecessorList<Int> for STree {
 - die Minimum und Maximumwerte, die gespeichert werden, liegen immer als RAW-Pointer vor. In der Root-Ebene kann auf diese mittels element_list.{first,last} zugegriffen werden
 - Die HashMap in Level<T,V> ist kein Pointer, der im Falle |Level<V,T>| = 1 auf Element<T> und sonst auf eine HashMap zeigt. 
   Sondern es ext. 2 RAW-Pointer im Level (Min- und Max-Pointer, die Laut Spezifikation sowieso da sein sollten) und eine HashMap.  */
+
+  /* Achtung: Datenstruktur funktioniert "nur" auf Little-Endian-Systemen so wie sie soll. Evtl. ist diese performanter/inperformanter auf Big-Endian-Systemen*/
+
+  /*Frage morgen klären:
+  Was machen wenn Element bereits enthalten ist? Die HashFunktion auf der letzten Ebene muss dann ja auf ein Element zeigen (das Erste?, das Letzte? Egal?) */
