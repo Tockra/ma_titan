@@ -2,7 +2,7 @@ mod internal;
 use internal::{List,Element};
 
 use fnv::FnvHashMap;
-
+use std::ptr;
 use std::mem::{self, MaybeUninit};
 
 
@@ -49,6 +49,11 @@ impl STree<Store> {
         let mut data: [MaybeUninit<FirstLevel>; 1 << (8 * mem::size_of::<i32>()/2)] = unsafe {
             MaybeUninit::uninit().assume_init()
         };
+        for elem in &mut data[..] {
+            unsafe { 
+                ptr::write(elem.as_mut_ptr(), FirstLevel::new()); 
+            }
+        }
         STree {
             element_list: List::new(),
             root_top: [0; 1 << (8 * mem::size_of::<i32>()/2)/32],
