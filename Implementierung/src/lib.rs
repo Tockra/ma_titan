@@ -25,8 +25,8 @@ pub struct STree {
     root_table: [FirstLevel; 1 << (8 * mem::size_of::<Int>()/2)],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 32 wegen der Fenstergröße
     root_top: [u32; 1 << (8 * mem::size_of::<Int>()/2)/32],
-    l1_top: [u32; (1 << (8 * mem::size_of::<Int>()/2))/32/32],
-    l2_top: [u32; ((1 << (8 * mem::size_of::<Int>()/2))/32)/32/32],
+    l1_top: [u32; root_size::<Int>()/32/32],
+    l2_top: [u32; (root_size::<Int>()/32)/32/32],
     element_list: internal::List<Int>,
 }
 
@@ -51,6 +51,10 @@ impl<T,V> Level<T,V> {
     }
 }
 
+const fn root_size<T>() -> usize {
+    1 << 8*mem::size_of::<T>() / 2
+}
+
 impl STree {
     #[inline]
     pub fn new() -> STree {
@@ -64,7 +68,9 @@ impl STree {
                 }
             }
 
-            unsafe { mem::transmute::<_, [FirstLevel; 1 << (8 * mem::size_of::<Int>()/2)]>(data) }
+            unsafe { 
+                mem::transmute::<_, [FirstLevel; root_size::<Int>()]>(data) 
+            }
         };
         STree {
             element_list: List::new(),
