@@ -96,6 +96,10 @@ impl STree {
     fn change_bounds(&mut self, element: Int, minimum: *mut Element<Int>, maximum: *mut Element<Int>) {
         unimplemented!();
     }
+
+    fn insert_into_hashtables(&mut self, element: Element<Int> ) {
+        unimplemented!();
+    }
 }
 
 impl PredecessorList<Int> for STree {
@@ -138,6 +142,8 @@ impl PredecessorList<Int> for STree {
 
             let first_level = &mut self.root_table[i];
 
+            // Falls Element kleiner oder größer als das bestehende Minimum/Maximum ist
+           // if element < 
 
             unimplemented!();
             /* Hier kann parallelisiert werden! */
