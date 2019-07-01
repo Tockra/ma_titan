@@ -97,6 +97,8 @@ impl STree {
         unimplemented!();
     }
 
+    // Diese Funktion dient dem Einfügen eines Elementes in die Liste. Hierbei wird das Element definitiv eingefügt.Element
+    // TODO: Predecessor implementieren.
     fn insert_into_hashtables(&mut self, element: Element<Int> ) {
         unimplemented!();
     }
