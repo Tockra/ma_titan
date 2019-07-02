@@ -82,9 +82,45 @@ impl STree {
     }
 
     #[inline]
-    pub fn locate(&mut self, _element: Int) -> Element<Int> {
+    pub fn locate(&mut self, element: Int) -> Option<*mut Element<Int>> {
+        let i: usize = (element >> 16) as usize;
+        // Die niedrigwertigsten 16 Bits
+        let low = element & 0xFFFF;
+        // Bits 16 bis 23
+        let j = low >> 8;
+        // Die niedrigwertigsten 8 Bits
+        let k = element & 255;
+
+        if self.len() < 1 || element > self.maximum().unwrap(){
+            return None;
+        } 
+
+        unsafe {
+            if self.root_table[i].maximum.is_null() || (*self.root_table[i].maximum).elem < element {
+                // return die locate Methode in Top-Tabellen (Siehe Paper)
+            }
+        }
+
+        // War Maximum und/oder Minimum null, dann wurde oben bereits returnt und diese Zeile würde nicht erreicht werden.
+        if self.root_table[i].maximum == self.root_table[i].minimum {
+            return Some(self.root_table[i].minimum);
+        }
+
+        unsafe {
+            if self.root_table[i].hash_map.get_mut(j).is_none() || (*self.root_table[i].hash_map.get_mut(j).unwrap().maximum).elem < element {
+                // return die locate Methode in Top-Tabellen (Siehe Paper)
+            }
+        }
+
+        // Ext. keine dritte Ebene, also ist self.root_table[i].hash_map.get_mut(j) None, dann wäre das letzte Return ausgeführt worden!
+        if self.root_table[i].hash_map.get_mut(j).unwrap().maximum == self.root_table[i].hash_map.get_mut(j).unwrap().minimum {
+            return Some(self.root_table[i].hash_map.get_mut(j).unwrap().minimum);
+        }
+
+        // TODO letzte Zeile aus Paper
         unimplemented!();
     }
+    
 
     // Diese Methode setzt die benötigten Bits in der Root-Top-Tabelle und in L1-Top und L2-Top
     #[inline]
@@ -101,6 +137,11 @@ impl STree {
     // TODO: Predecessor implementieren.
     fn insert_into_hashtables(&mut self, element: Element<Int> ) {
         unimplemented!();
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.element_list.len()
     }
 }
 
@@ -164,7 +205,7 @@ impl PredecessorList<Int> for STree {
 
     // Diese Methode gibt den größten Wert, der echt kleiner als number ist und in der Datenstruktur enthalten ist, aus.
     #[inline]
-    fn predecessor(&self,_number: Int) -> Option<Int> {
+    fn predecessor(&self, number: Int) -> Option<Int> {
         unimplemented!();
     }
 
