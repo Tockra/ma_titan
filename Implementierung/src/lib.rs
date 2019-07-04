@@ -123,8 +123,20 @@ impl STree {
     // Hierbei beachten, dass j zwar Bitweise adressiert wird, die Level-Arrays allerdings ganze 64-Bit-Blöcke besitzen. Somit ist z.B: root_top[5] nicht das 6. 
     // Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
     #[inline]
-    fn locate_top_level(&mut self, element: Int, level: u8) -> Option<Int> {
-        //let block
+    fn locate_top_level(&mut self, bit: Int, level: u8) -> Option<Int> {
+        let index = match level {0=>{bit/64},_=>{0}};
+        let in_index = bit%64;
+
+        // Siehe Paper, irgendwo muss noch Fill Zeros implementiert werden
+        match level {
+            0=> {
+                // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
+                // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
+            },
+            _=> {
+                // Leading Zeros von l1_top[index] bestimmen. Wenn nur 0en enthalten oder sich die nächste 1 nicht rechts von in_index befindet, dann None zurückgeben
+            }
+        }
         unimplemented!();
     }
     
