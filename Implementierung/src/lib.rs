@@ -22,11 +22,10 @@ pub type Int = i32;
 type SecondLevel = Level<Int,Int>;
 type FirstLevel = Level<SecondLevel,Int>;
 pub struct STree {
-    root_table: [FirstLevel; 1 << (8 * mem::size_of::<Int>()/2)],
-    // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 32 wegen der Fenstergröße
-    root_top: [u32; 1 << (8 * mem::size_of::<Int>()/2)/32],
-    l1_top: [u32; root_size::<Int>()/32/32],
-    l2_top: [u32; (root_size::<Int>()/32)/32/32],
+    root_table: [FirstLevel; root_size::<Int>()],
+    // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
+    root_top: [u64; root_size::<Int>()/64],
+    l1_top: [u64; 1], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
     element_list: internal::List<Int>,
 }
 
@@ -59,7 +58,7 @@ impl STree {
     #[inline]
     pub fn new() -> STree {
         let data = {
-            let mut data: [MaybeUninit<FirstLevel>; 1 << (8 * mem::size_of::<i32>()/2)] = unsafe {
+            let mut data: [MaybeUninit<FirstLevel>; root_size::<Int>()] = unsafe {
                 MaybeUninit::uninit().assume_init()
             };
             for elem in &mut data[..] {
@@ -74,9 +73,8 @@ impl STree {
         };
         STree {
             element_list: List::new(),
-            root_top: [0; 1 << (8 * mem::size_of::<i32>()/2)/32],
-            l1_top: [0; (1 << (8 * mem::size_of::<i32>()/2))/32/32],
-            l2_top: [0; ((1 << (8 * mem::size_of::<i32>()/2))/32)/32/32],
+            root_top: [0; root_size::<Int>()/64],
+            l1_top: [0; 1],
             root_table: data,
         }
     }
@@ -87,9 +85,9 @@ impl STree {
         // Die niedrigwertigsten 16 Bits
         let low = element & 0xFFFF;
         // Bits 16 bis 23
-        let j = low >> 8;
+        let j: u8 = (low >> 8) as u8;
         // Die niedrigwertigsten 8 Bits
-        let k = element & 255;
+        let k: u8 = (element & 255) as u8;
 
         if self.len() < 1 || element > self.maximum().unwrap(){
             return None;
@@ -107,17 +105,26 @@ impl STree {
         }
 
         unsafe {
-            if self.root_table[i].hash_map.get_mut(j).is_none() || (*self.root_table[i].hash_map.get_mut(j).unwrap().maximum).elem < element {
+            if self.root_table[i].hash_map.get_mut(&j).is_none() || (*self.root_table[i].hash_map.get_mut(&j).unwrap().maximum).elem < element {
                 // return die locate Methode in Top-Tabellen (Siehe Paper)
             }
         }
 
         // Ext. keine dritte Ebene, also ist self.root_table[i].hash_map.get_mut(j) None, dann wäre das letzte Return ausgeführt worden!
-        if self.root_table[i].hash_map.get_mut(j).unwrap().maximum == self.root_table[i].hash_map.get_mut(j).unwrap().minimum {
-            return Some(self.root_table[i].hash_map.get_mut(j).unwrap().minimum);
+        if self.root_table[i].hash_map.get_mut(&j).unwrap().maximum == self.root_table[i].hash_map.get_mut(&j).unwrap().minimum {
+            return Some(self.root_table[i].hash_map.get_mut(&j).unwrap().minimum);
         }
 
         // TODO letzte Zeile aus Paper
+        unimplemented!();
+    }
+
+    // Gibt das kleinste j zurück, so dass element <= j und k_level[j]=1
+    // Hierbei beachten, dass j zwar Bitweise adressiert wird, die Level-Arrays allerdings ganze 64-Bit-Blöcke besitzen. Somit ist z.B: root_top[5] nicht das 6. 
+    // Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
+    #[inline]
+    fn locate_top_level(&mut self, element: Int, level: u8) -> Option<Int> {
+        //let block
         unimplemented!();
     }
     
