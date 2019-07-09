@@ -25,7 +25,7 @@ pub struct STree {
     root_table: [FirstLevel; root_size::<Int>()],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
     root_top: [u64; root_size::<Int>()/64],
-    l1_top: [u64; 1], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
+    l1_top: [u64; root_size::<Int>()/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
     element_list: internal::List<Int>,
 }
 
@@ -74,7 +74,7 @@ impl STree {
         STree {
             element_list: List::new(),
             root_top: [0; root_size::<Int>()/64],
-            l1_top: [0; 1],
+            l1_top: [0; root_size::<Int>()/64/64],
             root_table: data,
         }
     }
@@ -89,13 +89,22 @@ impl STree {
         // Die niedrigwertigsten 8 Bits
         let k: u8 = (element & 255) as u8;
 
+        let mut new_existing_elem = element;
+
         if self.len() < 1 || element > self.maximum().unwrap(){
             return None;
         } 
 
         unsafe {
             if self.root_table[i].maximum.is_null() || (*self.root_table[i].maximum).elem < element {
-                // return die locate Methode in Top-Tabellen (Siehe Paper)
+                match self.locate_top_level(i as Int,0) {
+                    None => {
+                        return None;
+                    }
+                    Some(x) => {
+                        new_existing_elem = x;
+                    }
+                }
             }
         }
 
@@ -124,20 +133,51 @@ impl STree {
     // Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
     #[inline]
     fn locate_top_level(&mut self, bit: Int, level: u8) -> Option<Int> {
-        let index = match level {0=>{bit/64},_=>{0}};
+        let index = bit as usize/64;
         let in_index = bit%64;
-
+        // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
+        // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
+        let bit_mask: u64 = (1 << (64-in_index))-1; // genau falschherum
         // Siehe Paper, irgendwo muss noch Fill Zeros implementiert werden
         match level {
             0=> {
+                let nulls = (self.root_top[index] & bit_mask).leading_zeros();
+                match nulls {
+                    64 => {
+                        let new_index = self.locate_top_level(index as i32 ,level+1);
+                        match new_index {
+                            None => None,
+                            Some(x) => {
+                                match self.root_top[x as usize].leading_zeros() {
+                                    64 => None,
+                                    val => Some(x as i32*64  + val as i32)
+                                }
+                            }
+                        }
+                    },
+                    val => {
+                        Some(index as i32 *64+val as i32)
+                    }
+                }
                 // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
                 // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
             },
             _=> {
-                // Leading Zeros von l1_top[index] bestimmen. Wenn nur 0en enthalten oder sich die nächste 1 nicht rechts von in_index befindet, dann None zurückgeben
+                let mut new_index = index;
+                for i in (index..self.l1_top.len()) {
+                    if self.l1_top[i] != 0 {
+                        new_index = i;
+                    }
+                }
+                let nulls = self.l1_top[new_index].leading_zeros();
+                if(nulls != 64) {
+                    Some(new_index as i32*64 + nulls as i32)
+                } else {
+                    None
+                }
             }
         }
-        unimplemented!();
+        //unimplemented!();
     }
     
 
