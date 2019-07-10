@@ -7,7 +7,7 @@ use fnv::FnvHashMap;
 use std::ptr;
 use std::mem::{self, MaybeUninit};
 
-#[cfg(test)]
+//#[cfg(test)]
 mod tests;
 
 /*
