@@ -29,7 +29,7 @@ const fn root_size<T>() -> usize {
 }
 
 pub type Int = i32;
-type SecondLevel = Level<Int,Int>;
+type SecondLevel = Level<*mut Element<Int>,Int>;
 type FirstLevel = Level<SecondLevel,Int>;
 
 pub struct STree {
@@ -111,22 +111,25 @@ impl STree {
         }
     }
 
+    /** 
+     * Gibt den kleinstne Wert j mit element <= j zurück 
+     */
     #[inline]
     pub fn locate(&mut self, element: Int) -> Option<*mut Element<Int>> {
         let i: usize = (element >> 16) as usize;
-        // Die niedrigwertigsten 16 Bits
+        // Die niedrigwertigsten 16 Bits element[16..31]
         let low = element & 0xFFFF;
-        // Bits 16 bis 23
+        // Bits 16 bis 23 element[8..15]
         let j: u8 = (low >> 8) as u8;
-        // Die niedrigwertigsten 8 Bits
+        // Die niedrigwertigsten 8 Bits element[0..7]
         let k: u8 = (element & 255) as u8;
 
-        let mut new_existing_elem = element;
-
+        // Paper z.1 
         if self.len() < 1 || element > self.maximum().unwrap(){
             return None;
         } 
 
+        // Paper z. 3 
         unsafe {
             if self.root_table[i].maximum.is_null() || (*self.root_table[i].maximum).elem < element {
                 match self.locate_top_level(i as Int,0) {
@@ -140,11 +143,12 @@ impl STree {
             }
         }
 
-        // War Maximum und/oder Minimum null, dann wurde oben bereits returnt und diese Zeile würde nicht erreicht werden.
+        // Paper z. 4
         if self.root_table[i].maximum == self.root_table[i].minimum {
             return Some(self.root_table[i].minimum);
         }
 
+        // Paper z. 6
         unsafe {
             if self.root_table[i].hash_map.get_mut(&j).is_none() || (*self.root_table[i].hash_map.get_mut(&j).unwrap().maximum).elem < element {
                 let new_j = self.root_table[i].locate_top_level(j);
@@ -161,13 +165,20 @@ impl STree {
             }
         }
 
-        // Ext. keine dritte Ebene, also ist self.root_table[i].hash_map.get_mut(j) None, dann wäre ein vorriges Return ausgeführt worden!
+        // Paper z.7
         if self.root_table[i].hash_map.get_mut(&j).unwrap().maximum == self.root_table[i].hash_map.get_mut(&j).unwrap().minimum {
             return Some(self.root_table[i].hash_map.get_mut(&j).unwrap().minimum);
         }
 
-        // TODO letzte Zeile aus Paper
-        unimplemented!();
+        // Paper z.8
+        let new_k = self.root_table[i].hash_map.get_mut(&j).unwrap().locate_top_level(k);
+        match new_k {
+            Some(x) => {
+                return Some(*self.root_table[i].hash_map.get_mut(&j).unwrap().hash_map.get_mut(&x).unwrap());
+            }
+            None => {return None}
+        }
+       
     }
 
     // Gibt das kleinste j zurück, so dass element <= j und k_level[j]=1
@@ -224,13 +235,13 @@ impl STree {
     }
 
     #[inline]
-    fn change_bounds(&mut self, element: Int, minimum: *mut Element<Int>, maximum: *mut Element<Int>) {
+    fn change_bounds(&mut self, _element: Int, _minimum: *mut Element<Int>, _maximum: *mut Element<Int>) {
         unimplemented!();
     }
 
     // Diese Funktion dient dem Einfügen eines Elementes in die Liste. Hierbei wird das Element definitiv eingefügt.Element
     // TODO: Predecessor implementieren.
-    fn insert_into_hashtables(&mut self, element: Element<Int> ) {
+    fn insert_into_hashtables(&mut self, _element: Element<Int> ) {
         unimplemented!();
     }
 
@@ -274,18 +285,18 @@ impl PredecessorSet<Int> for STree {
             // Die niedrigwertigsten 16 Bits
             let low = element & 0xFFFF;
             // Bits 16 bis 23
-            let j = low >> 8;
+            let _j = low >> 8;
             // Die niedrigwertigsten 8 Bits
-            let k = element & 255;
+            let _k = element & 255;
 
-            let first_level = &mut self.root_table[i];
+            let _first_level = &mut self.root_table[i];
 
             // Falls Element kleiner oder größer als das bestehende Minimum/Maximum ist
            // if element < 
 
             unimplemented!();
             /* Hier kann parallelisiert werden! */
-            self.insert_into_top_table(element);
+            //self.insert_into_top_table(element);
             //}
         }
 
@@ -294,19 +305,19 @@ impl PredecessorSet<Int> for STree {
 
     // Diese Method entfernt ein Element vom Typ Int=i32 aus der Datenstruktur.
     #[inline]
-    fn delete(&mut self,_element: Int) {
+    fn delete(&mut self, _element: Int) {
         unimplemented!();
     }
 
     // Diese Methode gibt den größten Wert, der echt kleiner als number ist und in der Datenstruktur enthalten ist, aus.
     #[inline]
-    fn predecessor(&self, number: Int) -> Option<Int> {
+    fn predecessor(&self, _number: Int) -> Option<Int> {
         unimplemented!();
     }
 
     // Gibt den kleinsten Wert, der echt größer als number ist und in der Datenstruktur enthalten ist, aus.
     #[inline]
-    fn sucessor(&self,_number: Int) -> Option<Int> {
+    fn sucessor(&self, _number: Int) -> Option<Int> {
         unimplemented!();
     }
 
