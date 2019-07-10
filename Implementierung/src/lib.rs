@@ -68,7 +68,14 @@ impl<T,V> Level<T,V> {
     fn locate_top_level(&mut self, bit: u8) -> Option<Int> {
         let index = bit as usize/64;
 
-        for i in index..self.lx_top.len() {
+        if self.lx_top[index] != 0 {
+            let in_index = bit%64;
+            let bit_mask: u64 = (1 << (64-in_index))-1;
+            let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
+
+            return Some(index as i32 *64 + num_zeroes as i32);
+        }
+        for i in index+1..self.lx_top.len() {
             let val = self.lx_top[i];
             if val != 0 {
                 let num_zeroes = val.leading_zeros();
@@ -127,7 +134,7 @@ impl STree {
                         return None;
                     }
                     Some(x) => {
-                        new_existing_elem = x;
+                        //return self.locate(x);
                     }
                 }
             }
@@ -188,21 +195,15 @@ impl STree {
                 // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
             },
             _=> {
-                let mut new_index = index;
-                for i in (index..self.root_top_sub.len()) {
+                for i in index..self.root_top_sub.len() {
                     if self.root_top_sub[i] != 0 {
-                        new_index = i;
+                        let nulls = self.root_top_sub[i].leading_zeros();
+                        return Some(i as i32*64 + nulls as i32);
                     }
                 }
-                let nulls = self.root_top_sub[new_index].leading_zeros();
-                if(nulls != 64) {
-                    Some(new_index as i32*64 + nulls as i32)
-                } else {
-                    None
-                }
+                None
             }
         }
-        //unimplemented!();
     }
     
 
