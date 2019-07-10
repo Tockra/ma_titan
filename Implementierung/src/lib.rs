@@ -7,12 +7,18 @@ use fnv::FnvHashMap;
 use std::ptr;
 use std::mem::{self, MaybeUninit};
 
+/*
+    Diese Datenstruktur agiert als Menge, die Zahlenwerte speichert. Explizit wird hier eine Implementierung für i32, i40, i48 und i64 geschaffen, 
+    wobei die Datentypen i40 und i48 eigene Datentypen sind. 
+    Diese Datenstruktur bietet predecessor(x) und sucessor(x) Methoden, welche den Vorgänger bzw. Nachfolger einer beliebigen Zahl x (egal ob enthalten oder nicht) ausgibt.
 
-pub trait PredecessorList<T> {
+    Folgender Trait definiert die Methoden, die eine PredecessorSet beinhalten soll.
+*/
+pub trait PredecessorSet<T> {
     fn insert(&mut self,element: T);
     fn delete(&mut self,element: T);
     fn predecessor(&self,number: T) -> Option<T>;
-    fn sucessor(&self,number: T) -> Option<T>;
+    fn sucessor(&self,number: T) -> Option<T>; // Optional
     fn minimum(&self) -> Option<T>;
     fn maximum(&self) -> Option<T>; 
     fn contains(&self) -> bool;
@@ -25,7 +31,7 @@ pub struct STree {
     root_table: [FirstLevel; root_size::<Int>()],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
     root_top: [u64; root_size::<Int>()/64],
-    l1_top: [u64; root_size::<Int>()/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
+    root_top_sub: [u64; root_size::<Int>()/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
     element_list: internal::List<Int>,
 }
 
@@ -37,16 +43,34 @@ struct Level<T,V> {
     pub hash_map: FnvHashMap<u8,T>,
     pub maximum: *mut Element<V>,
     pub minimum: *mut Element<V>,
+    pub lx_top: Vec<u64>,
 }
 
 impl<T,V> Level<T,V> {
     #[inline]
-    fn new() -> Level<T,Int> {
+    fn new(level: usize) -> Level<T,Int> {
         Level {
             hash_map: (FnvHashMap::<u8,T>::default()),
             maximum: ptr::null_mut(),
             minimum: ptr::null_mut(),
+            lx_top: vec![0;level],
         }
+    }
+
+    // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 8 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
+    // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^8 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
+    #[inline]
+    fn locate_top_level(&mut self, bit: Int) -> Option<Int> {
+        let index = bit as usize/64;
+
+        for i in index..self.lx_top.len() {
+            let val = self.lx_top[i];
+            if val != 0 {
+                let num_zeroes = val.leading_zeros();
+                return Some(i as i32 *64 + num_zeroes as i32);
+            }
+        }
+        None
     }
 }
 
@@ -63,7 +87,7 @@ impl STree {
             };
             for elem in &mut data[..] {
                 unsafe { 
-                    ptr::write(elem.as_mut_ptr(), FirstLevel::new()); 
+                    ptr::write(elem.as_mut_ptr(), FirstLevel::new((1<<8)/64)); 
                 }
             }
 
@@ -74,7 +98,7 @@ impl STree {
         STree {
             element_list: List::new(),
             root_top: [0; root_size::<Int>()/64],
-            l1_top: [0; root_size::<Int>()/64/64],
+            root_top_sub: [0; root_size::<Int>()/64/64],
             root_table: data,
         }
     }
@@ -164,12 +188,12 @@ impl STree {
             },
             _=> {
                 let mut new_index = index;
-                for i in (index..self.l1_top.len()) {
-                    if self.l1_top[i] != 0 {
+                for i in (index..self.root_top_sub.len()) {
+                    if self.root_top_sub[i] != 0 {
                         new_index = i;
                     }
                 }
-                let nulls = self.l1_top[new_index].leading_zeros();
+                let nulls = self.root_top_sub[new_index].leading_zeros();
                 if(nulls != 64) {
                     Some(new_index as i32*64 + nulls as i32)
                 } else {
@@ -204,7 +228,7 @@ impl STree {
     }
 }
 
-impl PredecessorList<Int> for STree {
+impl PredecessorSet<Int> for STree {
     // Diese Methode fügt ein Element vom Typ Int=i32 in die Datenstruktur ein.
     #[inline]
     fn insert(&mut self,element: Int) {
@@ -300,19 +324,17 @@ impl PredecessorList<Int> for STree {
 }
 
 /* TODO :
-- adde 
 - prüfen ob maximum und minimum Methoden ohne Variablen und mit element_list.first, element_list.last nicht schneller sind
-- prüfen wie die Datenstruktur im Vergleich zur Datenstruktur in C++ abschneidet
+- prüfen wie die Datenstruktur im Vergleich zur Datenstruktur von Johannes und der vEB-B-Baum-Kombi abschneidet.
 - prüfen ob die 2Mbyte Initialisierungsspeicher durch Verzicht auf Pointer, einen Leistungsschub bringen 
-- herausfinden ob X86 CPUs 32-Bit oder 64-Bit Instruktionen zum Ermitteln von bestimmten Bits haben -> leading Zeros ext.
+
+- Statische Implementierung für i40
 */
 
 /* Anpassungen an der Vorlage:
 - die Minimum und Maximumwerte, die gespeichert werden, liegen immer als RAW-Pointer vor. In der Root-Ebene kann auf diese mittels element_list.{first,last} zugegriffen werden
 - Die HashMap in Level<T,V> ist kein Pointer, der im Falle |Level<V,T>| = 1 auf Element<T> und sonst auf eine HashMap zeigt. 
-  Sondern es ext. 2 RAW-Pointer im Level (Min- und Max-Pointer, die Laut Spezifikation sowieso da sein sollten) und eine HashMap.  */
+  Sondern es ext. 2 RAW-Pointer im Level (Min- und Max-Pointer, die Laut Spezifikation sowieso da sein sollten) und eine HashMap.  
+- Root_Top befindet sich in der Hauptdatenstruktur, L2_Top und L3_Top befinden sich als lx_top im Struct Level*/
 
   /* Achtung: Datenstruktur funktioniert "nur" auf Little-Endian-Systemen so wie sie soll. Evtl. ist diese performanter/inperformanter auf Big-Endian-Systemen*/
-
-  /*Frage morgen klären:
-  Was machen wenn Element bereits enthalten ist? Die HashFunktion auf der letzten Ebene muss dann ja auf ein Element zeigen (das Erste?, das Letzte? Egal?) */
