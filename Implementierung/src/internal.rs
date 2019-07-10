@@ -132,7 +132,7 @@ impl<T> Element<T> {
     }
 }
 
-// #[cfg(test)]
+#[cfg(test)]
 pub mod tests {
     #[test]
     pub fn test_insert_and_pop() {
