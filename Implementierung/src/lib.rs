@@ -171,7 +171,6 @@ impl STree {
      * Hierbei beachten, dass j zwar Bitweise adressiert wird, die Level-Arrays allerdings ganze 64-Bit-Blöcke besitzen. Somit ist z.B: root_top[5] nicht das 6. 
      * Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
      */ 
-    #[inline]
     fn locate_top_level(&mut self, bit: Int, level: u8) -> Option<Int> {
         let index = bit as usize/64;
         let in_index = bit%64;
@@ -179,39 +178,34 @@ impl STree {
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
         let bit_mask: u64 = (1 << (64-in_index))-1; // genau falschherum
         // Siehe Paper, irgendwo muss noch Fill Zeros implementiert werden
-        match level {
-            0=> {
-                let nulls = (self.root_top[index] & bit_mask).leading_zeros();
-                match nulls {
-                    64 => {
-                        let new_index = self.locate_top_level(index as i32 ,level+1);
-                        match new_index {
-                            None => None,
-                            Some(x) => {
-                                match self.root_top[x as usize].leading_zeros() {
-                                    64 => None,
-                                    val => Some(x as i32*64  + val as i32)
-                                }
-                            }
-                        }
-                    },
-                    val => {
-                        Some(index as i32 *64+val as i32)
-                    }
+        
+        if level != 0 {
+            for i in index..self.root_top_sub.len() {
+                if self.root_top_sub[i] != 0 {
+                    let nulls = self.root_top_sub[i].leading_zeros();
+                    return Some(i as i32*64 + nulls as i32);
                 }
-                // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
-                // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-            },
-            _=> {
-                for i in index..self.root_top_sub.len() {
-                    if self.root_top_sub[i] != 0 {
-                        let nulls = self.root_top_sub[i].leading_zeros();
-                        return Some(i as i32*64 + nulls as i32);
-                    }
-                }
-                None
             }
+            return None;
         }
+        
+        let nulls = (self.root_top[index] & bit_mask).leading_zeros();
+        
+        // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
+        if nulls != 64 {
+            return Some(index as i32 *64+val as i32);
+        }
+        
+        // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
+        let new_index = self.locate_top_level(index as i32 ,level+1);
+
+        new_index.and_then(|x|
+            match self.root_top[x as usize].leading_zeros() {
+                64 => None,
+                val => Some(x as i32*64  + val as i32)
+            }
+        )
+        
     }
     
 
