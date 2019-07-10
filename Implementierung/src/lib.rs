@@ -112,7 +112,9 @@ impl STree {
     }
 
     /** 
-     * Gibt den kleinstne Wert j mit element <= j zurück 
+     * Gibt den kleinstne Wert j mit element <= j zurück. 
+     * Kann verwendet werden, um zu prüfen ob element in der Datenstruktur enthalten ist. 
+     * Gibt anderenfalls den Nachfolger zurück, falls dieser existiert.
      */
     #[inline]
     pub fn locate(&mut self, element: Int) -> Option<*mut Element<Int>> {
@@ -164,9 +166,11 @@ impl STree {
        
     }
 
-    // Gibt das kleinste j zurück, so dass element <= j und k_level[j]=1
-    // Hierbei beachten, dass j zwar Bitweise adressiert wird, die Level-Arrays allerdings ganze 64-Bit-Blöcke besitzen. Somit ist z.B: root_top[5] nicht das 6. 
-    // Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
+    /**
+     * Gibt das kleinste j zurück, so dass element <= j und k_level[j]=1
+     * Hierbei beachten, dass j zwar Bitweise adressiert wird, die Level-Arrays allerdings ganze 64-Bit-Blöcke besitzen. Somit ist z.B: root_top[5] nicht das 6. 
+     * Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
+     */ 
     #[inline]
     fn locate_top_level(&mut self, bit: Int, level: u8) -> Option<Int> {
         let index = bit as usize/64;
