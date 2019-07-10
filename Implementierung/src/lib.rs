@@ -132,14 +132,8 @@ impl STree {
         // Paper z. 3 
         unsafe {
             if self.root_table[i].maximum.is_null() || (*self.root_table[i].maximum).elem < element {
-                match self.locate_top_level(i as Int,0) {
-                    None => {
-                        return None;
-                    }
-                    Some(x) => {
-                        return Some(self.root_table[x as usize].minimum);
-                    }
-                }
+                return self.locate_top_level(i as Int,0)
+                    .map(|x| self.root_table[x as usize].minimum);
             }
         }
 
@@ -152,16 +146,9 @@ impl STree {
         unsafe {
             if self.root_table[i].hash_map.get_mut(&j).is_none() || (*self.root_table[i].hash_map.get_mut(&j).unwrap().maximum).elem < element {
                 let new_j = self.root_table[i].locate_top_level(j);
-                match new_j {
-                    None => {return None;},
-                    Some(x) => {
-                        let result = self.root_table[i].hash_map.get_mut(&(x));
-                        if !result.is_none() {
-                            return Some(result.unwrap().minimum);
-                        }
-                    }
-                }
-                return None;
+                return new_j
+                    .and_then(|x| self.root_table[i].hash_map.get_mut(&(x)))
+                    .map(|x| x.minimum);
             }
         }
 
@@ -172,12 +159,8 @@ impl STree {
 
         // Paper z.8
         let new_k = self.root_table[i].hash_map.get_mut(&j).unwrap().locate_top_level(k);
-        match new_k {
-            Some(x) => {
-                return Some(*self.root_table[i].hash_map.get_mut(&j).unwrap().hash_map.get_mut(&x).unwrap());
-            }
-            None => {return None}
-        }
+        return new_k
+            .map(|x| *self.root_table[i].hash_map.get_mut(&j).unwrap().hash_map.get_mut(&x).unwrap());
        
     }
 
