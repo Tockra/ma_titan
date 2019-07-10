@@ -65,7 +65,7 @@ impl<T,V> Level<T,V> {
     // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 8 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
     // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^8 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
     #[inline]
-    fn locate_top_level(&mut self, bit: u8) -> Option<Int> {
+    fn locate_top_level(&mut self, bit: u8) -> Option<u8> {
         let index = bit as usize/64;
 
         if self.lx_top[index] != 0 {
@@ -73,13 +73,13 @@ impl<T,V> Level<T,V> {
             let bit_mask: u64 = (1 << (64-in_index))-1;
             let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
 
-            return Some(index as i32 *64 + num_zeroes as i32);
+            return Some(index as u8 *64 + num_zeroes as u8);
         }
         for i in index+1..self.lx_top.len() {
             let val = self.lx_top[i];
             if val != 0 {
                 let num_zeroes = val.leading_zeros();
-                return Some(i as i32 *64 + num_zeroes as i32);
+                return Some(i as u8 *64 + num_zeroes as u8);
             }
         }
         None
@@ -134,7 +134,7 @@ impl STree {
                         return None;
                     }
                     Some(x) => {
-                        //return self.locate(x);
+                        return Some(self.root_table[x as usize].minimum);
                     }
                 }
             }
@@ -147,11 +147,21 @@ impl STree {
 
         unsafe {
             if self.root_table[i].hash_map.get_mut(&j).is_none() || (*self.root_table[i].hash_map.get_mut(&j).unwrap().maximum).elem < element {
-                self.root_table[i].locate_top_level(j);
+                let new_j = self.root_table[i].locate_top_level(j);
+                match new_j {
+                    None => {return None;},
+                    Some(x) => {
+                        let result = self.root_table[i].hash_map.get_mut(&(x));
+                        if !result.is_none() {
+                            return Some(result.unwrap().minimum);
+                        }
+                    }
+                }
+                return None;
             }
         }
 
-        // Ext. keine dritte Ebene, also ist self.root_table[i].hash_map.get_mut(j) None, dann wäre das letzte Return ausgeführt worden!
+        // Ext. keine dritte Ebene, also ist self.root_table[i].hash_map.get_mut(j) None, dann wäre ein vorriges Return ausgeführt worden!
         if self.root_table[i].hash_map.get_mut(&j).unwrap().maximum == self.root_table[i].hash_map.get_mut(&j).unwrap().minimum {
             return Some(self.root_table[i].hash_map.get_mut(&j).unwrap().minimum);
         }
