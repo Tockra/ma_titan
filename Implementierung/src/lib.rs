@@ -7,6 +7,9 @@ use fnv::FnvHashMap;
 use std::ptr;
 use std::mem::{self, MaybeUninit};
 
+#[cfg(test)]
+mod tests;
+
 /*
     Diese Datenstruktur agiert als Menge, die Zahlenwerte speichert. Explizit wird hier eine Implementierung für i32, i40, i48 und i64 geschaffen, 
     wobei die Datentypen i40 und i48 eigene Datentypen sind. 
@@ -193,7 +196,7 @@ impl STree {
         
         // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
         if nulls != 64 {
-            return Some(index as i32 *64+val as i32);
+            return Some(index as i32 *64+nulls as i32);
         }
         
         // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
