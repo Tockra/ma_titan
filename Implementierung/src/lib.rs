@@ -24,9 +24,14 @@ pub trait PredecessorSet<T> {
     fn contains(&self) -> bool;
 }
 
+const fn root_size<T>() -> usize {
+    1 << 8*mem::size_of::<T>() / 2
+}
+
 pub type Int = i32;
 type SecondLevel = Level<Int,Int>;
 type FirstLevel = Level<SecondLevel,Int>;
+
 pub struct STree {
     root_table: [FirstLevel; root_size::<Int>()],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
@@ -60,7 +65,7 @@ impl<T,V> Level<T,V> {
     // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 8 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
     // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^8 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
     #[inline]
-    fn locate_top_level(&mut self, bit: Int) -> Option<Int> {
+    fn locate_top_level(&mut self, bit: u8) -> Option<Int> {
         let index = bit as usize/64;
 
         for i in index..self.lx_top.len() {
@@ -72,10 +77,6 @@ impl<T,V> Level<T,V> {
         }
         None
     }
-}
-
-const fn root_size<T>() -> usize {
-    1 << 8*mem::size_of::<T>() / 2
 }
 
 impl STree {
@@ -139,7 +140,7 @@ impl STree {
 
         unsafe {
             if self.root_table[i].hash_map.get_mut(&j).is_none() || (*self.root_table[i].hash_map.get_mut(&j).unwrap().maximum).elem < element {
-                // return die locate Methode in Top-Tabellen (Siehe Paper)
+                self.root_table[i].locate_top_level(j);
             }
         }
 
