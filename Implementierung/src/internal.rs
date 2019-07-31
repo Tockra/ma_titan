@@ -1,9 +1,15 @@
 #![allow(dead_code)]  
 use std::ptr;
+use std::mem;
+
 pub struct List<T> {
     pub first: Option<Box<Element<T>>>,
     pub last: *mut Element<T>,
     pub len: usize,
+}
+
+pub const fn root_size<T>() -> usize {
+    1 << 8*mem::size_of::<T>() / 2
 }
 
 pub trait PredecessorSet<T> {

@@ -12,20 +12,15 @@ use super::internal::{List,Element, PredecessorSet};
     Folgender Trait definiert die Methoden, die eine PredecessorSet beinhalten soll.
 */
 
-
-const fn root_size<T>() -> usize {
-    1 << 8*mem::size_of::<T>() / 2
-}
-
 pub type Int = i32;
 type SecondLevel = Level<*mut Element<Int>,Int>;
 type FirstLevel = Level<SecondLevel,Int>;
 
 pub struct STree {
-    pub root_table: [FirstLevel; root_size::<Int>()],
+    pub root_table: [FirstLevel; super::internal::root_size::<Int>()],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
-    pub root_top: [u64; root_size::<Int>()/64],
-    pub root_top_sub: [u64; root_size::<Int>()/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
+    pub root_top: [u64; super::internal::root_size::<Int>()/64],
+    pub root_top_sub: [u64; super::internal::root_size::<Int>()/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
     pub element_list: super::internal::List<Int>,
 }
 
@@ -79,7 +74,7 @@ impl STree {
     #[inline]
     pub fn new() -> STree {
         let data = {
-            let mut data: [MaybeUninit<FirstLevel>; root_size::<Int>()] = unsafe {
+            let mut data: [MaybeUninit<FirstLevel>; super::internal::root_size::<Int>()] = unsafe {
                 MaybeUninit::uninit().assume_init()
             };
             for elem in &mut data[..] {
@@ -89,13 +84,13 @@ impl STree {
             }
 
             unsafe { 
-                mem::transmute::<_, [FirstLevel; root_size::<Int>()]>(data) 
+                mem::transmute::<_, [FirstLevel; super::internal::root_size::<Int>()]>(data) 
             }
         };
         STree {
             element_list: List::new(),
-            root_top: [0; root_size::<Int>()/64],
-            root_top_sub: [0; root_size::<Int>()/64/64],
+            root_top: [0; super::internal::root_size::<Int>()/64],
+            root_top_sub: [0; super::internal::root_size::<Int>()/64/64],
             root_table: data,
         }
     }
@@ -311,7 +306,7 @@ impl PredecessorSet<Int> for STree {
 
     // Prüft ob ein Wert in der Datenstruktur enthalten ist.
     #[inline]
-    fn contains(&self) -> bool {
+    fn contains(&self, _number: Int) -> bool {
         unimplemented!();
     }
 }
