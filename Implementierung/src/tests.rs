@@ -1,8 +1,9 @@
+#![allow(dead_code)]  
 pub type Int = i32;
 type SecondLevel = Level<*mut Element<Int>,Int>;
 type FirstLevel = Level<SecondLevel,Int>;
 
-use super::{Level,STree};
+use super::dynamics::{Level,STree};
 use super::internal::{List,Element};
 
 use std::ptr;
