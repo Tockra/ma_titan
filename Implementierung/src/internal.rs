@@ -13,7 +13,7 @@ pub trait PredecessorSet<T> {
     fn sucessor(&self,number: T) -> Option<T>; // Optional
     fn minimum(&self) -> Option<T>;
     fn maximum(&self) -> Option<T>; 
-    fn contains(&self) -> bool;
+    fn contains(&self, number: T) -> bool;
 }
 
 pub struct Element<T> {
