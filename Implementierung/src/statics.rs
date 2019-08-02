@@ -26,7 +26,13 @@ impl STree {
         };
         for (index,element) in items.iter().enumerate() {
             let (i,j,k) = super::internal::split_integer_down(*element);
-            
+            // Dadurch das die Reihenfolge sortiert ist, wird das letzte hinzugefügte Element das größte und das erste das kleinste sein.
+            if result.root_table[i].minimum.is_none() {
+                result.root_table[i].minimum = Some(index);
+            }
+            result.root_table[i].maximum = Some(index);
+            let first_key = result.root_table[i].hasher.as_ref().unwrap().try_hash(&j).unwrap() as usize;
+            let second_key = result.root_table[i].objects[first_key].hasher.as_ref().unwrap().try_hash(&k).unwrap() as usize;
         }
         result
     }
