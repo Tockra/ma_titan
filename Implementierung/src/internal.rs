@@ -2,7 +2,7 @@
 use std::mem::{self, MaybeUninit};
 use std::ptr;
 use std::collections::HashMap;
-use ux::{i40,u10,u40};
+use ux::{u10,u40};
 use boomphf::Mphf;
 
 pub struct List<T> {
@@ -243,7 +243,7 @@ impl PerfectHashBuilder {
 #[inline]
 pub fn split_integer_down(element: u40) -> (usize,u10,u10) {
     // TODO: Achtung funktioniert nicht korrekt mit negativen Zahlen
-    let i: usize = (u64::from(element) >> 20) as usize;
+    let i: usize = u64::from(element >> 20) as usize;
     // Die niedrigwertigsten 16 Bits element[16..31]
     let low = u64::from(element) & 0xFFFFF;
     // Bits 16 bis 23 element[8..15]
@@ -252,8 +252,6 @@ pub fn split_integer_down(element: u40) -> (usize,u10,u10) {
     let k: u10 = u10::new((u64::from(element) & 0x3FF) as u16);
     (i, j, k) 
 }
-
-
 
 #[cfg(test)]
 pub mod tests {
