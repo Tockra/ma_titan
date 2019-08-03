@@ -2,7 +2,7 @@
 use fnv::FnvHashMap;
 use std::ptr;
 use std::mem::{self, MaybeUninit};
-use super::internal::{List,Element, PredecessorSet};
+use crate::help::internal::{List,Element, PredecessorSet, Splittable,root_size};
 
 /*
     Diese Datenstruktur agiert als Menge, die Zahlenwerte speichert. Explizit wird hier eine Implementierung für i32, i40, i48 und i64 geschaffen, 
@@ -17,11 +17,11 @@ type SecondLevel = Level<*mut Element<Int>,Int>;
 type FirstLevel = Level<SecondLevel,Int>;
 
 pub struct STree {
-    pub root_table: [FirstLevel; super::internal::root_size::<Int>()],
+    pub root_table: [FirstLevel; root_size::<Int>()],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
-    pub root_top: [u64; super::internal::root_size::<Int>()/64],
-    pub root_top_sub: [u64; super::internal::root_size::<Int>()/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
-    pub element_list: super::internal::List<Int>,
+    pub root_top: [u64; root_size::<Int>()/64],
+    pub root_top_sub: [u64; root_size::<Int>()/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
+    pub element_list: List<Int>,
 }
 
 // Implementiert die zwei Level unter der Root-Tabelle. Diese besitzen ein Maximum- und ein Minimumpointer und ggf. eine hash_map, wenn *minimum!= *maximum
@@ -74,7 +74,7 @@ impl STree {
     #[inline]
     pub fn new() -> STree {
         let data = {
-            let mut data: [MaybeUninit<FirstLevel>; super::internal::root_size::<Int>()] = unsafe {
+            let mut data: [MaybeUninit<FirstLevel>; root_size::<Int>()] = unsafe {
                 MaybeUninit::uninit().assume_init()
             };
             for elem in &mut data[..] {
@@ -84,13 +84,13 @@ impl STree {
             }
 
             unsafe { 
-                mem::transmute::<_, [FirstLevel; super::internal::root_size::<Int>()]>(data) 
+                mem::transmute::<_, [FirstLevel; root_size::<Int>()]>(data) 
             }
         };
         STree {
             element_list: List::new(),
-            root_top: [0; super::internal::root_size::<Int>()/64],
-            root_top_sub: [0; super::internal::root_size::<Int>()/64/64],
+            root_top: [0; root_size::<Int>()/64],
+            root_top_sub: [0; root_size::<Int>()/64/64],
             root_table: data,
         }
     }
@@ -102,13 +102,7 @@ impl STree {
      */
     #[inline]
     pub fn locate(&mut self, element: Int) -> Option<*mut Element<Int>> {
-        let i: usize = (element >> 16) as usize;
-        // Die niedrigwertigsten 16 Bits element[16..31]
-        let low = element & 0xFFFF;
-        // Bits 16 bis 23 element[8..15]
-        let j: u8 = (low >> 8) as u8;
-        // Die niedrigwertigsten 8 Bits element[0..7]
-        let k: u8 = (element & 255) as u8;
+        let (i,j,k) = Splittable::<usize,u8>::split_integer_down(&element);
 
         // Paper z.1 
         if self.len() < 1 || element > self.maximum().unwrap(){

@@ -3,8 +3,8 @@ pub type Int = i32;
 type SecondLevel = Level<*mut Element<Int>,Int>;
 type FirstLevel = Level<SecondLevel,Int>;
 
-use super::dynamics::{Level,STree};
-use super::internal::{List,Element};
+use super::data_structures::dynamics::{Level,STree};
+use super::help::internal::{List,Element};
 
 use std::ptr;
 use std::mem::{self, MaybeUninit};

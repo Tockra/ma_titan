@@ -1,9 +1,8 @@
 #![allow(dead_code)]  
-use std::mem::{self, MaybeUninit};
+use std::mem::{self};
 use std::ptr;
-use std::collections::HashMap;
+
 use ux::{u10,u40};
-use boomphf::Mphf;
 
 pub struct List<T> {
     pub first: Option<Box<Element<T>>>,
@@ -152,105 +151,38 @@ impl<T> Element<T> {
     }
 }
 
-type SecondLevelBuild = PerfectHashBuilderLevel<usize>;
-type FirstLevelBuild = PerfectHashBuilderLevel<SecondLevelBuild>;
-type Int = u40;
-pub struct PerfectHashBuilder {
-    root_table: [FirstLevelBuild; root_size::<Int>()],
-    root_indexs: Vec<usize>,
+
+pub trait Splittable<T,V> {
+    fn split_integer_down(&self) -> (T,V,V);
 }
 
-pub struct PerfectHashBuilderLevel<T> {
-    pub hash_map: std::collections::HashMap<u10,T>,
-    pub objects: Vec<u10>,
-    pub maximum: usize,
-    pub minimum: usize,
-    pub lx_top: Vec<u64>,
-}
-impl<T> PerfectHashBuilderLevel<T> {
+impl Splittable<usize,u10> for u40 {
     #[inline]
-    pub fn new(level: usize) -> PerfectHashBuilderLevel<T> {
-        PerfectHashBuilderLevel {
-            hash_map: (HashMap::<u10,T>::default()),
-            objects: vec![],
-            maximum: 0,
-            minimum: 0,
-            lx_top: vec![0;level],
-        }
-    }
-}
-impl PerfectHashBuilder {
-    pub fn new(objects: Vec<Int>) ->  PerfectHashBuilder{
-        let mut root_indexs = vec![];
-        let mut root_table = {
-            let mut data: [MaybeUninit<FirstLevelBuild>; root_size::<Int>()] = unsafe {
-                MaybeUninit::uninit().assume_init()
-            };
-            for elem in &mut data[..] {
-                unsafe { 
-                    ptr::write(elem.as_mut_ptr(), FirstLevelBuild::new((1<<10)/64)); 
-                }
-            }
-
-            unsafe { 
-                mem::transmute::<_, [FirstLevelBuild; root_size::<Int>()]>(data) 
-            }
-        };
-        for element in objects {
-            let (i,j,k) = split_integer_down(element);
-
-            root_indexs.push(i);
-            root_table[i].objects.push(j);
-            
-            if !root_table[i].hash_map.contains_key(&j) {
-                root_table[i].hash_map.insert(j,SecondLevelBuild::new((1<<10)/64));
-            }
-            root_table[i].hash_map.get_mut(&j).unwrap().objects.push(k);
-        }
-        PerfectHashBuilder {root_table: root_table, root_indexs: root_indexs}
-    }
-
-    pub fn build(self) -> [super::statics::FirstLevel; root_size::<Int>()] {
-        let mut result: [super::statics::FirstLevel; root_size::<Int>()] = {
-            let mut data: [MaybeUninit<super::statics::FirstLevel>; super::internal::root_size::<Int>()] = unsafe {
-                MaybeUninit::uninit().assume_init()
-            };
-            for (i, elem) in data.iter_mut().enumerate() {
-                unsafe { 
-                    ptr::write(elem.as_mut_ptr(), super::statics::FirstLevel::new((1<<10)/64, Some(self.root_table[i].objects.clone()))); 
-                }
-            }
-
-            unsafe { 
-                mem::transmute::<_, [super::statics::FirstLevel; super::internal::root_size::<Int>()]>(data) 
-            }
-        };
-        for i in self.root_indexs {
-            for _ in self.root_table[i].objects.clone() {
-                result[i].objects.push(super::statics::SecondLevel::new(1<<10, None));
-            }
-
-            for key in self.root_table[i].objects.clone() {
-                result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].hasher = 
-                    Some(Mphf::new_parallel(2.0,&self.root_table[i].hash_map.get(&key).unwrap().objects.clone(), None));
-            }
-
-        }
-        result
+    fn split_integer_down(&self) -> (usize,u10,u10) {
+        // TODO: Achtung funktioniert nicht korrekt mit negativen Zahlen
+        let i: usize = u64::from(*self >> 20) as usize;
+        // Die niedrigwertigsten 16 Bits element[16..31]
+        let low = u64::from(*self) & 0xFFFFF;
+        // Bits 16 bis 23 element[8..15]
+        let j: u10 = u10::new((low >> 10) as u16) ;
+        // Die niedrigwertigsten 8 Bits element[0..7]
+        let k: u10 = u10::new((u64::from(*self) & 0x3FF) as u16);
+        (i, j, k) 
     }
 }
 
-#[inline]
-pub fn split_integer_down(element: u40) -> (usize,u10,u10) {
-    // TODO: Achtung funktioniert nicht korrekt mit negativen Zahlen
-    let i: usize = u64::from(element >> 20) as usize;
-    // Die niedrigwertigsten 16 Bits element[16..31]
-    let low = u64::from(element) & 0xFFFFF;
-    // Bits 16 bis 23 element[8..15]
-    let j: u10 = u10::new((low >> 10) as u16) ;
-    // Die niedrigwertigsten 8 Bits element[0..7]
-    let k: u10 = u10::new((u64::from(element) & 0x3FF) as u16);
-    (i, j, k) 
+impl Splittable<usize,u8> for i32 {
+    #[inline]
+    fn split_integer_down(&self) -> (usize,u8,u8) {
+        let i: usize = (*self >> 16) as usize;
+        // Die niedrigwertigsten 16 Bits element[16..31]
+        let low = *self & 0xFFFF;
+        // Bits 16 bis 23 element[8..15]
+        let j: u8 = (low >> 8) as u8;
+        // Die niedrigwertigsten 8 Bits element[0..7]
+        let k: u8 = (*self & 255) as u8;
+        (i,j,k)
+    }
 }
 
 #[cfg(test)]
@@ -261,7 +193,7 @@ pub mod tests {
         fill_list(&mut l);
         assert_eq!(l.len(), 6);
 
-        let len = l.len();
+        //let len = l.len();
         assert_eq!(l.pop_front().unwrap(), -20);
         assert_eq!(l.pop_front().unwrap(), 10);
         assert_eq!(l.pop_front().unwrap(), 20);

@@ -1,7 +1,6 @@
-mod internal;
+mod data_structures;
+mod help;
 
-mod statics;
-mod dynamics;
 //#[cfg(test)]
 mod tests;
 
