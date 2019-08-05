@@ -72,7 +72,7 @@ impl PerfectHashBuilder {
 
     pub fn build(&self) -> [FirstLevel; root_size::<Int>()] {
         let mut result: [FirstLevel; root_size::<Int>()] = {
-            let mut data: [MaybeUninit<FirstLevel>; super::internal::root_size::<Int>()] = unsafe {
+            let mut data: [MaybeUninit<FirstLevel>; root_size::<Int>()] = unsafe {
                 MaybeUninit::uninit().assume_init()
             };
             for (i, elem) in data.iter_mut().enumerate() {
@@ -82,7 +82,7 @@ impl PerfectHashBuilder {
             }
 
             unsafe { 
-                mem::transmute::<_, [FirstLevel; super::internal::root_size::<Int>()]>(data) 
+                mem::transmute::<_, [FirstLevel; root_size::<Int>()]>(data) 
             }
         };
         for i in self.root_indexs.clone() {
@@ -108,10 +108,12 @@ impl PerfectHashBuilder {
         let mut root_top: [u64; root_size::<Int>()/64] = [0; root_size::<Int>()/64];
         let mut root_top_sub: [u64; root_size::<Int>()/64/64] = [0; root_size::<Int>()/64/64];
         for i in self.root_indexs.clone() {
+            // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
             let bit = i/64;
             let bit_in_mask: u64  = 1<<(63-(i%64));
             root_top[bit] = root_top[bit] | bit_in_mask;
 
+            // Berechnung des Indexs (sub_bit) im root_top_sub array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
             let sub_bit = bit/64;
             let sub_bit_in_mask: u64 = 1<<(63-(bit%64));
             root_top_sub[sub_bit] = root_top_sub[sub_bit] | sub_bit_in_mask;
