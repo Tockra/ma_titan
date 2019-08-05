@@ -55,12 +55,16 @@ impl PerfectHashBuilder {
         for element in objects {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
 
-            root_indexs.push(i);
-            root_table[i].objects.push(j);
+            if !root_indexs.contains(&i) {
+                root_indexs.push(i);
+            }
             
             if !root_table[i].hash_map.contains_key(&j) {
+                root_table[i].objects.push(j);
                 root_table[i].hash_map.insert(j,SecondLevelBuild::new((1<<10)/64));
             }
+            
+            // Hier ist keine Prüfung notwendig, da die Elemente einmalig sind.
             root_table[i].hash_map.get_mut(&j).unwrap().objects.push(k);
         }
         PerfectHashBuilder {root_table: root_table, root_indexs: root_indexs}
