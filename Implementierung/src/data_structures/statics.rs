@@ -42,14 +42,14 @@ impl STree {
             }
             result.root_table[i].maximum = Some(index);
 
-            let first_key = result.root_table[i].hasher.as_ref().unwrap().try_hash(&j).unwrap() as usize;
+            let first_key = result.root_table[i].hasher.as_ref().unwrap().hash(&j) as usize;
             // Minima- und Maximasetzung auf der ersten Ebene
             if result.root_table[i].objects[first_key].minimum.is_none() {
                 result.root_table[i].objects[first_key].minimum = Some(index);
             }
             result.root_table[i].objects[first_key].maximum = Some(index);
 
-            let second_key = result.root_table[i].objects[first_key].hasher.as_ref().unwrap().try_hash(&k).unwrap() as usize;
+            let second_key = result.root_table[i].objects[first_key].hasher.as_ref().unwrap().hash(&k) as usize;
             // Werte korrekt auf das Array zeigen lassen:Level
             result.root_table[i].objects[first_key].objects[second_key] = Some(index);
         }
