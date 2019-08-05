@@ -91,8 +91,13 @@ impl PerfectHashBuilder {
             }
 
             for key in self.root_table[i].objects.clone() {
+                let len = self.root_table[i].hash_map.get(&key).unwrap().objects.len();
+
                 result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].hasher = 
                     Some(Mphf::new_parallel(2.0,&self.root_table[i].hash_map.get(&key).unwrap().objects.clone(), None));
+                for _ in 0..len {
+                    result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].objects.push(None);
+                } 
             }
 
         }

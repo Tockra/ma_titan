@@ -5,7 +5,7 @@ use crate::help::internal::{Splittable,root_size};
 use crate::help::builder::PerfectHashBuilder;
 pub type Int = u40;
 // In der statischen Variante werden die Indizes des Vektors für die Minima und Maxima gespeichert.
-pub type SecondLevel = Level<usize>;
+pub type SecondLevel = Level<Option<usize>>;
 pub type FirstLevel = Level<SecondLevel>;
 
 
@@ -20,6 +20,11 @@ pub struct STree {
 
 impl STree {
     // Annahme: items enthält unique i40 Werte in sortierter Reihenfolge!
+    /**
+     *  Diese Methode verwendet die Builder-Hilfs-Klasse um die perfekten Hashfunktionen zu setzen. Anschließend werden die richtigen
+     *  Zeiger für die Werte eingefügt und die Maxima- und Minima-Zeiger werden eingefügt (hier Indizes des Arrays). Zum Schluss
+     *  werden die Top-Level-Datenstrukturen angepasst.
+     * */ 
     pub fn new(items: Vec<Int>) -> STree {
         let mut result = STree{
             root_table: PerfectHashBuilder::new(items.clone()).build(),
@@ -34,8 +39,17 @@ impl STree {
                 result.root_table[i].minimum = Some(index);
             }
             result.root_table[i].maximum = Some(index);
+
             let first_key = result.root_table[i].hasher.as_ref().unwrap().try_hash(&j).unwrap() as usize;
-            let _second_key = result.root_table[i].objects[first_key].hasher.as_ref().unwrap().try_hash(&k).unwrap() as usize;
+            // Minima- und Maximasetzung auf der ersten Ebene
+            if result.root_table[i].objects[first_key].minimum.is_none() {
+                result.root_table[i].objects[first_key].minimum = Some(index);
+            }
+            result.root_table[i].objects[first_key].maximum = Some(index);
+
+            let second_key = result.root_table[i].objects[first_key].hasher.as_ref().unwrap().try_hash(&k).unwrap() as usize;
+            // Werte korrekt auf das Array zeigen lassen:Level
+            result.root_table[i].objects[first_key].objects[second_key] = Some(index);
         }
         result
     }
