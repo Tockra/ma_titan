@@ -37,16 +37,12 @@ impl STree {
         for (index,element) in items.iter().enumerate() {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(element);//super::internal::split_integer_down(*element);
             // Dadurch das die Reihenfolge sortiert ist, wird das letzte hinzugefügte Element das größte und das erste das kleinste sein.
-            if result.root_table[i].minimum.is_none() {
-                result.root_table[i].minimum = Some(index);
-            }
+            result.root_table[i].minimum.get_or_insert(index);
             result.root_table[i].maximum = Some(index);
 
             let first_key = result.root_table[i].hasher.as_ref().unwrap().hash(&j) as usize;
             // Minima- und Maximasetzung auf der ersten Ebene
-            if result.root_table[i].objects[first_key].minimum.is_none() {
-                result.root_table[i].objects[first_key].minimum = Some(index);
-            }
+            result.root_table[i].objects[first_key].minimum.get_or_insert(index);
             result.root_table[i].objects[first_key].maximum = Some(index);
 
             let second_key = result.root_table[i].objects[first_key].hasher.as_ref().unwrap().hash(&k) as usize;
