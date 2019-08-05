@@ -26,10 +26,12 @@ impl STree {
      *  werden die Top-Level-Datenstrukturen angepasst.
      * */ 
     pub fn new(items: Vec<Int>) -> STree {
+        let builder = PerfectHashBuilder::new(items.clone());
+        let (root_top,root_top_sub) = builder.build_root_top();
         let mut result = STree{
-            root_table: PerfectHashBuilder::new(items.clone()).build(),
-            root_top: [0; root_size::<Int>()/64],
-            root_top_sub: [0; root_size::<Int>()/64/64], 
+            root_table: builder.build(),
+            root_top: root_top,
+            root_top_sub: root_top_sub, 
             element_list: items.clone(),
         };
         for (index,element) in items.iter().enumerate() {

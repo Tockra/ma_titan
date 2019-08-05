@@ -70,7 +70,7 @@ impl PerfectHashBuilder {
         PerfectHashBuilder {root_table: root_table, root_indexs: root_indexs}
     }
 
-    pub fn build(self) -> [FirstLevel; root_size::<Int>()] {
+    pub fn build(&self) -> [FirstLevel; root_size::<Int>()] {
         let mut result: [FirstLevel; root_size::<Int>()] = {
             let mut data: [MaybeUninit<FirstLevel>; super::internal::root_size::<Int>()] = unsafe {
                 MaybeUninit::uninit().assume_init()
@@ -85,7 +85,7 @@ impl PerfectHashBuilder {
                 mem::transmute::<_, [FirstLevel; super::internal::root_size::<Int>()]>(data) 
             }
         };
-        for i in self.root_indexs {
+        for i in self.root_indexs.clone() {
             for _ in self.root_table[i].objects.clone() {
                 result[i].objects.push(SecondLevel::new(1<<10, None));
             }
@@ -102,5 +102,20 @@ impl PerfectHashBuilder {
 
         }
         result
+    }
+
+    pub fn build_root_top(&self) -> ([u64; root_size::<Int>()/64],[u64; root_size::<Int>()/64/64]){
+        let mut root_top: [u64; root_size::<Int>()/64] = [0; root_size::<Int>()/64];
+        let mut root_top_sub: [u64; root_size::<Int>()/64/64] = [0; root_size::<Int>()/64/64];
+        for i in self.root_indexs.clone() {
+            let bit = i/64;
+            let bit_in_mask: u64  = 1<<(63-(i%64));
+            root_top[bit] = root_top[bit] | bit_in_mask;
+
+            let sub_bit = bit/64;
+            let sub_bit_in_mask: u64 = 1<<(63-(bit%64));
+            root_top_sub[sub_bit] = root_top_sub[sub_bit] | sub_bit_in_mask;
+        }
+        (root_top,root_top_sub)
     }
 }
