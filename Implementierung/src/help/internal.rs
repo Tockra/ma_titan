@@ -40,11 +40,11 @@ impl<T> List<T> {
         }
     }
 
-    pub fn insert_after(&mut self, _element: &mut Element<T>, _to_insert: Element<T>) {
+    pub fn insert_after(&mut self, _element: &mut Element<T>, _to_insert: Box<Element<T>>) {
         unimplemented!();
     }
 
-    pub fn insert_before(&mut self, _element: &mut Element<T>, _to_insert: Element<T>) {
+    pub fn insert_before(&mut self, _element: Box<Element<T>>, _to_insert: Box<Element<T>>) {
         unimplemented!();
     }
 
@@ -152,10 +152,10 @@ impl<T> Element<T> {
     /* Vor dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
         muss beachtet werden, dass extern die Size angepasst werden muss und ggf. der First-Zeiger angepasst werden muss.  */
     #[inline]
-    pub fn insert_before(mut self, mut elem: Box<Element<T>>) -> Result<(), Box<Element<T>>> {
+    pub fn insert_before(mut self: Box<Self>, mut elem: Box<Element<T>>) -> Result<(), Box<Element<T>>> {
         elem.prev = self.prev;
         self.prev = &mut *elem;
-        elem.next = Some(Box::new(self));
+        elem.next = Some(self);
         if elem.prev.is_null() {
                 Err(elem)
         } else {
@@ -268,7 +268,6 @@ mod tests {
         assert_eq!(l.pop_front().unwrap(), 40);
         assert_eq!(l.pop_front().unwrap(), 50);
 
-        let mut l = super::List::new();
         fill_list(&mut l);
         let elem = Box::new(super::Element::new(23));
         match l.first.take().unwrap().insert_before(elem) {
@@ -287,7 +286,6 @@ mod tests {
         assert_eq!(l.pop_back().unwrap(), -20);
         assert_eq!(l.pop_back().unwrap(), 23);
 
-        let mut l = super::List::new();
         fill_list(&mut l);
         let elem = Box::new(super::Element::new(23));
         match l.first.take().unwrap().insert_before(elem) {
