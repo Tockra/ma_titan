@@ -40,12 +40,38 @@ impl<T> List<T> {
         }
     }
 
-    pub fn insert_after(&mut self, _element: &mut Element<T>, _to_insert: Box<Element<T>>) {
-        unimplemented!();
+    pub fn insert_after(&mut self, element: &mut Element<T>, mut to_insert: Box<Element<T>>) {
+        to_insert.prev = element;
+        match element.next.as_mut() {
+            Some(x) => {
+                x.prev = &mut *to_insert;
+            },
+            None => {
+                self.last = &mut *to_insert;
+            },
+        };
+        to_insert.next = mem::replace(&mut element.next, None);
+        element.next = Some(to_insert);
+        self.increase_len();
     }
 
-    pub fn insert_before(&mut self, _element: Box<Element<T>>, _to_insert: Box<Element<T>>) {
-        unimplemented!();
+    // TODO Hier reicht eine Referenz, denn mittels der Referenz kann man auf ref.prev.next zugreifen, was dann den richtigen Wert entspricht.
+    pub fn insert_before(&mut self, element: &mut Element<T>, mut to_insert: Box<Element<T>>) {
+        to_insert.prev = element.prev;
+        if element.prev.is_null() {
+            element.prev = &mut *to_insert;
+            to_insert.next = self.first.take();
+            self.first = Some(to_insert);
+        } else {
+            unsafe {
+                let mut before = &mut (*element.prev);
+                element.prev = &mut *to_insert;
+                to_insert.next = before.next.take();
+                before.next = Some(to_insert);
+            }
+        }
+        
+        self.increase_len();
     }
 
     // Fügt am Ende der Liste ein Element mit Wert 'elem' ein.
