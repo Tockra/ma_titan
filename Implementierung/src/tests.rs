@@ -3,14 +3,14 @@ pub type Int = i32;
 type SecondLevel = Level<*mut Element<Int>,Int>;
 type FirstLevel = Level<SecondLevel,Int>;
 
-use super::data_structures::dynamics::{Level,STree};
-use super::help::internal::{List,Element};
+use crate::data_structures::dynamics::{Level,STree};
+use crate::help::internal::{List,Element,root_size};
 
 use std::ptr;
 use std::mem::{self, MaybeUninit};
 #[test]
 pub fn locate() {
-    test_locate_root_top();
+//    test_locate_root_top();
 }
 
 /**
@@ -94,6 +94,4 @@ fn new_stree(root_top: [u64; root_size::<Int>()/64], root_top_sub: [u64; root_si
     }
 }
 
-const fn root_size<T>() -> usize {
-    1 << 8*mem::size_of::<T>() / 2
-}
+

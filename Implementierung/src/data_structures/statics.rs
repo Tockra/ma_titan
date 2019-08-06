@@ -127,3 +127,8 @@ impl<T> Level<T> {
 
 // Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 // Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
+
+#[cfg(test)]
+mod tests {
+    
+}
