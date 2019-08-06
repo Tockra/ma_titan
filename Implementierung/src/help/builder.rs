@@ -92,10 +92,13 @@ impl PerfectHashBuilder {
 
             for key in self.root_table[i].objects.clone() {
                 let len = self.root_table[i].hash_map.get(&key).unwrap().objects.len();
-
+                build_lx_top(&mut result[i].lx_top, key);
                 result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].hasher = 
                     Some(Mphf::new_parallel(2.0,&self.root_table[i].hash_map.get(&key).unwrap().objects.clone(), None));
                 for _ in 0..len {
+                    for sub_key in self.root_table[i].hash_map.get(&key).unwrap().objects.clone() {
+                        build_lx_top(&mut result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].lx_top,sub_key);
+                    }
                     result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].objects.push(None);
                 } 
             }
@@ -120,4 +123,13 @@ impl PerfectHashBuilder {
         }
         (root_top,root_top_sub)
     }
+}
+
+// Annahme: Größe des l1_top-Arrays 2^10 Elemente
+fn build_lx_top(l1_top: &mut Vec<u64>, key: u10) {
+    let key = u16::from(key);
+
+    let index = (key/64) as usize;
+    let in_index_mask = 1<<(9-(key % 64));
+    l1_top[index] = l1_top[index] | in_index_mask;
 }
