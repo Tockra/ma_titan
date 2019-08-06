@@ -37,17 +37,21 @@ impl STree {
         for (index,element) in items.iter().enumerate() {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(element);//super::internal::split_integer_down(*element);
             // Dadurch das die Reihenfolge sortiert ist, wird das letzte hinzugefügte Element das größte und das erste das kleinste sein.
-            result.root_table[i].minimum.get_or_insert(index);
-            result.root_table[i].maximum = Some(index);
 
-            let first_key = result.root_table[i].hasher.as_ref().unwrap().hash(&j) as usize;
+            let root = &mut result.root_table[i];
+            root.minimum.get_or_insert(index);
+            root.maximum = Some(index);
+
+            let first_key = root.hasher.as_ref().unwrap().hash(&j) as usize;
+            let first = &mut root.objects[first_key];
+
             // Minima- und Maximasetzung auf der ersten Ebene
-            result.root_table[i].objects[first_key].minimum.get_or_insert(index);
-            result.root_table[i].objects[first_key].maximum = Some(index);
+            first.minimum.get_or_insert(index);
+            first.maximum = Some(index);
 
-            let second_key = result.root_table[i].objects[first_key].hasher.as_ref().unwrap().hash(&k) as usize;
+            let second_key = first.hasher.as_ref().unwrap().hash(&k) as usize;
             // Werte korrekt auf das Array zeigen lassen:Level
-            result.root_table[i].objects[first_key].objects[second_key] = Some(index);
+            first.objects[second_key] = Some(index);
         }
         result
     }
