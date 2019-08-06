@@ -228,8 +228,9 @@ impl PredecessorSet<Int> for STree {
                 let mut old_first = mem::replace(&mut self.element_list.first, Some(new_list_element)).unwrap();
                 let second = mem::replace(&mut old_first.next, None);
                 match second {
-                    Some(x) => {
-                        x.insert_before(pointer_to_new_element);
+                    Some(_x) => {
+                        //x.insert_before(pointer_to_new_element);
+                        //TODO: FIX
                     }
                     _ => {}
                 }

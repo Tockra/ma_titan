@@ -40,6 +40,14 @@ impl<T> List<T> {
         }
     }
 
+    pub fn insert_after(&mut self, _element: &mut Element<T>, _to_insert: Element<T>) {
+        unimplemented!();
+    }
+
+    pub fn insert_before(&mut self, _element: &mut Element<T>, _to_insert: Element<T>) {
+        unimplemented!();
+    }
+
     // Fügt am Ende der Liste ein Element mit Wert 'elem' ein.
     #[inline]
     pub fn insert_at_end(&mut self, elem: T) {
@@ -144,11 +152,18 @@ impl<T> Element<T> {
     /* Vor dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
         muss beachtet werden, dass extern die Size angepasst werden muss und ggf. der First-Zeiger angepasst werden muss.  */
     #[inline]
-    pub fn insert_before(mut self, elem: *mut Element<T>) {
-        unsafe {
-            (*elem).prev = self.prev;
-            self.prev = elem;
-            (*elem).next = Some(Box::new(self));
+    pub fn insert_before(mut self, mut elem: Box<Element<T>>) -> Result<(), Box<Element<T>>> {
+        elem.prev = self.prev;
+        self.prev = &mut *elem;
+        elem.next = Some(Box::new(self));
+        if elem.prev.is_null() {
+                Err(elem)
+        } else {
+            unsafe {
+                let mut before = &mut (*elem.prev);
+                before.next = Some(elem);
+            }
+            Ok(())
         }
     }
 }
@@ -232,14 +247,16 @@ mod tests {
         assert_eq!(l.len(), 6);
     }
 
-    //#[test]
+    #[test]
     pub fn test_insert_before_first() {
         let mut l = super::List::new();
         fill_list(&mut l);
-        let mut elem = Box::new(super::Element::new(23));
-        l.first.unwrap().insert_before(&mut *elem);
+        let elem = Box::new(super::Element::new(23));
+        match l.first.take().unwrap().insert_before(elem) {
+            Err(elem) => {l.first = Some(elem);},
+            _ => {},
+        }
         // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
-        l.first = Some(elem);
         l.increase_len();
         assert_eq!(l.len(), 7);
         
@@ -251,11 +268,14 @@ mod tests {
         assert_eq!(l.pop_front().unwrap(), 40);
         assert_eq!(l.pop_front().unwrap(), 50);
 
+        let mut l = super::List::new();
         fill_list(&mut l);
-        let mut elem = Box::new(super::Element::new(23));
-        l.first.unwrap().insert_before(&mut *elem);
+        let elem = Box::new(super::Element::new(23));
+        match l.first.take().unwrap().insert_before(elem) {
+            Err(elem) => {l.first = Some(elem);},
+            _ => {},
+        }
         // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
-        l.first = Some(elem);
         l.increase_len();
         assert_eq!(l.len(), 7);
 
@@ -267,11 +287,15 @@ mod tests {
         assert_eq!(l.pop_back().unwrap(), -20);
         assert_eq!(l.pop_back().unwrap(), 23);
 
+        let mut l = super::List::new();
         fill_list(&mut l);
-        let mut elem = Box::new(super::Element::new(23));
-        l.first.unwrap().insert_before(&mut *elem);
+        let elem = Box::new(super::Element::new(23));
+        match l.first.take().unwrap().insert_before(elem) {
+            Err(elem) => {l.first = Some(elem);},
+            _ => {},
+        }
         // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
-        l.first = Some(elem);
+        
         l.increase_len();
         assert_eq!(l.len(), 7);
 
