@@ -109,13 +109,15 @@ impl<T> List<T> {
     #[inline]
     pub fn pop_front(&mut self) -> Option<T> {
         self.first.take().map(|head| {
-            let mut head = *head;
+            let head = *head;
             self.first = head.next;
 
             if self.first.is_none() {
                 self.last = ptr::null_mut();
+            } else {
+                self.first.as_mut().unwrap().prev =  ptr::null_mut();
             }
-            head.prev =  ptr::null_mut();
+            
             self.decrease_len();
             head.elem
         })
@@ -278,14 +280,11 @@ mod tests {
         let mut l = super::List::new();
         fill_list(&mut l);
         let elem = Box::new(super::Element::new(23));
-        match l.first.take().unwrap().insert_before(elem) {
-            Err(elem) => {l.first = Some(elem);},
-            _ => {},
+        unsafe {
+            let first = &mut *(*(*(*(*(*l.last).prev).prev).prev).prev).prev;
+            l.insert_before(first,elem);
         }
-        // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
-        l.increase_len();
-        assert_eq!(l.len(), 7);
-        
+        assert_eq!(l.len(), 7);        
         assert_eq!(l.pop_front().unwrap(), 23);
         assert_eq!(l.pop_front().unwrap(), -20);
         assert_eq!(l.pop_front().unwrap(), 10);
@@ -296,14 +295,11 @@ mod tests {
 
         fill_list(&mut l);
         let elem = Box::new(super::Element::new(23));
-        match l.first.take().unwrap().insert_before(elem) {
-            Err(elem) => {l.first = Some(elem);},
-            _ => {},
+        unsafe {
+            let first = &mut *(*(*(*(*(*l.last).prev).prev).prev).prev).prev;
+            l.insert_before(first,elem);
         }
-        // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
-        l.increase_len();
         assert_eq!(l.len(), 7);
-
         assert_eq!(l.pop_back().unwrap(), 50);
         assert_eq!(l.pop_back().unwrap(), 40);
         assert_eq!(l.pop_back().unwrap(), 30);
@@ -314,15 +310,11 @@ mod tests {
 
         fill_list(&mut l);
         let elem = Box::new(super::Element::new(23));
-        match l.first.take().unwrap().insert_before(elem) {
-            Err(elem) => {l.first = Some(elem);},
-            _ => {},
+        unsafe {
+            let first = &mut *(*(*(*(*(*l.last).prev).prev).prev).prev).prev;
+            l.insert_before(first,elem);
         }
-        // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
-        
-        l.increase_len();
         assert_eq!(l.len(), 7);
-
         assert_eq!(l.pop_front().unwrap(), 23);
         assert_eq!(l.pop_back().unwrap(), 50);
         assert_eq!(l.pop_back().unwrap(), 40);
@@ -338,16 +330,13 @@ mod tests {
     pub fn test_insert_after_last() {
         let mut l = super::List::new();
         fill_list(&mut l);
-        let mut elem = Box::new(super::Element::new(23));
-        let tmp = l.last;
-        l.last = &mut *elem;
+        let elem = Box::new(super::Element::new(23));
         unsafe {
-            (*tmp).insert_after(elem);
+            let last = &mut (*l.last);
+            l.insert_after(last,elem);
         }
-        l.increase_len();
-
-        // Das kann die Methode aus technischen Gründen nicht übernehmen und muss extern gemacht werden!
-
+        
+        assert_eq!(l.len(), 7);
         assert_eq!(l.pop_front().unwrap(), -20);
         assert_eq!(l.pop_front().unwrap(), 10);
         assert_eq!(l.pop_front().unwrap(), 20);
@@ -356,14 +345,14 @@ mod tests {
         assert_eq!(l.pop_front().unwrap(), 50);
         assert_eq!(l.pop_front().unwrap(), 23);
 
+
         fill_list(&mut l);
-        let mut elem = Box::new(super::Element::new(23));
-        let tmp = l.last;
-        l.last = &mut *elem;
+        let elem = Box::new(super::Element::new(23));
         unsafe {
-            (*tmp).insert_after(elem);
+            let last = &mut (*l.last);
+            l.insert_after(last,elem);
         }
-        l.increase_len();
+        assert_eq!(l.len(), 7);
         assert_eq!(l.pop_back().unwrap(), 23);
         assert_eq!(l.pop_back().unwrap(), 50);
         assert_eq!(l.pop_back().unwrap(), 40);
@@ -374,13 +363,12 @@ mod tests {
         
 
         fill_list(&mut l);
-        let mut elem = Box::new(super::Element::new(23));
-        let tmp = l.last;
-        l.last = &mut *elem;
+        let elem = Box::new(super::Element::new(23));
         unsafe {
-            (*tmp).insert_after(elem);
+            let last = &mut (*l.last);
+            l.insert_after(last,elem);
         }
-        l.increase_len();
+        assert_eq!(l.len(), 7);
         assert_eq!(l.pop_back().unwrap(), 23);
         assert_eq!(l.pop_front().unwrap(), -20);
         assert_eq!(l.pop_front().unwrap(), 10);
