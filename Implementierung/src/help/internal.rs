@@ -147,7 +147,7 @@ impl<T> Element<T> {
     pub fn insert_before(mut self, elem: *mut Element<T>) {
         unsafe {
             (*elem).prev = self.prev;
-            self.prev = &mut *elem;
+            self.prev = elem;
             (*elem).next = Some(Box::new(self));
         }
     }
@@ -232,7 +232,7 @@ mod tests {
         l.insert_at_end(50);
     }
 
-   // #[test]
+    //#[test]
     pub fn test_insert_before_first() {
         let mut l = super::List::new();
         fill_list(&mut l);
