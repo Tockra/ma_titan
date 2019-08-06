@@ -133,6 +133,10 @@ impl<T> Element<T> {
     #[inline]
     pub fn insert_after(&mut self, mut elem: Box<Element<T>>) {
         elem.prev = self;
+        match self.next.as_mut() {
+            Some(x) => {x.prev = &mut *elem},
+            None => {},
+        };
         elem.next = mem::replace(&mut self.next, None);
         self.next = Some(elem);
     }
@@ -228,7 +232,7 @@ mod tests {
         assert_eq!(l.len(), 6);
     }
 
-    #[test]
+    //#[test]
     pub fn test_insert_before_first() {
         let mut l = super::List::new();
         fill_list(&mut l);
@@ -282,7 +286,7 @@ mod tests {
         
     }
 
-    //#[test]
+    #[test]
     pub fn test_insert_after_last() {
         let mut l = super::List::new();
         fill_list(&mut l);

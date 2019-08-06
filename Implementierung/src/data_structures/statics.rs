@@ -128,7 +128,21 @@ impl<T> Level<T> {
 // Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 // Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
-    
-}
+    use ux::{u40,u10};
+    use super::STree;
+
+    fn test_new_hashfunctions() {
+
+        // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
+        // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
+        let mut data: Vec<u40> = vec![u40::new(0);(1<<40)-1];
+        for i in 0..((1<<40)-1) {
+            data[i] = u40::new(i);
+        }
+
+        let data_structure: STree = STree::new(data);
+
+    }
+}*/
