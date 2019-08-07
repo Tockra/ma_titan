@@ -93,7 +93,7 @@ impl STree {
 
         // Paper z. 3 
         if self.root_table[i].maximum.is_none() || self.element_list[self.root_table[i].maximum.unwrap()] < element {
-            return self.locate_top_level(u40::new(i as u64 + 1),0)
+            return self.locate_top_level(u40::new(i as u64 + 1))
                 .map(|x| self.root_table[u64::from(x) as usize].minimum.unwrap());
         }
        
@@ -131,7 +131,25 @@ impl STree {
      */ 
 
     //TODO: Fix that Shit
-    pub fn locate_top_level(&self, bit: Int, level: u8) -> Option<Int> {
+
+    fn locate_top_level_sub(&self, bit: Int, level:u8) -> Option<Int> {
+        let bit = u64::from(bit);
+        let index = bit as usize/64;
+
+        if level != 0 {
+            for i in index+1..self.root_top_sub.len() {
+                if self.root_top_sub[i] != 0 {
+                    let nulls = self.root_top_sub[i].leading_zeros();
+                    return Some(u40::new(i as u64 + nulls as u64));
+                }
+            }
+            None
+        }
+        else {
+            self.locate_top_level(u40::new(bit))
+        }
+    }
+    fn locate_top_level(&self, bit: Int) -> Option<Int> {
         let bit = u64::from(bit);
         let index = bit as usize/64;
         let in_index = bit%64;
@@ -139,16 +157,6 @@ impl STree {
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
         let bit_mask: u64 = u64::max_value() >> in_index; // genau falschherum
         // Siehe Paper, irgendwo muss noch Fill Zeros implementiert werden
-        
-        if level != 0 {
-            for i in index..self.root_top_sub.len() {
-                if self.root_top_sub[i] != 0 {
-                    let nulls = self.root_top_sub[i].leading_zeros();
-                    return Some(u40::new(i as u64 + nulls as u64));
-                }
-            }
-            return None;
-        }
         
         let nulls = (self.root_top[index] & bit_mask).leading_zeros();
         
@@ -158,8 +166,8 @@ impl STree {
         }
         
         // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-        let new_index = self.locate_top_level(u40::new(index as u64 +1) ,level+1);
-
+        let new_index = self.locate_top_level_sub(u40::new(bit as u64) ,1);
+        
         new_index.and_then(|x|
             match self.root_top[u64::from(x) as usize *64].leading_zeros() {
                 64 => None,
@@ -327,7 +335,7 @@ mod tests {
         }
         
         let data_structure: STree = STree::new(data);
-        println!("Max: {}", data_structure.element_list[data_structure.root_table[0].maximum.unwrap()]);
+        println!("Max: {}", data_structure.locate_top_level(u40::new(1), 0).unwrap());
         for (index,_) in data_v1.iter().enumerate() {
             if index < data_v1.len()-1 {
                 for i in data_v1[index]+1..data_v1[index+1]+1 {
