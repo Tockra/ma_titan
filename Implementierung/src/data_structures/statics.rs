@@ -134,7 +134,7 @@ impl STree {
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
-        let bit_mask: u64 = (1 << (64-in_index))-1; // genau falschherum
+        let bit_mask: u64 = (1 << (63-in_index))-1; // genau falschherum
         // Siehe Paper, irgendwo muss noch Fill Zeros implementiert werden
         
         if level != 0 {
@@ -207,8 +207,8 @@ impl<T> Level<T> {
         self.objects.get(hash)
     }
 
-    // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 8 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
-    // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^8 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
+    // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 10 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
+    // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^10 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
     #[inline]
     pub fn locate_top_level(&self, bit: u10) -> Option<u10> {
         let bit = u16::from(bit);
@@ -216,7 +216,7 @@ impl<T> Level<T> {
 
         if self.lx_top[index] != 0 {
             let in_index = bit%64;
-            let bit_mask: u64 = (1 << (64-in_index))-1;
+            let bit_mask: u64 = (1 << (63-in_index))-1;
             let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
 
             return Some(u10::new(index as u16 *64 + num_zeroes as u16));
@@ -232,7 +232,7 @@ impl<T> Level<T> {
     }
 
 }
-
+// TODO:: HIER!!!
 
 
 
@@ -316,9 +316,10 @@ use std::time::{Instant};
 
         let data_structure: STree = STree::new(data);
 
-
-
-        let now = Instant::now();
+        let locate = data_structure.locate(u40::new(1)).unwrap();
+       // assert_eq!(data_structure.element_list[locate], u40::new(1));
+        println!("Das Maximum: {:?}", data_structure.root_table[0].get(&u10::new(0)).unwrap().locate_top_level(u10::new(1)));
+        /*let now = Instant::now();
         for (index,_) in data_v1.iter().enumerate() {
             if index < data_v1.len()-1 {
                 for i in data_v1[index]+1..data_v1[index+1]+1 {
@@ -327,9 +328,9 @@ use std::time::{Instant};
                     assert_eq!(data_structure.element_list[locate], u40::new(data_v1[index+1]));
                 }
             }
-        }
+        }*/
         
-        println!("Zeit: {}", now.elapsed().as_nanos());
+ 
         
     }
 }
