@@ -134,7 +134,7 @@ impl STree {
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
-        let bit_mask: u64 = (1 << (63-in_index))-1; // genau falschherum
+        let bit_mask: u64 = u64::max_value() >> in_index; // genau falschherum
         // Siehe Paper, irgendwo muss noch Fill Zeros implementiert werden
         
         if level != 0 {
@@ -216,7 +216,7 @@ impl<T> Level<T> {
 
         if self.lx_top[index] != 0 {
             let in_index = bit%64;
-            let bit_mask: u64 = (1 << (63-in_index))-1;
+            let bit_mask: u64 = u64::max_value() >> in_index;
             let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
 
             return Some(u10::new(index as u16 *64 + num_zeroes as u16));
@@ -232,7 +232,7 @@ impl<T> Level<T> {
     }
 
 }
-// TODO:: HIER!!!
+
 
 
 
@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(data_structure.root_top_sub[255], 1);
         
     }
-use std::time::{Instant};
+
     #[test]
     fn test_locate() {
         
@@ -316,10 +316,7 @@ use std::time::{Instant};
 
         let data_structure: STree = STree::new(data);
 
-        let locate = data_structure.locate(u40::new(1)).unwrap();
-       // assert_eq!(data_structure.element_list[locate], u40::new(1));
-        println!("Das Maximum: {:?}", data_structure.root_table[0].get(&u10::new(0)).unwrap().locate_top_level(u10::new(1)));
-        /*let now = Instant::now();
+
         for (index,_) in data_v1.iter().enumerate() {
             if index < data_v1.len()-1 {
                 for i in data_v1[index]+1..data_v1[index+1]+1 {
@@ -328,7 +325,7 @@ use std::time::{Instant};
                     assert_eq!(data_structure.element_list[locate], u40::new(data_v1[index+1]));
                 }
             }
-        }*/
+        }
         
  
         

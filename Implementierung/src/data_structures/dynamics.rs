@@ -54,7 +54,7 @@ impl<T,V> Level<T,V> {
 
         if self.lx_top[index] != 0 {
             let in_index = bit%64;
-            let bit_mask: u64 = (1 << (64-in_index))-1;
+            let bit_mask: u64 = u64::max_value() >> in_index;
             let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
 
             return Some(index as u8 *64 + num_zeroes as u8);
@@ -154,7 +154,7 @@ impl STree {
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
-        let bit_mask: u64 = (1 << (64-in_index))-1; // genau falschherum
+        let bit_mask: u64 = u64::max_value() >> in_index; // genau falschherum
         // Siehe Paper, irgendwo muss noch Fill Zeros implementiert werden
         
         if level != 0 {
