@@ -93,10 +93,10 @@ impl STree {
 
         // Paper z. 3 
         if self.root_table[i].maximum.is_none() || self.element_list[self.root_table[i].maximum.unwrap()] < element {
-            return self.locate_top_level(u40::new(i as u64),0)
+            return self.locate_top_level(u40::new(i as u64 + 1),0)
                 .map(|x| self.root_table[u64::from(x) as usize].minimum.unwrap());
         }
-
+       
         // Paper z. 4
         if self.root_table[i].maximum == self.root_table[i].minimum {
             return Some(self.root_table[i].minimum.unwrap());
@@ -104,7 +104,8 @@ impl STree {
 
         // Paper z. 6
         if self.root_table[i].get(&j).is_none() || self.element_list[self.root_table[i].get(&j).unwrap().maximum.unwrap()] < element {
-            let new_j = self.root_table[i].locate_top_level(j);
+           
+            let new_j = self.root_table[i].locate_top_level(&(j+u10::new(1)));
             return new_j
                 .and_then(|x| self.root_table[i].get(&(x)))
                 .map(|x| x.minimum.unwrap());
@@ -117,7 +118,7 @@ impl STree {
         }
 
         // Paper z.8
-        let new_k = self.root_table[i].get(&j).unwrap().locate_top_level(k);
+        let new_k = self.root_table[i].get(&j).unwrap().locate_top_level(&k);
         return new_k
             .map(|x| self.root_table[i].get(&j).unwrap().get(&x).unwrap().unwrap());
 
@@ -128,6 +129,8 @@ impl STree {
      * Hierbei beachten, dass j zwar Bitweise adressiert wird, die Level-Arrays allerdings ganze 64-Bit-Blöcke besitzen. Somit ist z.B: root_top[5] nicht das 6. 
      * Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
      */ 
+
+    //TODO: Fix that Shit
     pub fn locate_top_level(&self, bit: Int, level: u8) -> Option<Int> {
         let bit = u64::from(bit);
         let index = bit as usize/64;
@@ -141,7 +144,7 @@ impl STree {
             for i in index..self.root_top_sub.len() {
                 if self.root_top_sub[i] != 0 {
                     let nulls = self.root_top_sub[i].leading_zeros();
-                    return Some(u40::new(i as u64*64 + nulls as u64));
+                    return Some(u40::new(i as u64 + nulls as u64));
                 }
             }
             return None;
@@ -155,12 +158,12 @@ impl STree {
         }
         
         // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-        let new_index = self.locate_top_level(u40::new(index as u64) ,level+1);
+        let new_index = self.locate_top_level(u40::new(index as u64 +1) ,level+1);
 
         new_index.and_then(|x|
-            match self.root_top[u64::from(x) as usize].leading_zeros() {
+            match self.root_top[u64::from(x) as usize *64].leading_zeros() {
                 64 => None,
-                val => Some(u40::new(u64::from(x)*64  + val as u64))
+                val => Some(u40::new(u64::from(x)*64 + val as u64))
             }
         )
         
@@ -170,6 +173,7 @@ impl STree {
 
 pub struct Level<T> {
     pub hasher: Option<Mphf<u10>>,
+    pub keys: Vec<u10>,
     pub objects: Vec<T>,
     pub maximum: Option<usize>,
     pub minimum: Option<usize>,
@@ -182,6 +186,7 @@ impl<T> Level<T> {
         match keys {
             Some(x) => Level {
                 hasher: Some(Mphf::new_parallel(2.0,&x,None)),
+                keys: x,
                 objects: vec![],
                 maximum: None,
                 minimum: None,
@@ -190,6 +195,7 @@ impl<T> Level<T> {
             None => Level {
                 hasher: None,
                 objects: vec![],
+                keys: vec![],
                 maximum: None,
                 minimum: None,
                 lx_top: vec![0;level],
@@ -203,15 +209,19 @@ impl<T> Level<T> {
      */
     #[inline]
     pub fn get(&self, key: &u10) -> Option<&T> {
-        let hash = self.hasher.as_ref().unwrap().hash(&key) as usize;
-        self.objects.get(hash)
+        let hash = self.hasher.as_ref().unwrap().try_hash(&key)? as usize;
+        if self.keys.contains(key) {
+            self.objects.get(hash)
+        } else {
+            None
+        }
     }
 
     // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 10 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
     // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^10 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
     #[inline]
-    pub fn locate_top_level(&self, bit: u10) -> Option<u10> {
-        let bit = u16::from(bit);
+    pub fn locate_top_level(&self, bit: &u10) -> Option<u10> {
+        let bit = u16::from(*bit);
         let index = bit as usize/64;
 
         if self.lx_top[index] != 0 {
@@ -219,7 +229,9 @@ impl<T> Level<T> {
             let bit_mask: u64 = u64::max_value() >> in_index;
             let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
 
-            return Some(u10::new(index as u16 *64 + num_zeroes as u16));
+            if num_zeroes != 64 {
+                return Some(u10::new(index as u16 *64 + num_zeroes as u16));
+            }
         }
         for i in index+1..self.lx_top.len() {
             let val = self.lx_top[i];
@@ -308,19 +320,18 @@ mod tests {
     #[test]
     fn test_locate() {
         
-        let data_v1: Vec<u64> = vec![1,3,23,123,232,500,20000];
+        let data_v1: Vec<u64> = vec![1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 200005200005];
         let mut data: Vec<u40> = vec![];
         for val in data_v1.iter() {
             data.push(u40::new(*val));
         }
-
+        
         let data_structure: STree = STree::new(data);
-
-
+        println!("Max: {}", data_structure.element_list[data_structure.root_table[0].maximum.unwrap()]);
         for (index,_) in data_v1.iter().enumerate() {
             if index < data_v1.len()-1 {
                 for i in data_v1[index]+1..data_v1[index+1]+1 {
-                    println!("Vor-Crash: {}", i);
+                   // println!("Index: {}", i);
                     let locate = data_structure.locate(u40::new(i)).unwrap();
                     assert_eq!(data_structure.element_list[locate], u40::new(data_v1[index+1]));
                 }

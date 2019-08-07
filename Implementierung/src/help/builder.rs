@@ -77,8 +77,11 @@ impl PerfectHashBuilder {
             for key in self.root_table[i].objects.clone() {
                 let len = self.root_table[i].hash_map.get(&key).unwrap().objects.len();
                 build_lx_top(&mut result[i].lx_top, key);
+                let keys = self.root_table[i].hash_map.get(&key).unwrap().objects.clone();
                 result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].hasher = 
-                    Some(Mphf::new_parallel(2.0,&self.root_table[i].hash_map.get(&key).unwrap().objects.clone(), None));
+                    Some(Mphf::new_parallel(2.0,&keys, None));
+                result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].keys = keys;
+                    
                 for _ in 0..len {
                     for sub_key in self.root_table[i].hash_map.get(&key).unwrap().objects.clone() {
                         build_lx_top(&mut result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].lx_top,sub_key);
