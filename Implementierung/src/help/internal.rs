@@ -1,6 +1,7 @@
 #![allow(dead_code)]  
 use std::mem::{self};
 use std::ptr;
+use std::any::TypeId;
 
 use ux::{u10,u40};
 
@@ -10,7 +11,7 @@ pub struct List<T> {
     pub len: usize,
 }
 
-pub const fn root_size<T>() -> usize {
+pub const fn root_size<T:>() -> usize {
     1 << 8*mem::size_of::<T>() / 2
 }
 

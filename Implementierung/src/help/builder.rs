@@ -5,14 +5,14 @@ use std::ptr;
 use ux::{u10,u40};
 use boomphf::Mphf;
 
-use crate::help::internal::{Splittable,root_size};
+use crate::help::internal::{Splittable};
 use crate::data_structures::statics::{FirstLevel, SecondLevel};
 
 type SecondLevelBuild = PerfectHashBuilderLevel<usize>;
 type FirstLevelBuild = PerfectHashBuilderLevel<SecondLevelBuild>;
 type Int = u40;
 pub struct PerfectHashBuilder {
-    root_table: [FirstLevelBuild; root_size::<Int>()],
+    root_table: [FirstLevelBuild; 1<<20],
     root_indexs: Vec<usize>,
 }
 
@@ -39,7 +39,7 @@ impl PerfectHashBuilder {
     pub fn new(objects: Vec<Int>) ->  PerfectHashBuilder{
         let mut root_indexs = vec![];
         let mut root_table = {
-            let mut data: [MaybeUninit<FirstLevelBuild>; root_size::<Int>()] = unsafe {
+            let mut data: [MaybeUninit<FirstLevelBuild>; (1<<20)] = unsafe {
                 MaybeUninit::uninit().assume_init()
             };
             for elem in &mut data[..] {
@@ -49,7 +49,7 @@ impl PerfectHashBuilder {
             }
 
             unsafe { 
-                mem::transmute::<_, [FirstLevelBuild; root_size::<Int>()]>(data) 
+                mem::transmute::<_, [FirstLevelBuild; (1<<20)]>(data) 
             }
         };
         for element in objects {
@@ -70,9 +70,9 @@ impl PerfectHashBuilder {
         PerfectHashBuilder {root_table: root_table, root_indexs: root_indexs}
     }
 
-    pub fn build(&self) -> [FirstLevel; root_size::<Int>()] {
-        let mut result: [FirstLevel; root_size::<Int>()] = {
-            let mut data: [MaybeUninit<FirstLevel>; root_size::<Int>()] = unsafe {
+    pub fn build(&self) -> [FirstLevel; (1<<20)] {
+        let mut result: [FirstLevel; (1<<20)] = {
+            let mut data: [MaybeUninit<FirstLevel>; (1<<20)] = unsafe {
                 MaybeUninit::uninit().assume_init()
             };
             for (i, elem) in data.iter_mut().enumerate() {
@@ -82,7 +82,7 @@ impl PerfectHashBuilder {
             }
 
             unsafe { 
-                mem::transmute::<_, [FirstLevel; root_size::<Int>()]>(data) 
+                mem::transmute::<_, [FirstLevel; (1<<20)]>(data) 
             }
         };
         for i in self.root_indexs.clone() {
@@ -107,9 +107,9 @@ impl PerfectHashBuilder {
         result
     }
 
-    pub fn build_root_top(&self) -> ([u64; root_size::<Int>()/64],[u64; root_size::<Int>()/64/64]){
-        let mut root_top: [u64; root_size::<Int>()/64] = [0; root_size::<Int>()/64];
-        let mut root_top_sub: [u64; root_size::<Int>()/64/64] = [0; root_size::<Int>()/64/64];
+    pub fn build_root_top(&self) -> ([u64; (1<<20)/64],[u64; (1<<20)/64/64]) {
+        let mut root_top: [u64; (1<<20)/64] = [0; (1<<20)/64];
+        let mut root_top_sub: [u64; (1<<20)/64/64] = [0; (1<<20)/64/64];
         for i in self.root_indexs.clone() {
             // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
             let bit = i/64;

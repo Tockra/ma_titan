@@ -1,7 +1,7 @@
 #![allow(dead_code)]  
 use ux::{u40,u10};
 use boomphf::Mphf;
-use crate::help::internal::{Splittable,root_size};
+use crate::help::internal::{Splittable};
 use crate::help::builder::PerfectHashBuilder;
 pub type Int = u40;
 // In der statischen Variante werden die Indizes des Vektors für die Minima und Maxima gespeichert.
@@ -11,10 +11,10 @@ pub type FirstLevel = Level<SecondLevel>;
 
 
 pub struct STree {
-    root_table: [FirstLevel; root_size::<Int>()],
+    root_table: [FirstLevel; 1<<20],
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
-    root_top: [u64; root_size::<Int>()/64],
-    root_top_sub: [u64; root_size::<Int>()/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
+    root_top: [u64; (1<<20)/64],
+    root_top_sub: [u64; (1<<20)/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
     element_list: Vec<Int>,
 }
 
@@ -128,21 +128,22 @@ impl<T> Level<T> {
 // Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 // Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use ux::{u40,u10};
     use super::STree;
 
+    #[test]
     fn test_new_hashfunctions() {
 
         // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
         // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
-        let mut data: Vec<u40> = vec![u40::new(0);(1<<40)-1];
-        for i in 0..((1<<40)-1) {
-            data[i] = u40::new(i);
+        let mut data: Vec<u40> = vec![u40::new(0);(1<<16)-1];
+        for i in 0..data.len() {
+            data[i] = u40::new(i as u64);
         }
 
-        let data_structure: STree = STree::new(data);
+        let _data_structure: STree = STree::new(data);
 
     }
-}*/
+}
