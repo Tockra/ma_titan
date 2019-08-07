@@ -11,15 +11,15 @@ pub type FirstLevel = Level<SecondLevel>;
 
 
 pub struct STree {
-    root_table: [FirstLevel; 1<<20],
+    root_table: Box<[FirstLevel]>,
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
-    root_top: [u64; (1<<20)/64],
-    root_top_sub: [u64; (1<<20)/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
+    root_top: Box<[u64; (1<<20)/64]>,
+    root_top_sub: Box<[u64; (1<<20)/64/64]>, //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
     element_list: Vec<Int>,
 }
 
 impl STree {
-    // Annahme: items enthält unique i40 Werte in sortierter Reihenfolge!
+    // Annahme: items enthält unique u40 Werte in sortierter Reihenfolge!
     /**
      *  Diese Methode verwendet die Builder-Hilfs-Klasse um die perfekten Hashfunktionen zu setzen. Anschließend werden die richtigen
      *  Zeiger für die Werte eingefügt und die Maxima- und Minima-Zeiger werden eingefügt (hier Indizes des Arrays). Zum Schluss
@@ -138,7 +138,7 @@ mod tests {
 
         // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
         // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
-        let mut data: Vec<u40> = vec![u40::new(0);(1<<16)-1];
+        let mut data: Vec<u40> = vec![u40::new(0);(1<<10)];
         for i in 0..data.len() {
             data[i] = u40::new(i as u64);
         }

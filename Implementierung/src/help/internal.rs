@@ -1,7 +1,6 @@
 #![allow(dead_code)]  
 use std::mem::{self};
 use std::ptr;
-use std::any::TypeId;
 
 use ux::{u10,u40};
 

@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::mem::{self, MaybeUninit};
-use std::ptr;
 
 use ux::{u10,u40};
 use boomphf::Mphf;
@@ -11,8 +9,9 @@ use crate::data_structures::statics::{FirstLevel, SecondLevel};
 type SecondLevelBuild = PerfectHashBuilderLevel<usize>;
 type FirstLevelBuild = PerfectHashBuilderLevel<SecondLevelBuild>;
 type Int = u40;
+const U40_HALF_SIZE: usize = 1<<20;
 pub struct PerfectHashBuilder {
-    root_table: [FirstLevelBuild; 1<<20],
+    root_table: Box<[FirstLevelBuild]>,
     root_indexs: Vec<usize>,
 }
 
@@ -38,20 +37,13 @@ impl<T> PerfectHashBuilderLevel<T> {
 impl PerfectHashBuilder {
     pub fn new(objects: Vec<Int>) ->  PerfectHashBuilder{
         let mut root_indexs = vec![];
-        let mut root_table = {
-            let mut data: [MaybeUninit<FirstLevelBuild>; (1<<20)] = unsafe {
-                MaybeUninit::uninit().assume_init()
-            };
-            for elem in &mut data[..] {
-                unsafe { 
-                    ptr::write(elem.as_mut_ptr(), FirstLevelBuild::new((1<<10)/64)); 
-                }
-            }
 
-            unsafe { 
-                mem::transmute::<_, [FirstLevelBuild; (1<<20)]>(data) 
-            }
-        };
+        let mut tmp: Vec<FirstLevelBuild> = Vec::with_capacity(U40_HALF_SIZE);
+        for _ in 0..tmp.len() {
+            tmp.push(FirstLevelBuild::new((1<<10)/64));
+        }
+        let mut root_table: Box<[FirstLevelBuild]> = tmp.into_boxed_slice();
+
         for element in objects {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
 
@@ -70,21 +62,13 @@ impl PerfectHashBuilder {
         PerfectHashBuilder {root_table: root_table, root_indexs: root_indexs}
     }
 
-    pub fn build(&self) -> [FirstLevel; (1<<20)] {
-        let mut result: [FirstLevel; (1<<20)] = {
-            let mut data: [MaybeUninit<FirstLevel>; (1<<20)] = unsafe {
-                MaybeUninit::uninit().assume_init()
-            };
-            for (i, elem) in data.iter_mut().enumerate() {
-                unsafe { 
-                    ptr::write(elem.as_mut_ptr(), FirstLevel::new((1<<10)/64, Some(self.root_table[i].objects.clone()))); 
-                }
-            }
+    pub fn build(&self) -> Box<[FirstLevel]> {
+        let mut tmp: Vec<FirstLevel> = Vec::with_capacity(U40_HALF_SIZE);
+        for i in 0..tmp.len() {
+            tmp.push(FirstLevel::new((1<<10)/64, Some(self.root_table[i].objects.clone())));
+        }
+        let mut result: Box<[FirstLevel]> = tmp.into_boxed_slice();
 
-            unsafe { 
-                mem::transmute::<_, [FirstLevel; (1<<20)]>(data) 
-            }
-        };
         for i in self.root_indexs.clone() {
             for _ in self.root_table[i].objects.clone() {
                 result[i].objects.push(SecondLevel::new(1<<10, None));
@@ -107,9 +91,9 @@ impl PerfectHashBuilder {
         result
     }
 
-    pub fn build_root_top(&self) -> ([u64; (1<<20)/64],[u64; (1<<20)/64/64]) {
-        let mut root_top: [u64; (1<<20)/64] = [0; (1<<20)/64];
-        let mut root_top_sub: [u64; (1<<20)/64/64] = [0; (1<<20)/64/64];
+    pub fn build_root_top(&self) -> (Box<[u64; U40_HALF_SIZE/64]>,Box<[u64; U40_HALF_SIZE/64/64]>) {
+        let mut root_top: [u64; U40_HALF_SIZE/64] = [0; U40_HALF_SIZE/64];
+        let mut root_top_sub: [u64; U40_HALF_SIZE/64/64] = [0; U40_HALF_SIZE/64/64];
         for i in self.root_indexs.clone() {
             // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
             let bit = i/64;
@@ -121,7 +105,7 @@ impl PerfectHashBuilder {
             let sub_bit_in_mask: u64 = 1<<(63-(bit%64));
             root_top_sub[sub_bit] = root_top_sub[sub_bit] | sub_bit_in_mask;
         }
-        (root_top,root_top_sub)
+        (Box::new(root_top),Box::new(root_top_sub))
     }
 }
 
