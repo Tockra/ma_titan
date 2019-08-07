@@ -77,8 +77,93 @@ impl STree {
         Some(self.len() - 1)
     }
 
-    pub fn locate(&self) -> Option<usize> {
-        unimplemented!();
+        /** 
+     * Gibt den kleinstne Wert j mit element <= j zurück. 
+     * Kann verwendet werden, um zu prüfen ob element in der Datenstruktur enthalten ist. 
+     * Gibt anderenfalls den Nachfolger zurück, falls dieser existiert.
+     */
+    #[inline]
+    pub fn locate(&self, element: Int) -> Option<usize> {
+        let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
+
+        // Paper z.1 
+        if self.len() < 1 || element > self.element_list[self.maximum().unwrap()] {
+            return None;
+        } 
+
+        // Paper z. 3 
+        if self.root_table[i].maximum.is_none() || self.element_list[self.root_table[i].maximum.unwrap()] < element {
+            return self.locate_top_level(u40::new(i as u64),0)
+                .map(|x| self.root_table[u64::from(x) as usize].minimum.unwrap());
+        }
+
+        // Paper z. 4
+        if self.root_table[i].maximum == self.root_table[i].minimum {
+            return Some(self.root_table[i].minimum.unwrap());
+        }
+
+        // Paper z. 6
+        if self.root_table[i].get(&j).is_none() || self.element_list[self.root_table[i].get(&j).unwrap().maximum.unwrap()] < element {
+            let new_j = self.root_table[i].locate_top_level(j);
+            return new_j
+                .and_then(|x| self.root_table[i].get(&(x)))
+                .map(|x| x.minimum.unwrap());
+        }
+    
+
+        // Paper z.7
+        if self.root_table[i].get(&j).unwrap().maximum == self.root_table[i].get(&j).unwrap().minimum {
+            return Some(self.root_table[i].get(&j).unwrap().minimum.unwrap());
+        }
+
+        // Paper z.8
+        let new_k = self.root_table[i].get(&j).unwrap().locate_top_level(k);
+        return new_k
+            .map(|x| self.root_table[i].get(&j).unwrap().get(&x).unwrap().unwrap());
+
+    }
+
+     /**
+     * Gibt das kleinste j zurück, so dass element <= j und k_level[j]=1
+     * Hierbei beachten, dass j zwar Bitweise adressiert wird, die Level-Arrays allerdings ganze 64-Bit-Blöcke besitzen. Somit ist z.B: root_top[5] nicht das 6. 
+     * Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
+     */ 
+    pub fn locate_top_level(&self, bit: Int, level: u8) -> Option<Int> {
+        let bit = u64::from(bit);
+        let index = bit as usize/64;
+        let in_index = bit%64;
+        // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
+        // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
+        let bit_mask: u64 = (1 << (64-in_index))-1; // genau falschherum
+        // Siehe Paper, irgendwo muss noch Fill Zeros implementiert werden
+        
+        if level != 0 {
+            for i in index..self.root_top_sub.len() {
+                if self.root_top_sub[i] != 0 {
+                    let nulls = self.root_top_sub[i].leading_zeros();
+                    return Some(u40::new(i as u64*64 + nulls as u64));
+                }
+            }
+            return None;
+        }
+        
+        let nulls = (self.root_top[index] & bit_mask).leading_zeros();
+        
+        // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
+        if nulls != 64 {
+            return Some(u40::new(index as u64 *64+nulls as u64));
+        }
+        
+        // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
+        let new_index = self.locate_top_level(u40::new(index as u64) ,level+1);
+
+        new_index.and_then(|x|
+            match self.root_top[u64::from(x) as usize].leading_zeros() {
+                64 => None,
+                val => Some(u40::new(u64::from(x)*64  + val as u64))
+            }
+        )
+        
     }
 
 }
@@ -112,12 +197,40 @@ impl<T> Level<T> {
         }
     }
 
+    /**
+     * Diese Funktion dient der Abfrage eines Wertes aus der Hashtabelle des Levels
+     * 
+     */
+    #[inline]
+    pub fn get(&self, key: &u10) -> Option<&T> {
+        let hash = self.hasher.as_ref().unwrap().hash(&key) as usize;
+        self.objects.get(hash)
+    }
+
     // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 8 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
     // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^8 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
     #[inline]
-    pub fn locate_top_level(&mut self, _bit: u10) -> Option<u10> {
-        unimplemented!();
+    pub fn locate_top_level(&self, bit: u10) -> Option<u10> {
+        let bit = u16::from(bit);
+        let index = bit as usize/64;
+
+        if self.lx_top[index] != 0 {
+            let in_index = bit%64;
+            let bit_mask: u64 = (1 << (64-in_index))-1;
+            let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
+
+            return Some(u10::new(index as u16 *64 + num_zeroes as u16));
+        }
+        for i in index+1..self.lx_top.len() {
+            let val = self.lx_top[i];
+            if val != 0 {
+                let num_zeroes = val.leading_zeros();
+                return Some(u10::new(i as u16 *64 + num_zeroes as u16));
+            }
+        }
+        None
     }
+
 }
 
 
@@ -139,12 +252,12 @@ mod tests {
 
         // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
         // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
-        let mut data: Vec<u40> = vec![u40::new(0);1<<2];
+        let mut data: Vec<u40> = vec![u40::new(0);1<<10];
         
         for i in 0..data.len() {
             data[i] = u40::new(i as u64);
         }
-
+ 
         let check = data.clone();
         let data_structure: STree = STree::new(data);
 
@@ -189,6 +302,34 @@ mod tests {
             assert_eq!(data_structure.root_top_sub[i],0);
         }
         assert_eq!(data_structure.root_top_sub[255], 1);
+        
+    }
+use std::time::{Instant};
+    #[test]
+    fn test_locate() {
+        
+        let data_v1: Vec<u64> = vec![1,3,23,123,232,500,20000];
+        let mut data: Vec<u40> = vec![];
+        for val in data_v1.iter() {
+            data.push(u40::new(*val));
+        }
+
+        let data_structure: STree = STree::new(data);
+
+
+
+        let now = Instant::now();
+        for (index,_) in data_v1.iter().enumerate() {
+            if index < data_v1.len()-1 {
+                for i in data_v1[index]+1..data_v1[index+1]+1 {
+                    println!("Vor-Crash: {}", i);
+                    let locate = data_structure.locate(u40::new(i)).unwrap();
+                    assert_eq!(data_structure.element_list[locate], u40::new(data_v1[index+1]));
+                }
+            }
+        }
+        
+        println!("Zeit: {}", now.elapsed().as_nanos());
         
     }
 }

@@ -109,11 +109,11 @@ impl PerfectHashBuilder {
     }
 }
 
-// Annahme: Größe des l1_top-Arrays 2^10 Elemente
-fn build_lx_top(l1_top: &mut Vec<u64>, key: u10) {
+// Annahme: Größe des lx_top-Arrays 2^10 Elemente
+fn build_lx_top(lx_top: &mut Vec<u64>, key: u10) {
     let key = u16::from(key);
 
     let index = (key/64) as usize;
-    let in_index_mask = 1<<(9-(key % 64));
-    l1_top[index] = l1_top[index] | in_index_mask;
+    let in_index_mask = 1<<(63-(key % 64));
+    lx_top[index] = lx_top[index] | in_index_mask;
 }
