@@ -132,18 +132,63 @@ impl<T> Level<T> {
 mod tests {
     use ux::{u40,u10};
     use super::STree;
+    use crate::help::internal::{Splittable};
 
     #[test]
     fn test_new_hashfunctions() {
 
         // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
         // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
-        let mut data: Vec<u40> = vec![u40::new(0);(1<<10)];
+        let mut data: Vec<u40> = vec![u40::new(0);1<<2];
+        
         for i in 0..data.len() {
             data[i] = u40::new(i as u64);
         }
 
-        let _data_structure: STree = STree::new(data);
+        let check = data.clone();
+        let data_structure: STree = STree::new(data);
 
+        assert_eq!(data_structure.len(),check.len());
+        assert_eq!(data_structure.minimum().unwrap(),0);
+        assert_eq!(data_structure.maximum().unwrap(),check.len()-1);
+        for val in check {
+            let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
+            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hasher.as_ref().unwrap().hash(&j) as usize];
+            let saved_val = second_level.objects[second_level.hasher.as_ref().unwrap().hash(&k) as usize].unwrap();
+            assert_eq!(data_structure.element_list[saved_val],val);
+        }
+    }
+
+    #[test]
+    fn test_top_arrays() {
+        let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101)];
+        let check = data.clone();
+        let data_structure: STree = STree::new(data);
+
+        assert_eq!(data_structure.len(),check.len());
+        assert_eq!(data_structure.minimum().unwrap(),0);
+        assert_eq!(data_structure.maximum().unwrap(),check.len()-1);
+
+        for val in check {
+            let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
+            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hasher.as_ref().unwrap().hash(&j) as usize];
+            let saved_val = second_level.objects[second_level.hasher.as_ref().unwrap().hash(&k) as usize].unwrap();
+            assert_eq!(data_structure.element_list[saved_val],val);
+        }
+        // Root_TOP
+        // 1+61x0 = 9223372036854775808
+        assert_eq!(data_structure.root_top[0],9223372036854775808);
+        for i in 1..16383 {
+            assert_eq!(data_structure.root_top[i],0);
+        }
+        assert_eq!(data_structure.root_top[16383],1);
+
+        // ROOT_TOP_SUB
+        assert_eq!(data_structure.root_top_sub[0], 9223372036854775808);
+        for i in 1..255 {
+            assert_eq!(data_structure.root_top_sub[i],0);
+        }
+        assert_eq!(data_structure.root_top_sub[255], 1);
+        
     }
 }

@@ -39,11 +39,11 @@ impl PerfectHashBuilder {
         let mut root_indexs = vec![];
 
         let mut tmp: Vec<FirstLevelBuild> = Vec::with_capacity(U40_HALF_SIZE);
-        for _ in 0..tmp.len() {
+        for _ in 0..tmp.capacity() {
             tmp.push(FirstLevelBuild::new((1<<10)/64));
         }
         let mut root_table: Box<[FirstLevelBuild]> = tmp.into_boxed_slice();
-
+    
         for element in objects {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
 
@@ -64,7 +64,7 @@ impl PerfectHashBuilder {
 
     pub fn build(&self) -> Box<[FirstLevel]> {
         let mut tmp: Vec<FirstLevel> = Vec::with_capacity(U40_HALF_SIZE);
-        for i in 0..tmp.len() {
+        for i in 0..tmp.capacity() {
             tmp.push(FirstLevel::new((1<<10)/64, Some(self.root_table[i].objects.clone())));
         }
         let mut result: Box<[FirstLevel]> = tmp.into_boxed_slice();
