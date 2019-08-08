@@ -78,6 +78,7 @@ impl PerfectHashBuilder {
                 let len = self.root_table[i].hash_map.get(&key).unwrap().objects.len();
                 build_lx_top(&mut result[i].lx_top, key);
                 let keys = self.root_table[i].hash_map.get(&key).unwrap().objects.as_ref();
+
                 result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].hasher = 
                     Some(Mphf::new_parallel(2.0,&keys, None));
                 result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].origin_key = Some(key);

@@ -91,7 +91,7 @@ impl STree {
 
         // Paper z. 3 
         if self.root_table[i].maximum.is_none() || self.element_list[self.root_table[i].maximum.unwrap()] < element {
-            return self.locate_top_level(u40::new(i as u64 + 1))
+            return self.locate_top_level(u40::new(i as u64))
                 .map(|x| self.root_table[u64::from(x) as usize].minimum.unwrap());
         }
        
@@ -136,10 +136,9 @@ impl STree {
         let bit_mask: u64 = u64::max_value() >> in_index;
 
         if level != 0 {
-            let nulls = (self.root_top[index] & bit_mask).leading_zeros();
-            
+            let nulls = (self.root_top_sub[index] & bit_mask).leading_zeros();
             if nulls != 64 {
-                return Some(u40::new(bit + nulls as u64));
+                return Some(u40::new(index as u64 *64 + nulls as u64));
             } else {
                 for i in index+1..self.root_top_sub.len() {
                     if self.root_top_sub[i] != 0 {
@@ -156,14 +155,12 @@ impl STree {
         }
     }
     fn locate_top_level(&self, bit: Int) -> Option<Int> {
-        let bit = u64::from(bit);
+        let bit = u64::from(bit) + 1;
         let index = bit as usize/64;
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
         let bit_mask: u64 = u64::max_value() >> in_index; // genau falschherum
-        
-        
         
         // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
         let nulls = (self.root_top[index] & bit_mask).leading_zeros();
@@ -327,9 +324,8 @@ mod tests {
     }
 
     #[test]
-    fn test_locate() {
-        
-        let data_v1: Vec<u64> = vec![1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 200005200005];
+    fn test_locate_bruteforce() {
+        let data_v1: Vec<u64> = vec![0,1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 1065983];
         let mut data: Vec<u40> = vec![];
         for val in data_v1.iter() {
             data.push(u40::new(*val));
@@ -342,6 +338,75 @@ mod tests {
                     let locate = data_structure.locate(u40::new(i)).unwrap();
                     assert_eq!(data_structure.element_list[locate], u40::new(data_v1[index+1]));
                 }
+            }
+        }
+    }
+
+    /**
+     * Äquivalenzklassentest mit "Bruteforce"
+     */
+    #[test]
+    fn test_locate_eqc_bruteforce_test() {
+        let data_raw: Vec<u64> = vec![
+            0b00000000000000000000_0000000000_0000000001,
+            0b00000000000000000000_0000000000_0000111000,
+            0b00000000000000000000_0000000000_1111111111,
+
+            0b00000000000000000000_0001110000_0000000000,
+            0b00000000000000000000_0001110000_0000111000,
+            0b00000000000000000000_0001110000_1111111111,
+
+            0b00000000000000000000_1111111111_0000000000,
+            0b00000000000000000000_1111111111_0000111000,
+            0b00000000000000000000_1111111111_1111111111,
+
+            0b00000000001111000000_0000000000_0000000000,
+            0b00000000001111000000_0000000000_0000111000,
+            0b00000000001111000000_0000000000_1111111111,
+
+            0b00000000001111000000_0001110000_0000000000,
+            0b00000000001111000000_0001110000_0000111000,
+            0b00000000001111000000_0001110000_1111111111,
+
+            0b00000000001111000000_1111111111_0000000000,
+            0b00000000001111000000_1111111111_0000111000,
+            0b00000000001111000000_1111111111_1111111111,
+
+            0b11111111111111111111_0000000000_0000000000,
+            0b11111111111111111111_0000000000_0000111000,
+            0b11111111111111111111_0000000000_1111111111,
+
+            0b11111111111111111111_0001110000_0000000000,
+            0b11111111111111111111_0001110000_0000111000,
+            0b11111111111111111111_0001110000_1111111111,
+
+            0b11111111111111111111_1111111111_0000000000,
+            0b11111111111111111111_1111111111_0000111000,
+            0b11111111111111111111_1111111111_1111111110,
+            
+        ];
+
+        let mut data: Vec<u40> = vec![];
+        for val in data_raw.iter() {
+            data.push(u40::new(*val));
+        }
+        let data_structure: STree = STree::new(data.clone());
+        assert_eq!(data_structure.locate(u40::new(0b11111111111111111111_1111111111_1111111111)), None);
+        assert_eq!(data_structure.locate(u40::new(0)), Some(0));
+
+        for (i,&elem) in data.iter().enumerate() {
+            if i > 0 {
+                for j in 0..16877216 {
+                    if u64::from(elem)>=j as u64 {
+                        let index = elem - u40::new(j);
+                        if index > data_structure.element_list[i-1] {
+                            assert_eq!(data_structure.element_list[data_structure.locate(index).unwrap() as usize], elem);
+                        }
+                    }
+                }
+            } else {
+                assert_eq!(data_structure.element_list[data_structure.locate(elem).unwrap() as usize], elem);
+                assert_eq!(data_structure.element_list[data_structure.locate(elem-u40::new(1)).unwrap() as usize], elem);
             }
         }
     }
