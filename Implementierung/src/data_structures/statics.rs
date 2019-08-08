@@ -68,7 +68,7 @@ impl STree {
             root.maximum = Some(index);
 
             let first_key = root.hash_function.as_ref().unwrap().hash(&j) as usize;
-            let first = &mut root.objects[first_key];
+            let first = &mut root.objects[first_key].1;
 
             // Minima- und Maximasetzung auf der ersten Ebene
             first.minimum.get_or_insert(index);
@@ -76,7 +76,7 @@ impl STree {
 
             let second_key = first.hash_function.as_ref().unwrap().hash(&k) as usize;
             // Werte korrekt auf die Array-Indizes zeigen lassen:Level
-            first.objects[second_key] = Some(index);
+            first.objects[second_key] = (Some(k),Some(index));
         }
         result
     }
@@ -224,7 +224,7 @@ pub struct Level<T> {
 
     /// Array, das mit Hilfe der perfekten Hashfunktion `hash_function` auf Objekte zeigt. 
     /// In objects sind alle Objekte gespeichert, auf die die Hashfunktion zeigen kann. Diese Objekte sind vom Typ T.
-    pub objects: Vec<T>,
+    pub objects: Vec<(Option<u10>,T)>,
 
     /// Falls mittels Hashfunktion auf ein Level gezeigt wird, muss geprüft werden, ob der verwendete Key überhaupt "Hashbar" sein sollte
     pub origin_key: Option<u10>,
@@ -350,8 +350,8 @@ mod tests {
         assert_eq!(data_structure.maximum().unwrap(),u40::new(check.len() as u64 - 1));
         for val in check {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
-            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hash_function.as_ref().unwrap().hash(&j) as usize];
-            let saved_val = second_level.objects[second_level.hash_function.as_ref().unwrap().hash(&k) as usize].unwrap();
+            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hash_function.as_ref().unwrap().hash(&j) as usize].1;
+            let saved_val = second_level.objects[second_level.hash_function.as_ref().unwrap().hash(&k) as usize].1.unwrap();
             assert_eq!(data_structure.element_list[saved_val],val);
         }
     }
@@ -371,7 +371,7 @@ mod tests {
         for val in check {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
             let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hash_function.as_ref().unwrap().hash(&j) as usize];
-            let saved_val = second_level.objects[second_level.hash_function.as_ref().unwrap().hash(&k) as usize].unwrap();
+            let saved_val = second_level.objects[second_level.hash_function.as_ref().unwrap().hash(&k) as usize].1.unwrap();
             assert_eq!(data_structure.element_list[saved_val],val);
         }
         // Root_TOP
