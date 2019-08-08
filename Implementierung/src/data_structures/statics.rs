@@ -174,7 +174,7 @@ impl STree {
         // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
         let new_index = self.locate_top_level_sub(u40::new(bit as u64/64) ,1);
         new_index.and_then(|x|
-            match self.root_top[u64::from(x) as usize *64].leading_zeros() {
+            match self.root_top[u64::from(x) as usize].leading_zeros() {
                 64 => None,
                 val => Some(u40::new(u64::from(x)*64 + val as u64))
             }
@@ -310,15 +310,15 @@ mod tests {
             assert_eq!(data_structure.element_list[saved_val],val);
         }
         // Root_TOP
-        // 1+61x0 = 9223372036854775808
-        assert_eq!(data_structure.root_top[0],9223372036854775808);
+        // 61 Nullen
+        assert_eq!(data_structure.root_top[0],0b1000000000000000000000000000000000000000000000000000000000000000);
         for i in 1..16383 {
             assert_eq!(data_structure.root_top[i],0);
         }
         assert_eq!(data_structure.root_top[16383],1);
 
         // ROOT_TOP_SUB
-        assert_eq!(data_structure.root_top_sub[0], 9223372036854775808);
+        assert_eq!(data_structure.root_top_sub[0], 0b1000000000000000000000000000000000000000000000000000000000000000);
         for i in 1..255 {
             assert_eq!(data_structure.root_top_sub[i],0);
         }
@@ -336,11 +336,9 @@ mod tests {
         }
         
         let data_structure: STree = STree::new(data);
-        println!("Max: {}", data_structure.locate_top_level(u40::new(1)).unwrap());
         for (index,_) in data_v1.iter().enumerate() {
             if index < data_v1.len()-1 {
                 for i in data_v1[index]+1..data_v1[index+1]+1 {
-                   // println!("Index: {}", i);
                     let locate = data_structure.locate(u40::new(i)).unwrap();
                     assert_eq!(data_structure.element_list[locate], u40::new(data_v1[index+1]));
                 }
