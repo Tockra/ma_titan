@@ -1,11 +1,18 @@
 #![allow(dead_code)]  
 use ux::{u40,u10};
 use boomphf::Mphf;
+
 use crate::help::internal::{Splittable};
 use crate::help::builder::STreeBuilder;
 
 /// In dieser Implementierung werden u40 Integer gespeichert.
 pub type Int = u40;
+
+/// Die Länge des Root-Arrays, des STrees (basierend auf 40-Bit /2/2.).
+const ROOT_ARRAY_SIZE: usize = 1 << 20;
+
+/// Die Länge der L2- und L3-Top-Arrays, des STrees (basierend auf 40-Bit /2/2.).
+const LX_ARRAY_SIZE: usize = 1 << 10;
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
@@ -18,38 +25,38 @@ pub type L3Ebene = Level<Option<usize>>;
 /// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 pub struct STree {
-    /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.AsMut
+    /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
     root_table: Box<[L2Ebene]>,
     
-    /// Das Root-Top-Array speichert für jeden Eintrag `root_table[x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.AsMut
+    /// Das Root-Top-Array speichert für jeden Eintrag `root_table[x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
     /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert. 
-    root_top: Box<[u64; (1<<20)/64]>,
+    root_top: Box<[u64; ROOT_ARRAY_SIZE/64]>,
 
     /// Das Root-Top-Sub-Array ist ein Hilfsarray. Dabei werden immer 64-Bit des Root-Top-Arrays (also ein Index) verodert und zu einem 
     /// Bit in `root_top_sub`. Somit können die nächsten gesetzten Bits in `root_top` gefunden werden, ohne alle Einträge zu überprüfen.
     /// Die Länge des Arrays beträgt somit [u64;2^20 / 64 / 64].
-    root_top_sub: Box<[u64; (1<<20)/64/64]>, 
+    root_top_sub: Box<[u64; ROOT_ARRAY_SIZE/64/64]>, 
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
     element_list: Box<[Int]>,
 }
 
 impl STree {
-    /// Gibt einen STree mit den in items enthaltenen Werten zurück.
+    /// Gibt einen STree mit den in `elements` enthaltenen Werten zurück.
     ///
     /// # Arguments
     ///
-    /// * `items` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new(items: Vec<Int>) -> STree {
-        let builder = STreeBuilder::new(items.clone());
+    /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
+    pub fn new(elements: Vec<Int>) -> STree {
+        let builder = STreeBuilder::new(elements.clone());
 
         let (root_top,root_top_sub) = builder.build_root_top();
         let mut result = STree{
             root_table: builder.build(),
             root_top: root_top,
             root_top_sub: root_top_sub, 
-            element_list: items.into_boxed_slice(),
+            element_list: elements.into_boxed_slice(),
         };
         for (index,element) in result.element_list.iter().enumerate() {
             // Dadurch das die Reihenfolge sortiert ist, wird das letzte hinzugefügte Element das größte und das erste das kleinste sein.
@@ -320,7 +327,7 @@ impl<T> Level<T> {
 #[cfg(test)]
 mod tests {
     use ux::{u40,u10};
-    use super::STree;
+    use super::{STree,LX_ARRAY_SIZE};
     use crate::help::internal::{Splittable};
 
     /// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
@@ -329,7 +336,7 @@ mod tests {
 
         // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
         // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
-        let mut data: Vec<u40> = vec![u40::new(0);1<<10];
+        let mut data: Vec<u40> = vec![u40::new(0);LX_ARRAY_SIZE];
         
         for i in 0..data.len() {
             data[i] = u40::new(i as u64);
