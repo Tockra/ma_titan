@@ -69,22 +69,22 @@ impl PerfectHashBuilder {
         }
         let mut result: Box<[FirstLevel]> = tmp.into_boxed_slice();
 
-        for i in self.root_indexs.clone() {
-            for _ in self.root_table[i].objects.clone() {
+        for &i in &self.root_indexs {
+            for _ in &self.root_table[i].objects {
                 result[i].objects.push(SecondLevel::new(1<<10,None, None));
             }
 
-            for key in self.root_table[i].objects.clone() {
+            for &key in &self.root_table[i].objects {
                 let len = self.root_table[i].hash_map.get(&key).unwrap().objects.len();
                 build_lx_top(&mut result[i].lx_top, key);
-                let keys = self.root_table[i].hash_map.get(&key).unwrap().objects.clone();
+                let keys = self.root_table[i].hash_map.get(&key).unwrap().objects.as_ref();
                 result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].hasher = 
                     Some(Mphf::new_parallel(2.0,&keys, None));
                 result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].origin_key = Some(key);
                     
                     
                 for _ in 0..len {
-                    for sub_key in self.root_table[i].hash_map.get(&key).unwrap().objects.clone() {
+                    for &sub_key in &self.root_table[i].hash_map.get(&key).unwrap().objects {
                         build_lx_top(&mut result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].lx_top,sub_key);
                     }
                     result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].objects.push(None);
@@ -98,16 +98,16 @@ impl PerfectHashBuilder {
     pub fn build_root_top(&self) -> (Box<[u64; U40_HALF_SIZE/64]>,Box<[u64; U40_HALF_SIZE/64/64]>) {
         let mut root_top: [u64; U40_HALF_SIZE/64] = [0; U40_HALF_SIZE/64];
         let mut root_top_sub: [u64; U40_HALF_SIZE/64/64] = [0; U40_HALF_SIZE/64/64];
-        for i in self.root_indexs.clone() {
+        for &bit in &self.root_indexs {
             // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
-            let bit = i/64;
-            let bit_in_mask: u64  = 1<<(63-(i%64));
-            root_top[bit] = root_top[bit] | bit_in_mask;
+            let index = bit/64;
+            let bit_mask: u64  = 1<<(63-(bit%64));
+            root_top[index] = root_top[index] | bit_mask;
 
             // Berechnung des Indexs (sub_bit) im root_top_sub array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
-            let sub_bit = bit/64;
-            let sub_bit_in_mask: u64 = 1<<(63-(bit%64));
-            root_top_sub[sub_bit] = root_top_sub[sub_bit] | sub_bit_in_mask;
+            let index_sub = index/64;
+            let bit_mask_sub: u64 = 1<<(63-(index%64));
+            root_top_sub[index_sub] = root_top_sub[index_sub] | bit_mask_sub;
         }
         (Box::new(root_top),Box::new(root_top_sub))
     }
