@@ -3,38 +3,58 @@ use ux::{u40,u10};
 use boomphf::Mphf;
 use crate::help::internal::{Splittable};
 use crate::help::builder::PerfectHashBuilder;
+
+/// In dieser Implementierung werden u40 Integer gespeichert.
 pub type Int = u40;
-// In der statischen Variante werden die Indizes des Vektors für die Minima und Maxima gespeichert.
-pub type SecondLevel = Level<Option<usize>>;
+
+/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
+/// L3-Ebene zeigt.
 pub type FirstLevel = Level<SecondLevel>;
 
+/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf 
+/// ein Indize der STree.element_list zeigt.
+pub type SecondLevel = Level<Option<usize>>;
+
+/// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
+/// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 pub struct STree {
+    /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.AsMut
+    /// Dabei gilt `root_table: [FirstLevel;2^20]`
     root_table: Box<[FirstLevel]>,
-    // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
+    
+    /// Das Root-Top-Array speichert für jeden Eintrag `root_table[x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.AsMut
+    /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert. 
     root_top: Box<[u64; (1<<20)/64]>,
-    root_top_sub: Box<[u64; (1<<20)/64/64]>, //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
-    element_list: Vec<Int>,
+
+    /// Das Root-Top-Sub-Array ist ein Hilfsarray. Dabei werden immer 64-Bit des Root-Top-Arrays (also ein Index) verodert und zu einem 
+    /// Bit in `root_top_sub`. Somit können die nächsten gesetzten Bits in `root_top` gefunden werden, ohne alle Einträge zu überprüfen.
+    /// Die Länge des Arrays beträgt somit [u64;2^20 / 64 / 64].
+    root_top_sub: Box<[u64; (1<<20)/64/64]>, 
+
+    /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
+    element_list: Box<[Int]>,
 }
 
 impl STree {
-    // Annahme: items enthält unique u40 Werte in sortierter Reihenfolge!
-    /**
-     *  Diese Methode verwendet die Builder-Hilfs-Klasse um die perfekten Hashfunktionen zu setzen. Anschließend werden die richtigen
-     *  Zeiger für die Werte eingefügt und die Maxima- und Minima-Zeiger werden eingefügt (hier Indizes des Arrays). Zum Schluss
-     *  werden die Top-Level-Datenstrukturen angepasst.
-     * */ 
+    /// Gibt einen STree mit den in items enthaltenen Werten zurück.
+    ///
+    /// # Arguments
+    ///
+    /// * `items` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
     pub fn new(items: Vec<Int>) -> STree {
         let builder = PerfectHashBuilder::new(items.clone());
+
         let (root_top,root_top_sub) = builder.build_root_top();
         let mut result = STree{
             root_table: builder.build(),
             root_top: root_top,
             root_top_sub: root_top_sub, 
-            element_list: items,
+            element_list: items.into_boxed_slice(),
         };
         for (index,element) in result.element_list.iter().enumerate() {
-            let (i,j,k) = Splittable::<usize,u10>::split_integer_down(element);//super::internal::split_integer_down(*element);
             // Dadurch das die Reihenfolge sortiert ist, wird das letzte hinzugefügte Element das größte und das erste das kleinste sein.
+
+            let (i,j,k) = Splittable::<usize,u10>::split_integer_down(element);
 
             let root = &mut result.root_table[i];
             root.minimum.get_or_insert(index);
@@ -48,44 +68,51 @@ impl STree {
             first.maximum = Some(index);
 
             let second_key = first.hasher.as_ref().unwrap().hash(&k) as usize;
-            // Werte korrekt auf das Array zeigen lassen:Level
+            // Werte korrekt auf die Array-Indizes zeigen lassen:Level
             first.objects[second_key] = Some(index);
         }
         result
     }
 
+
+    /// Gibt die Anzahl der in self enthaltenen Elemente zurück.
     #[inline]
     pub fn len(&self) -> usize {
         self.element_list.len()
     }
 
+    /// Gibt das in der Datenstruktur gespeicherte Minimum zurück. Falls die Datenstruktur leer ist, wird None zurückgegeben.
     #[inline]
-    pub fn minimum(&self) -> Option<usize> {
+    pub fn minimum(&self) -> Option<Int> {
         if self.len() == 0 {
             return None;
         }
-        Some(0)
+        Some(self.element_list[0])
     }
 
+    /// Gibt das in der Datenstruktur gespeicherte Minimum zurück. Falls die Datenstruktur leer ist, wird None zurückgegeben.
     #[inline]
-    pub fn maximum(&self) -> Option<usize> {
+    pub fn maximum(&self) -> Option<Int> {
         if self.len() == 0 {
             return None;
         }
-        Some(self.len() - 1)
+        Some(self.element_list[self.len() - 1])
     }
 
-        /** 
-     * Gibt den kleinstne Wert j mit element <= j zurück. 
-     * Kann verwendet werden, um zu prüfen ob element in der Datenstruktur enthalten ist. 
-     * Gibt anderenfalls den Nachfolger zurück, falls dieser existiert.
-     */
+
+    /// Diese Methode gibt den Index INDEX des kleinsten Elements zurück für das gilt element<=element_list[INDEX].
+    /// Somit kann mit dieser Methode geprüft werden, ob ein Element in der Datenstruktur enthalten ist. Dann wird der Index dieses Elements zurückgegeben.
+    /// Ist das Element nicht enthalten, wird der "Nachfolger" dieses Elements zurückgegeben.
+    /// 
+    /// # Arguments
+    ///
+    /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Nachfolgers von element zurückgegeben.
     #[inline]
     pub fn locate(&self, element: Int) -> Option<usize> {
         let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
 
         // Paper z.1 
-        if self.len() < 1 || element > self.element_list[self.maximum().unwrap()] {
+        if self.len() < 1 || element > self.maximum().unwrap() {
             return None;
         } 
 
@@ -121,14 +148,11 @@ impl STree {
 
     }
 
-     /**
-     * Gibt das kleinste j zurück, so dass element <= j und k_level[j]=1
-     * Hierbei beachten, dass j zwar Bitweise adressiert wird, die Level-Arrays allerdings ganze 64-Bit-Blöcke besitzen. Somit ist z.B: root_top[5] nicht das 6. 
-     * Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
-     */ 
-
-    //TODO: Fix that Shit
-
+    /// Hilfsfunktion, die in der Root-Top-Sub-Tabelle das nächste Bit, dass nach Index `bit` gesetzt ist, zurückgibt. 
+    /// 
+    /// # Arguments
+    ///
+    /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Nachfolger" gesucht werden soll.
     fn locate_top_level_sub(&self, bit: Int, level:u8) -> Option<Int> {
         let bit = u64::from(bit) + 1;
         let index = bit as usize/64;
@@ -154,6 +178,12 @@ impl STree {
             self.locate_top_level(u40::new(bit))
         }
     }
+
+    /// Hilfsfunktion, die in der Root-Top-Tabelle das nächste Bit, dass nach Index `bit` gesetzt ist, zurückgibt. 
+    /// 
+    /// # Arguments
+    ///
+    /// * `bit` - Bitgenauer Index in self.root_top, dessen "Nachfolger" gesucht werden soll.
     fn locate_top_level(&self, bit: Int) -> Option<Int> {
         let bit = u64::from(bit) + 1;
         let index = bit as usize/64;
@@ -181,23 +211,48 @@ impl STree {
 
 }
 
+/// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 pub struct Level<T> {
+    /// Perfekte Hashfunktion, die immer (außer zur Inialisierung) gesetzt ist. 
     pub hasher: Option<Mphf<u10>>,
+
+    /// Array, das mit Hilfe der perfekten Hashfunktion `hasher` auf Objekte zeigt. 
+    /// In objects sind alle Objekte gespeichert, auf die die Hashfunktion zeigen kann. Diese Objekte sind vom Typ T.
     pub objects: Vec<T>,
+
+    /// Falls mittels Hashfunktion auf ein Level gezeigt wird, muss geprüft werden, ob der verwendete Key überhaupt "Hashbar" sein sollte
     pub origin_key: Option<u10>,
+
+    /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: Option<usize>,
+
+    /// Speichert einen Zeiger auf den Index des Minimums dieses Levels
     pub minimum: Option<usize>,
+
+    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
+    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hasher.hash(x)] mindestens ein Wert gespeichert ist.
     pub lx_top: Vec<u64>,
 }
 
 impl<T> Level<T> {
+    /// Gibt ein Level<T> mit Origin-Key j zurück. Optional kann eine Schlüsselliste übergeben werden, für welche dann
+    /// eine perfekte Hashfunktion generiert wird.
+    ///
+    /// # Arguments
+    ///
+    /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
+    /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(level: usize, j: Option<u10>, keys: Option<Vec<u10>>) -> Level<T> {
+    pub fn new(level: usize, origin_key: Option<u10>, keys: Option<Vec<u10>>) -> Level<T> {
+        /*
+            Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
+            Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
+        */
         match keys {
             Some(x) => Level {
                 hasher: Some(Mphf::new_parallel(2.0,&x,None)),
                 objects: vec![],
-                origin_key: j,
+                origin_key: origin_key,
                 maximum: None,
                 minimum: None,
                 lx_top: vec![0;level],
@@ -205,7 +260,7 @@ impl<T> Level<T> {
             None => Level {
                 hasher: None,
                 objects: vec![],
-                origin_key: j,
+                origin_key: origin_key,
                 maximum: None,
                 minimum: None,
                 lx_top: vec![0;level],
@@ -213,18 +268,23 @@ impl<T> Level<T> {
         }
     }
 
-    /**
-     * Diese Funktion dient der Abfrage eines Wertes aus der Hashtabelle des Levels
-     * 
-     */
+    /// Mit Hilfe dieser Funktion kann die perfekte Hashfunktion verwendet werden. 
+    /// Es muss beachtet werden, dass sichergestellt werden muss, dass der verwendete Key auch existiert!
+    /// 
+    /// # Arguments
+    ///
+    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&self, key: &u10) -> Option<&T> {
         let hash = self.hasher.as_ref().unwrap().try_hash(&key)? as usize;
         self.objects.get(hash)
     }
 
-    // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 10 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
-    // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^10 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
+    /// Hilfsfunktion, die in der Lx-Top-Tabelle das nächste Bit, dass nach dem `bit` gesetzt ist, zurückgibt. 
+    /// 
+    /// # Arguments
+    ///
+    /// * `bit` - Bitgenauer Index in self.root_top, dessen "Nachfolger" gesucht werden soll.
     #[inline]
     pub fn locate_top_level(&self, bit: &u10) -> Option<u10> {
         let bit = u16::from(*bit);
@@ -256,8 +316,7 @@ impl<T> Level<T> {
 
 
 
-// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
-// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
+
 
 #[cfg(test)]
 mod tests {
@@ -265,6 +324,7 @@ mod tests {
     use super::STree;
     use crate::help::internal::{Splittable};
 
+    /// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
     #[test]
     fn test_new_hashfunctions() {
 
@@ -289,7 +349,9 @@ mod tests {
             assert_eq!(data_structure.element_list[saved_val],val);
         }
     }
-
+    
+    /// Die Top-Arrays werden geprüft. Dabei wird nur grob überprüft, ob sinnvolle Werte gesetzt wurden.
+    /// Dieser Test ist ein Kandidat zum Entfernen oder Erweitern.
     #[test]
     fn test_top_arrays() {
         let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101)];
@@ -323,6 +385,8 @@ mod tests {
         
     }
 
+    /// Die Locate-Funktion wird getestet. Dabei werden beliebige Werte in ein STree gegeben und anschließend wird
+    /// `locate(x) mit allen x zwischen STree.min() und STree.max() getestet.
     #[test]
     fn test_locate_bruteforce() {
         let data_v1: Vec<u64> = vec![0,1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 1065983];
@@ -342,9 +406,8 @@ mod tests {
         }
     }
 
-    /**
-     * Äquivalenzklassentest mit "Bruteforce"
-     */
+    /// # Äquivalenzklassentest mit Bruteforce
+    /// `locate` wird getestet. Dabei werden in jeder Ebene die gesuchten Elemente einmal im Minimum, im Maximum und irgendwo dazwischen liegen.
     #[test]
     fn test_locate_eqc_bruteforce_test() {
         let data_raw: Vec<u64> = vec![
