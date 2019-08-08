@@ -75,7 +75,7 @@ impl STreeBuilder {
 
         for &i in &self.root_indexs {
             for _ in &self.root_table[i].keys {
-                result[i].objects.push((None,L3Ebene::new(LX_ARRAY_SIZE,None, None)));
+                result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE,None, None));
             }
 
             for &key in &self.root_table[i].keys {
@@ -83,16 +83,16 @@ impl STreeBuilder {
                 build_lx_top(&mut result[i].lx_top, key);
                 let keys = self.root_table[i].hash_map.get(&key).unwrap().keys.as_ref();
 
-                result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].1.hash_function = 
+                result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].hash_function = 
                     Some(Mphf::new_parallel(2.0,&keys, None));
-                result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].0 = Some(key);
+                result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].origin_key = Some(key);
                     
                     
                 for _ in 0..len {
                     for &sub_key in &self.root_table[i].hash_map.get(&key).unwrap().keys {
-                        build_lx_top(&mut result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].1.lx_top,sub_key);
+                        build_lx_top(&mut result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].lx_top,sub_key);
                     }
-                    result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].1.objects.push((None,None));
+                    result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].objects.push(None);
                 } 
             }
 
