@@ -4,28 +4,29 @@ use ux::{u10,u40};
 use boomphf::Mphf;
 
 use crate::help::internal::{Splittable};
-use crate::data_structures::statics::{FirstLevel, SecondLevel};
+use crate::data_structures::statics::{L2Ebene, L3Ebene};
 
-type SecondLevelBuild = PerfectHashBuilderLevel<usize>;
-type FirstLevelBuild = PerfectHashBuilderLevel<SecondLevelBuild>;
 type Int = u40;
+type L2EbeneBuilder = BuilderLevel<L3EbeneBuilder>;
+type L3EbeneBuilder = BuilderLevel<usize>;
+
 const U40_HALF_SIZE: usize = 1<<20;
-pub struct PerfectHashBuilder {
-    root_table: Box<[FirstLevelBuild]>,
+pub struct STreeBuilder {
+    root_table: Box<[L2EbeneBuilder]>,
     root_indexs: Vec<usize>,
 }
 
-pub struct PerfectHashBuilderLevel<T> {
+pub struct BuilderLevel<T> {
     pub hash_map: std::collections::HashMap<u10,T>,
     pub objects: Vec<u10>,
     pub maximum: usize,
     pub minimum: usize,
     pub lx_top: Vec<u64>,
 }
-impl<T> PerfectHashBuilderLevel<T> {
+impl<T> BuilderLevel<T> {
     #[inline]
-    pub fn new(level: usize) -> PerfectHashBuilderLevel<T> {
-        PerfectHashBuilderLevel {
+    pub fn new(level: usize) -> BuilderLevel<T> {
+        BuilderLevel {
             hash_map: (HashMap::<u10,T>::default()),
             objects: vec![],
             maximum: 0,
@@ -34,15 +35,15 @@ impl<T> PerfectHashBuilderLevel<T> {
         }
     }
 }
-impl PerfectHashBuilder {
-    pub fn new(objects: Vec<Int>) ->  PerfectHashBuilder{
+impl STreeBuilder {
+    pub fn new(objects: Vec<Int>) ->  STreeBuilder{
         let mut root_indexs = vec![];
 
-        let mut tmp: Vec<FirstLevelBuild> = Vec::with_capacity(U40_HALF_SIZE);
+        let mut tmp: Vec<L2EbeneBuilder> = Vec::with_capacity(U40_HALF_SIZE);
         for _ in 0..tmp.capacity() {
-            tmp.push(FirstLevelBuild::new((1<<10)/64));
+            tmp.push(L2EbeneBuilder::new((1<<10)/64));
         }
-        let mut root_table: Box<[FirstLevelBuild]> = tmp.into_boxed_slice();
+        let mut root_table: Box<[L2EbeneBuilder]> = tmp.into_boxed_slice();
     
         for element in objects {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
@@ -53,25 +54,25 @@ impl PerfectHashBuilder {
             
             if !root_table[i].hash_map.contains_key(&j) {
                 root_table[i].objects.push(j);
-                root_table[i].hash_map.insert(j,SecondLevelBuild::new((1<<10)/64));
+                root_table[i].hash_map.insert(j,L3EbeneBuilder::new((1<<10)/64));
             }
             
             // Hier ist keine Prüfung notwendig, da die Elemente einmalig sind.
             root_table[i].hash_map.get_mut(&j).unwrap().objects.push(k);
         }
-        PerfectHashBuilder {root_table: root_table, root_indexs: root_indexs}
+        STreeBuilder {root_table: root_table, root_indexs: root_indexs}
     }
 
-    pub fn build(&self) -> Box<[FirstLevel]> {
-        let mut tmp: Vec<FirstLevel> = Vec::with_capacity(U40_HALF_SIZE);
+    pub fn build(&self) -> Box<[L2Ebene]> {
+        let mut tmp: Vec<L2Ebene> = Vec::with_capacity(U40_HALF_SIZE);
         for i in 0..tmp.capacity() {
-            tmp.push(FirstLevel::new((1<<10)/64, None, Some(self.root_table[i].objects.clone())));
+            tmp.push(L2Ebene::new((1<<10)/64, None, Some(self.root_table[i].objects.clone())));
         }
-        let mut result: Box<[FirstLevel]> = tmp.into_boxed_slice();
+        let mut result: Box<[L2Ebene]> = tmp.into_boxed_slice();
 
         for &i in &self.root_indexs {
             for _ in &self.root_table[i].objects {
-                result[i].objects.push(SecondLevel::new(1<<10,None, None));
+                result[i].objects.push(L3Ebene::new(1<<10,None, None));
             }
 
             for &key in &self.root_table[i].objects {
@@ -79,16 +80,16 @@ impl PerfectHashBuilder {
                 build_lx_top(&mut result[i].lx_top, key);
                 let keys = self.root_table[i].hash_map.get(&key).unwrap().objects.as_ref();
 
-                result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].hasher = 
+                result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].hash_function = 
                     Some(Mphf::new_parallel(2.0,&keys, None));
-                result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].origin_key = Some(key);
+                result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].origin_key = Some(key);
                     
                     
                 for _ in 0..len {
                     for &sub_key in &self.root_table[i].hash_map.get(&key).unwrap().objects {
-                        build_lx_top(&mut result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].lx_top,sub_key);
+                        build_lx_top(&mut result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].lx_top,sub_key);
                     }
-                    result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].objects.push(None);
+                    result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].objects.push(None);
                 } 
             }
 

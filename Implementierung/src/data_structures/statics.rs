@@ -2,25 +2,25 @@
 use ux::{u40,u10};
 use boomphf::Mphf;
 use crate::help::internal::{Splittable};
-use crate::help::builder::PerfectHashBuilder;
+use crate::help::builder::STreeBuilder;
 
 /// In dieser Implementierung werden u40 Integer gespeichert.
 pub type Int = u40;
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
-pub type FirstLevel = Level<SecondLevel>;
+pub type L2Ebene = Level<L3Ebene>;
 
 /// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf 
 /// ein Indize der STree.element_list zeigt.
-pub type SecondLevel = Level<Option<usize>>;
+pub type L3Ebene = Level<Option<usize>>;
 
 /// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 pub struct STree {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.AsMut
-    /// Dabei gilt `root_table: [FirstLevel;2^20]`
-    root_table: Box<[FirstLevel]>,
+    /// Dabei gilt `root_table: [L2Ebene;2^20]`
+    root_table: Box<[L2Ebene]>,
     
     /// Das Root-Top-Array speichert für jeden Eintrag `root_table[x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.AsMut
     /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert. 
@@ -42,7 +42,7 @@ impl STree {
     ///
     /// * `items` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
     pub fn new(items: Vec<Int>) -> STree {
-        let builder = PerfectHashBuilder::new(items.clone());
+        let builder = STreeBuilder::new(items.clone());
 
         let (root_top,root_top_sub) = builder.build_root_top();
         let mut result = STree{
@@ -60,14 +60,14 @@ impl STree {
             root.minimum.get_or_insert(index);
             root.maximum = Some(index);
 
-            let first_key = root.hasher.as_ref().unwrap().hash(&j) as usize;
+            let first_key = root.hash_function.as_ref().unwrap().hash(&j) as usize;
             let first = &mut root.objects[first_key];
 
             // Minima- und Maximasetzung auf der ersten Ebene
             first.minimum.get_or_insert(index);
             first.maximum = Some(index);
 
-            let second_key = first.hasher.as_ref().unwrap().hash(&k) as usize;
+            let second_key = first.hash_function.as_ref().unwrap().hash(&k) as usize;
             // Werte korrekt auf die Array-Indizes zeigen lassen:Level
             first.objects[second_key] = Some(index);
         }
@@ -108,7 +108,7 @@ impl STree {
     ///
     /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Nachfolgers von element zurückgegeben.
     #[inline]
-    pub fn locate(&self, element: Int) -> Option<usize> {
+    pub fn locate_or_succ(&self, element: Int) -> Option<usize> {
         let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
 
         // Paper z.1 
@@ -118,7 +118,7 @@ impl STree {
 
         // Paper z. 3 
         if self.root_table[i].maximum.is_none() || self.element_list[self.root_table[i].maximum.unwrap()] < element {
-            return self.locate_top_level(u40::new(i as u64))
+            return self.compute_next_set_bit(u40::new(i as u64))
                 .map(|x| self.root_table[u64::from(x) as usize].minimum.unwrap());
         }
        
@@ -129,7 +129,7 @@ impl STree {
 
         // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
         if self.root_table[i].get(&j).is_none() || self.root_table[i].get(&j).and_then(|x| if x.origin_key == Some(j) {Some(x)} else {None}).is_none() || self.element_list[self.root_table[i].get(&j).unwrap().maximum.unwrap()] < element {
-            let new_j = self.root_table[i].locate_top_level(&(j+u10::new(1)));
+            let new_j = self.root_table[i].compute_next_set_bit(&(j+u10::new(1)));
             return new_j
                 .and_then(|x| self.root_table[i].get(&(x)))
                 .map(|x| x.minimum.unwrap());
@@ -142,7 +142,7 @@ impl STree {
         }
 
         // Paper z.8
-        let new_k = self.root_table[i].get(&j).unwrap().locate_top_level(&k);
+        let new_k = self.root_table[i].get(&j).unwrap().compute_next_set_bit(&k);
         return new_k
             .map(|x| self.root_table[i].get(&j).unwrap().get(&x).unwrap().unwrap());
 
@@ -153,7 +153,7 @@ impl STree {
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Nachfolger" gesucht werden soll.
-    fn locate_top_level_sub(&self, bit: Int, level:u8) -> Option<Int> {
+    fn compute_next_set_bit_deep(&self, bit: Int, level:u8) -> Option<Int> {
         let bit = u64::from(bit) + 1;
         let index = bit as usize/64;
         let in_index = bit%64;
@@ -175,7 +175,7 @@ impl STree {
             None
         }
         else {
-            self.locate_top_level(u40::new(bit))
+            self.compute_next_set_bit(u40::new(bit))
         }
     }
 
@@ -184,7 +184,7 @@ impl STree {
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top, dessen "Nachfolger" gesucht werden soll.
-    fn locate_top_level(&self, bit: Int) -> Option<Int> {
+    fn compute_next_set_bit(&self, bit: Int) -> Option<Int> {
         let bit = u64::from(bit) + 1;
         let index = bit as usize/64;
         let in_index = bit%64;
@@ -199,7 +199,7 @@ impl STree {
         }
         
         // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-        let new_index = self.locate_top_level_sub(u40::new(bit as u64/64) ,1);
+        let new_index = self.compute_next_set_bit_deep(u40::new(bit as u64/64) ,1);
         new_index.and_then(|x|
             match self.root_top[u64::from(x) as usize].leading_zeros() {
                 64 => None,
@@ -208,15 +208,14 @@ impl STree {
         )
         
     }
-
 }
 
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 pub struct Level<T> {
     /// Perfekte Hashfunktion, die immer (außer zur Inialisierung) gesetzt ist. 
-    pub hasher: Option<Mphf<u10>>,
+    pub hash_function: Option<Mphf<u10>>,
 
-    /// Array, das mit Hilfe der perfekten Hashfunktion `hasher` auf Objekte zeigt. 
+    /// Array, das mit Hilfe der perfekten Hashfunktion `hash_function` auf Objekte zeigt. 
     /// In objects sind alle Objekte gespeichert, auf die die Hashfunktion zeigen kann. Diese Objekte sind vom Typ T.
     pub objects: Vec<T>,
 
@@ -230,7 +229,7 @@ pub struct Level<T> {
     pub minimum: Option<usize>,
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
-    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hasher.hash(x)] mindestens ein Wert gespeichert ist.
+    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     pub lx_top: Vec<u64>,
 }
 
@@ -250,7 +249,7 @@ impl<T> Level<T> {
         */
         match keys {
             Some(x) => Level {
-                hasher: Some(Mphf::new_parallel(2.0,&x,None)),
+                hash_function: Some(Mphf::new_parallel(2.0,&x,None)),
                 objects: vec![],
                 origin_key: origin_key,
                 maximum: None,
@@ -258,7 +257,7 @@ impl<T> Level<T> {
                 lx_top: vec![0;level],
             },
             None => Level {
-                hasher: None,
+                hash_function: None,
                 objects: vec![],
                 origin_key: origin_key,
                 maximum: None,
@@ -276,7 +275,7 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&self, key: &u10) -> Option<&T> {
-        let hash = self.hasher.as_ref().unwrap().try_hash(&key)? as usize;
+        let hash = self.hash_function.as_ref().unwrap().try_hash(&key)? as usize;
         self.objects.get(hash)
     }
 
@@ -286,7 +285,7 @@ impl<T> Level<T> {
     ///
     /// * `bit` - Bitgenauer Index in self.root_top, dessen "Nachfolger" gesucht werden soll.
     #[inline]
-    pub fn locate_top_level(&self, bit: &u10) -> Option<u10> {
+    pub fn compute_next_set_bit(&self, bit: &u10) -> Option<u10> {
         let bit = u16::from(*bit);
         let index = bit as usize/64;
 
@@ -340,12 +339,12 @@ mod tests {
         let data_structure: STree = STree::new(data);
 
         assert_eq!(data_structure.len(),check.len());
-        assert_eq!(data_structure.minimum().unwrap(),0);
-        assert_eq!(data_structure.maximum().unwrap(),check.len()-1);
+        assert_eq!(data_structure.minimum().unwrap(),u40::new(0));
+        assert_eq!(data_structure.maximum().unwrap(),u40::new(check.len() as u64 - 1));
         for val in check {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
-            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hasher.as_ref().unwrap().hash(&j) as usize];
-            let saved_val = second_level.objects[second_level.hasher.as_ref().unwrap().hash(&k) as usize].unwrap();
+            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hash_function.as_ref().unwrap().hash(&j) as usize];
+            let saved_val = second_level.objects[second_level.hash_function.as_ref().unwrap().hash(&k) as usize].unwrap();
             assert_eq!(data_structure.element_list[saved_val],val);
         }
     }
@@ -359,13 +358,13 @@ mod tests {
         let data_structure: STree = STree::new(data);
 
         assert_eq!(data_structure.len(),check.len());
-        assert_eq!(data_structure.minimum().unwrap(),0);
-        assert_eq!(data_structure.maximum().unwrap(),check.len()-1);
+        assert_eq!(data_structure.minimum().unwrap(),u40::new(0b00000000000000000000_1010010010_0101010101));
+        assert_eq!(data_structure.maximum().unwrap(),u40::new(0b11111111111111111111_1010010010_0101010101));
 
         for val in check {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
-            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hasher.as_ref().unwrap().hash(&j) as usize];
-            let saved_val = second_level.objects[second_level.hasher.as_ref().unwrap().hash(&k) as usize].unwrap();
+            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hash_function.as_ref().unwrap().hash(&j) as usize];
+            let saved_val = second_level.objects[second_level.hash_function.as_ref().unwrap().hash(&k) as usize].unwrap();
             assert_eq!(data_structure.element_list[saved_val],val);
         }
         // Root_TOP
@@ -385,10 +384,10 @@ mod tests {
         
     }
 
-    /// Die Locate-Funktion wird getestet. Dabei werden beliebige Werte in ein STree gegeben und anschließend wird
-    /// `locate(x) mit allen x zwischen STree.min() und STree.max() getestet.
+    /// Die locate_or_succ-Funktion wird getestet. Dabei werden beliebige Werte in ein STree gegeben und anschließend wird
+    /// `locate_or_succ(x) mit allen x zwischen STree.min() und STree.max() getestet.
     #[test]
-    fn test_locate_bruteforce() {
+    fn test_locate_or_succ_bruteforce() {
         let data_v1: Vec<u64> = vec![0,1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 1065983];
         let mut data: Vec<u40> = vec![];
         for val in data_v1.iter() {
@@ -399,7 +398,7 @@ mod tests {
         for (index,_) in data_v1.iter().enumerate() {
             if index < data_v1.len()-1 {
                 for i in data_v1[index]+1..data_v1[index+1]+1 {
-                    let locate = data_structure.locate(u40::new(i)).unwrap();
+                    let locate = data_structure.locate_or_succ(u40::new(i)).unwrap();
                     assert_eq!(data_structure.element_list[locate], u40::new(data_v1[index+1]));
                 }
             }
@@ -407,9 +406,9 @@ mod tests {
     }
 
     /// # Äquivalenzklassentest mit Bruteforce
-    /// `locate` wird getestet. Dabei werden in jeder Ebene die gesuchten Elemente einmal im Minimum, im Maximum und irgendwo dazwischen liegen.
+    /// `locate_or_succ` wird getestet. Dabei werden in jeder Ebene die gesuchten Elemente einmal im Minimum, im Maximum und irgendwo dazwischen liegen.
     #[test]
-    fn test_locate_eqc_bruteforce_test() {
+    fn test_locate_or_succ_eqc_bruteforce_test() {
         let data_raw: Vec<u64> = vec![
             0b00000000000000000000_0000000000_0000000001,
             0b00000000000000000000_0000000000_0000111000,
@@ -454,8 +453,8 @@ mod tests {
             data.push(u40::new(*val));
         }
         let data_structure: STree = STree::new(data.clone());
-        assert_eq!(data_structure.locate(u40::new(0b11111111111111111111_1111111111_1111111111)), None);
-        assert_eq!(data_structure.locate(u40::new(0)), Some(0));
+        assert_eq!(data_structure.locate_or_succ(u40::new(0b11111111111111111111_1111111111_1111111111)), None);
+        assert_eq!(data_structure.locate_or_succ(u40::new(0)), Some(0));
 
         for (i,&elem) in data.iter().enumerate() {
             if i > 0 {
@@ -463,13 +462,13 @@ mod tests {
                     if u64::from(elem)>=j as u64 {
                         let index = elem - u40::new(j);
                         if index > data_structure.element_list[i-1] {
-                            assert_eq!(data_structure.element_list[data_structure.locate(index).unwrap() as usize], elem);
+                            assert_eq!(data_structure.element_list[data_structure.locate_or_succ(index).unwrap() as usize], elem);
                         }
                     }
                 }
             } else {
-                assert_eq!(data_structure.element_list[data_structure.locate(elem).unwrap() as usize], elem);
-                assert_eq!(data_structure.element_list[data_structure.locate(elem-u40::new(1)).unwrap() as usize], elem);
+                assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem).unwrap() as usize], elem);
+                assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem-u40::new(1)).unwrap() as usize], elem);
             }
         }
     }
