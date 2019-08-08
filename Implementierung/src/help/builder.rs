@@ -65,13 +65,13 @@ impl PerfectHashBuilder {
     pub fn build(&self) -> Box<[FirstLevel]> {
         let mut tmp: Vec<FirstLevel> = Vec::with_capacity(U40_HALF_SIZE);
         for i in 0..tmp.capacity() {
-            tmp.push(FirstLevel::new((1<<10)/64, Some(self.root_table[i].objects.clone())));
+            tmp.push(FirstLevel::new((1<<10)/64, None, Some(self.root_table[i].objects.clone())));
         }
         let mut result: Box<[FirstLevel]> = tmp.into_boxed_slice();
 
         for i in self.root_indexs.clone() {
             for _ in self.root_table[i].objects.clone() {
-                result[i].objects.push(SecondLevel::new(1<<10, None));
+                result[i].objects.push(SecondLevel::new(1<<10,None, None));
             }
 
             for key in self.root_table[i].objects.clone() {
@@ -80,7 +80,8 @@ impl PerfectHashBuilder {
                 let keys = self.root_table[i].hash_map.get(&key).unwrap().objects.clone();
                 result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].hasher = 
                     Some(Mphf::new_parallel(2.0,&keys, None));
-                result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].keys = keys;
+                result[i].objects[result[i].hasher.as_ref().unwrap().hash(&key) as usize].origin_key = Some(key);
+                    
                     
                 for _ in 0..len {
                     for sub_key in self.root_table[i].hash_map.get(&key).unwrap().objects.clone() {

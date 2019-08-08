@@ -8,8 +8,6 @@ pub type Int = u40;
 pub type SecondLevel = Level<Option<usize>>;
 pub type FirstLevel = Level<SecondLevel>;
 
-
-
 pub struct STree {
     root_table: Box<[FirstLevel]>,
     // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
@@ -102,9 +100,8 @@ impl STree {
             return Some(self.root_table[i].minimum.unwrap());
         }
 
-        // Paper z. 6
-        if self.root_table[i].get(&j).is_none() || self.element_list[self.root_table[i].get(&j).unwrap().maximum.unwrap()] < element {
-           
+        // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
+        if self.root_table[i].get(&j).is_none() || self.root_table[i].get(&j).and_then(|x| if x.origin_key == Some(j) {Some(x)} else {None}).is_none() || self.element_list[self.root_table[i].get(&j).unwrap().maximum.unwrap()] < element {
             let new_j = self.root_table[i].locate_top_level(&(j+u10::new(1)));
             return new_j
                 .and_then(|x| self.root_table[i].get(&(x)))
@@ -181,8 +178,8 @@ impl STree {
 
 pub struct Level<T> {
     pub hasher: Option<Mphf<u10>>,
-    pub keys: Vec<u10>,
     pub objects: Vec<T>,
+    pub origin_key: Option<u10>,
     pub maximum: Option<usize>,
     pub minimum: Option<usize>,
     pub lx_top: Vec<u64>,
@@ -190,12 +187,12 @@ pub struct Level<T> {
 
 impl<T> Level<T> {
     #[inline]
-    pub fn new(level: usize, keys: Option<Vec<u10>>) -> Level<T> {
+    pub fn new(level: usize, j: Option<u10>, keys: Option<Vec<u10>>) -> Level<T> {
         match keys {
             Some(x) => Level {
                 hasher: Some(Mphf::new_parallel(2.0,&x,None)),
-                keys: x,
                 objects: vec![],
+                origin_key: j,
                 maximum: None,
                 minimum: None,
                 lx_top: vec![0;level],
@@ -203,7 +200,7 @@ impl<T> Level<T> {
             None => Level {
                 hasher: None,
                 objects: vec![],
-                keys: vec![],
+                origin_key: j,
                 maximum: None,
                 minimum: None,
                 lx_top: vec![0;level],
@@ -218,11 +215,7 @@ impl<T> Level<T> {
     #[inline]
     pub fn get(&self, key: &u10) -> Option<&T> {
         let hash = self.hasher.as_ref().unwrap().try_hash(&key)? as usize;
-        if self.keys.contains(key) {
-            self.objects.get(hash)
-        } else {
-            None
-        }
+        self.objects.get(hash)
     }
 
     // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 10 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
@@ -335,18 +328,15 @@ mod tests {
         }
         
         let data_structure: STree = STree::new(data);
-        println!("Max: {}", data_structure.locate_top_level(u40::new(1), 0).unwrap());
+        //println!("Max: {}", data_structure.locate_top_level(u40::new(1)).unwrap());
         for (index,_) in data_v1.iter().enumerate() {
             if index < data_v1.len()-1 {
                 for i in data_v1[index]+1..data_v1[index+1]+1 {
-                   // println!("Index: {}", i);
+                    println!("Index: {}", i);
                     let locate = data_structure.locate(u40::new(i)).unwrap();
                     assert_eq!(data_structure.element_list[locate], u40::new(data_v1[index+1]));
                 }
             }
         }
-        
- 
-        
     }
 }
