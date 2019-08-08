@@ -69,13 +69,13 @@ impl STreeBuilder {
     pub fn build(&self) -> Box<[L2Ebene]> {
         let mut tmp: Vec<L2Ebene> = Vec::with_capacity(ROOT_ARRAY_SIZE);
         for i in 0..tmp.capacity() {
-            tmp.push(L2Ebene::new(LX_ARRAY_SIZE/64, None, Some(self.root_table[i].keys.clone())));
+            tmp.push(L2Ebene::new(LX_ARRAY_SIZE/64, Some(self.root_table[i].keys.clone())));
         }
         let mut result: Box<[L2Ebene]> = tmp.into_boxed_slice();
 
         for &i in &self.root_indexs {
             for _ in &self.root_table[i].keys {
-                result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE,None, None));
+                result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE, None));
             }
 
             for &key in &self.root_table[i].keys {
@@ -85,7 +85,6 @@ impl STreeBuilder {
 
                 result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].hash_function = 
                     Some(Mphf::new_parallel(2.0,&keys, None));
-                result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].origin_key = Some(key);
                     
                     
                 for _ in 0..len {

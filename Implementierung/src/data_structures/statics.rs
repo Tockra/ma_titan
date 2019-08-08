@@ -135,7 +135,7 @@ impl STree {
         }
 
         // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
-        if self.root_table[i].get(&j).is_none() || self.root_table[i].get(&j).and_then(|x| if x.origin_key == Some(j) {Some(x)} else {None}).is_none() || self.element_list[self.root_table[i].get(&j).unwrap().maximum.unwrap()] < element {
+        if self.root_table[i].get(&j).is_none() || self.element_list[self.root_table[i].get(&j).unwrap().maximum.unwrap()] < element {
             let new_j = self.root_table[i].compute_next_set_bit(&(j+u10::new(1)));
             return new_j
                 .and_then(|x| self.root_table[i].get(&(x)))
@@ -226,9 +226,6 @@ pub struct Level<T> {
     /// In objects sind alle Objekte gespeichert, auf die die Hashfunktion zeigen kann. Diese Objekte sind vom Typ T.
     pub objects: Vec<T>,
 
-    /// Falls mittels Hashfunktion auf ein Level gezeigt wird, muss geprüft werden, ob der verwendete Key überhaupt "Hashbar" sein sollte
-    pub origin_key: Option<u10>,
-
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: Option<usize>,
 
@@ -249,7 +246,7 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(level: usize, origin_key: Option<u10>, keys: Option<Vec<u10>>) -> Level<T> {
+    pub fn new(level: usize, keys: Option<Vec<u10>>) -> Level<T> {
         /*
             Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
             Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
@@ -258,7 +255,6 @@ impl<T> Level<T> {
             Some(x) => Level {
                 hash_function: Some(Mphf::new_parallel(2.0,&x,None)),
                 objects: vec![],
-                origin_key: origin_key,
                 maximum: None,
                 minimum: None,
                 lx_top: vec![0;level],
@@ -266,7 +262,6 @@ impl<T> Level<T> {
             None => Level {
                 hash_function: None,
                 objects: vec![],
-                origin_key: origin_key,
                 maximum: None,
                 minimum: None,
                 lx_top: vec![0;level],
@@ -282,8 +277,17 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&self, key: &u10) -> Option<&T> {
-        let hash = self.hash_function.as_ref().unwrap().try_hash(&key)? as usize;
-        self.objects.get(hash)
+        let k = u16::from(*key);
+        let index = (k/64) as usize;
+        let in_index_mask = 1<<(63-(k % 64));
+
+        // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
+        if (self.lx_top[index] & in_index_mask) != 0 {
+            let hash = self.hash_function.as_ref().unwrap().try_hash(&key)? as usize;
+            self.objects.get(hash)
+        } else {
+            None
+        }
     }
 
     /// Hilfsfunktion, die in der Lx-Top-Tabelle das nächste Bit, dass nach dem `bit` gesetzt ist, zurückgibt. 
