@@ -30,9 +30,9 @@ impl STree {
             root_table: builder.build(),
             root_top: root_top,
             root_top_sub: root_top_sub, 
-            element_list: items.clone(),
+            element_list: items,
         };
-        for (index,element) in items.iter().enumerate() {
+        for (index,element) in result.element_list.iter().enumerate() {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(element);//super::internal::split_integer_down(*element);
             // Dadurch das die Reihenfolge sortiert ist, wird das letzte hinzugefügte Element das größte und das erste das kleinste sein.
 
