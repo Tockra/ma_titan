@@ -172,7 +172,6 @@ impl STree {
         let new_k = self.root_table[i].try_get(j).unwrap().compute_next_set_bit(&k);
         return new_k
             .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
-        unimplemented!();
     }
 
     /// Hilfsfunktion, die in der Root-Top-Sub-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
@@ -204,7 +203,7 @@ impl STree {
         else {
             self.compute_next_set_bit(u40::new(bit))
         }
-        unimplemented!();
+       
     }
 
     /// Hilfsfunktion, die in der Root-Top-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
@@ -234,7 +233,6 @@ impl STree {
                 val => Some(u40::new(u64::from(x)*64 + val as u64))
             }
         )
-        unimplemented!();
     }
 
     /// Diese Methode gibt den Index INDEX des kleinsten Elements zurück für das gilt element<=element_list[INDEX].
@@ -432,13 +430,42 @@ impl<T> Level<T> {
 
     
 
-    /// Hilfsfunktion, die in der Lx-Top-Tabelle das nächste Bit, dass nach dem `bit` gesetzt ist, zurückgibt. 
+    /// Hilfsfunktion, die in der Lx-Top-Tabelle das nächste Bit, dass nach `bit` gesetzt ist, zurückgibt. 
     /// 
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top, dessen "Nachfolger" gesucht werden soll.
     #[inline]
     pub fn compute_next_set_bit(&self, bit: &u10) -> Option<u10> {
+        let bit = u16::from(*bit);
+        let index = bit as usize/64;
+
+        if self.lx_top[index] != 0 {
+            let in_index = bit%64;
+            let bit_mask: u64 = u64::max_value() >> in_index;
+            let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
+
+            if num_zeroes != 64 {
+                return Some(u10::new(index as u16 *64 + num_zeroes as u16));
+            }
+        }
+        for i in index+1..self.lx_top.len() {
+            let val = self.lx_top[i];
+            if val != 0 {
+                let num_zeroes = val.leading_zeros();
+                return Some(u10::new(i as u16 *64 + num_zeroes as u16));
+            }
+        }
+        None
+    }
+
+    /// Hilfsfunktion, die in der Lx-Top-Tabelle das letzte Bit, dass vor `bit` gesetzt ist, zurückgibt. 
+    /// 
+    /// # Arguments
+    ///
+    /// * `bit` - Bitgenauer Index in self.root_top, dessen "Vorgänger" gesucht werden soll.
+    #[inline]
+    pub fn compute_last_set_bit(&self, bit: &u10) -> Option<u10> {
         let bit = u16::from(*bit);
         let index = bit as usize/64;
 
