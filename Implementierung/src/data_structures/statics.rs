@@ -135,23 +135,23 @@ impl STree {
         }
 
         // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
-        if self.root_table[i].get(j).is_none() || self.element_list[self.root_table[i].get(j).unwrap().maximum.unwrap()] < element {
+        if self.root_table[i].try_get(j).is_none() || self.element_list[self.root_table[i].try_get(j).unwrap().maximum.unwrap()] < element {
             let new_j = self.root_table[i].compute_next_set_bit(&(j+u10::new(1)));
             return new_j
-                .and_then(|x| self.root_table[i].get(x))
+                .and_then(|x| self.root_table[i].try_get(x))
                 .map(|x| x.minimum.unwrap());
         }
     
 
         // Paper z.7
-        if self.root_table[i].get(j).unwrap().maximum == self.root_table[i].get(j).unwrap().minimum {
-            return Some(self.root_table[i].get(j).unwrap().minimum.unwrap());
+        if self.root_table[i].try_get(j).unwrap().maximum == self.root_table[i].try_get(j).unwrap().minimum {
+            return Some(self.root_table[i].try_get(j).unwrap().minimum.unwrap());
         }
 
         // Paper z.8
-        let new_k = self.root_table[i].get(j).unwrap().compute_next_set_bit(&k);
+        let new_k = self.root_table[i].try_get(j).unwrap().compute_next_set_bit(&k);
         return new_k
-            .map(|x| self.root_table[i].get(j).unwrap().get(x).unwrap().unwrap());
+            .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
 
     }
 
@@ -276,7 +276,7 @@ impl<T> Level<T> {
     ///
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
-    pub fn get(&self, key: u10) -> Option<&T> {
+    pub fn try_get(&self, key: u10) -> Option<&T> {
         let k = u16::from(key);
         let index = (k/64) as usize;
         let in_index_mask = 1<<(63-(k % 64));
@@ -289,6 +289,8 @@ impl<T> Level<T> {
             None
         }
     }
+
+    
 
     /// Hilfsfunktion, die in der Lx-Top-Tabelle das nächste Bit, dass nach dem `bit` gesetzt ist, zurückgibt. 
     /// 
