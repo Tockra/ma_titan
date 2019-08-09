@@ -12,6 +12,10 @@ type Int = u40;
 /// Die Länge des Root-Arrays, des STrees (basierend auf 40-Bit geteilt durch 2.).
 const ROOT_ARRAY_SIZE: usize = 1<<20;
 
+/// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
+/// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
+pub const GAMMA: f64 = 2.0;
+
 /// Die Länge der L2- und L3-Top-Arrays, des STrees (basierend auf 40-Bit /2/2.).
 const LX_ARRAY_SIZE: usize = 1 << 10;
 
@@ -83,9 +87,7 @@ impl STreeBuilder {
                 build_lx_top(&mut result[i].lx_top, key);
                 let keys = self.root_table[i].hash_map.get(&key).unwrap().keys.as_ref();
 
-                result[i].get(key).hash_function = 
-                    Some(Mphf::new_parallel(2.0,&keys, None));
-                    
+                result[i].get(key).hash_function = Some(Mphf::new_parallel(GAMMA,&keys, None));
                     
                 for _ in 0..len {
                     for &sub_key in &self.root_table[i].hash_map.get(&key).unwrap().keys {

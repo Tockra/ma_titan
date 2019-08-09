@@ -3,7 +3,7 @@ use ux::{u40,u10};
 use boomphf::Mphf;
 
 use crate::help::internal::{Splittable};
-use crate::help::builder::STreeBuilder;
+use crate::help::builder::{GAMMA,STreeBuilder};
 
 /// In dieser Implementierung werden u40 Integer gespeichert.
 pub type Int = u40;
@@ -105,6 +105,137 @@ impl STree {
         Some(self.element_list[self.len() - 1])
     }
 
+    /// Gibt das Maximum der übergebenen Ebene zurück.
+    /// 
+    /// # Arguments
+    ///
+    /// * `lx` - Referenz auf die Ebene, dessen Maximum zurückgegeben werden soll.
+    #[inline]
+    fn maximum_level<T>(&self, lx: &Level<T>) -> Option<Int>{
+        lx.maximum.and_then(|x| Some(self.element_list[x]))
+    }
+
+    /// Gibt das Minimum der übergebenen Ebene zurück.
+    /// 
+    /// # Arguments
+    ///
+    /// * `lx` - Referenz auf die Ebene, dessen Minimum zurückgegeben werden soll.
+    #[inline]
+    fn minimum_level<T>(&self, lx: &Level<T>) -> Option<Int>{
+        lx.minimum.and_then(|x| Some(self.element_list[x]))
+    }
+
+
+
+    /// Diese Methode gibt den Index INDEX des größten Elements zurück für das gilt element_list[INDEX]<=element>.
+    /// Somit kann mit dieser Methode geprüft werden, ob ein Element in der Datenstruktur enthalten ist. Dann wird der Index dieses Elements zurückgegeben.
+    /// Ist das Element nicht enthalten, wird der "Nachfolger" dieses Elements zurückgegeben.
+    /// 
+    /// # Arguments
+    ///
+    /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Vorgängers von `element` zurückgegeben.
+    #[inline]
+    pub fn locate_or_pred(&self, element: Int) -> Option<usize> {
+        let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
+
+        // Paper z.1 
+        if self.len() < 1 || element > self.maximum().unwrap() {
+            return None;
+        } 
+
+        // Paper z. 3 
+        if self.root_table[i].maximum.is_none() || self.maximum_level(&self.root_table[i]).unwrap() < element {
+            return self.compute_next_set_bit(u40::new(i as u64))
+                .map(|x| self.root_table[u64::from(x) as usize].minimum.unwrap());
+        }
+       
+        // Paper z. 4
+        if self.root_table[i].maximum == self.root_table[i].minimum {
+            return Some(self.root_table[i].minimum.unwrap());
+        }
+
+        // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
+        if self.root_table[i].try_get(j).is_none() || self.maximum_level(&self.root_table[i].try_get(j).unwrap()).unwrap() < element {
+            let new_j = self.root_table[i].compute_next_set_bit(&(j+u10::new(1)));
+            return new_j
+                .and_then(|x| self.root_table[i].try_get(x))
+                .map(|x| x.minimum.unwrap());
+        }
+    
+
+        // Paper z.7
+        if self.root_table[i].try_get(j).unwrap().maximum == self.root_table[i].try_get(j).unwrap().minimum {
+            return Some(self.root_table[i].try_get(j).unwrap().minimum.unwrap());
+        }
+
+        // Paper z.8
+        let new_k = self.root_table[i].try_get(j).unwrap().compute_next_set_bit(&k);
+        return new_k
+            .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
+        unimplemented!();
+    }
+
+    /// Hilfsfunktion, die in der Root-Top-Sub-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
+    /// 
+    /// # Arguments
+    ///
+    /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Vorgänger" gesucht werden soll.
+    fn compute_last_set_bit_deep(&self, bit: Int, level:u8) -> Option<Int> {
+        let bit = u64::from(bit) + 1;
+        let index = bit as usize/64;
+        let in_index = bit%64;
+        let bit_mask: u64 = u64::max_value() >> in_index;
+
+        if level != 0 {
+            let nulls = (self.root_top_sub[index] & bit_mask).leading_zeros();
+            if nulls != 64 {
+                return Some(u40::new(index as u64 *64 + nulls as u64));
+            } else {
+                for i in index+1..self.root_top_sub.len() {
+                    if self.root_top_sub[i] != 0 {
+                        let nulls = self.root_top_sub[i].leading_zeros();
+                        return Some(u40::new(i as u64 * 64 + nulls as u64));
+                    }
+                } 
+            }
+
+            None
+        }
+        else {
+            self.compute_next_set_bit(u40::new(bit))
+        }
+        unimplemented!();
+    }
+
+    /// Hilfsfunktion, die in der Root-Top-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
+    /// 
+    /// # Arguments
+    ///
+    /// * `bit` - Bitgenauer Index in self.root_top, dessen "Vorgänger" gesucht werden soll.
+    fn compute_last_set_bit(&self, bit: Int) -> Option<Int> {
+        let bit = u64::from(bit) + 1;
+        let index = bit as usize/64;
+        let in_index = bit%64;
+        // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
+        // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
+        let bit_mask: u64 = u64::max_value() >> in_index; // genau falschherum
+        
+        // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
+        let nulls = (self.root_top[index] & bit_mask).leading_zeros();
+        if nulls != 64 {
+            return Some(u40::new(index as u64 *64+nulls as u64));
+        }
+        
+        // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
+        let new_index = self.compute_next_set_bit_deep(u40::new(bit as u64/64) ,1);
+        new_index.and_then(|x|
+            match self.root_top[u64::from(x) as usize].leading_zeros() {
+                64 => None,
+                val => Some(u40::new(u64::from(x)*64 + val as u64))
+            }
+        )
+        unimplemented!();
+    }
 
     /// Diese Methode gibt den Index INDEX des kleinsten Elements zurück für das gilt element<=element_list[INDEX].
     /// Somit kann mit dieser Methode geprüft werden, ob ein Element in der Datenstruktur enthalten ist. Dann wird der Index dieses Elements zurückgegeben.
@@ -123,7 +254,7 @@ impl STree {
         } 
 
         // Paper z. 3 
-        if self.root_table[i].maximum.is_none() || self.element_list[self.root_table[i].maximum.unwrap()] < element {
+        if self.root_table[i].maximum.is_none() || self.maximum_level(&self.root_table[i]).unwrap() < element {
             return self.compute_next_set_bit(u40::new(i as u64))
                 .map(|x| self.root_table[u64::from(x) as usize].minimum.unwrap());
         }
@@ -134,7 +265,7 @@ impl STree {
         }
 
         // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
-        if self.root_table[i].try_get(j).is_none() || self.element_list[self.root_table[i].try_get(j).unwrap().maximum.unwrap()] < element {
+        if self.root_table[i].try_get(j).is_none() || self.maximum_level(&self.root_table[i].try_get(j).unwrap()).unwrap() < element {
             let new_j = self.root_table[i].compute_next_set_bit(&(j+u10::new(1)));
             return new_j
                 .and_then(|x| self.root_table[i].try_get(x))
@@ -246,13 +377,9 @@ impl<T> Level<T> {
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
     pub fn new(level: usize, keys: Option<Vec<u10>>) -> Level<T> {
-        /*
-            Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
-            Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
-        */
         match keys {
             Some(x) => Level {
-                hash_function: Some(Mphf::new_parallel(2.0,&x,None)),
+                hash_function: Some(Mphf::new_parallel(GAMMA,&x,None)),
                 objects: vec![],
                 maximum: None,
                 minimum: None,
@@ -282,7 +409,7 @@ impl<T> Level<T> {
 
         // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
         if (self.lx_top[index] & in_index_mask) != 0 {
-            let hash = self.hash_function.as_ref().unwrap().try_hash(&key)? as usize;
+            let hash = self.hash_function.as_ref()?.try_hash(&key)? as usize;
             self.objects.get(hash)
         } else {
             None
