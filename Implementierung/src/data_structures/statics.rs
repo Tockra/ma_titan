@@ -63,20 +63,19 @@ impl STree {
 
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(element);
 
-            let root = &mut result.root_table[i];
-            root.minimum.get_or_insert(index);
-            root.maximum = Some(index);
+            let l2_level = &mut result.root_table[i];
+            l2_level.minimum.get_or_insert(index);
+            l2_level.maximum = Some(index);
 
-            let first_key = root.hash_function.as_ref().unwrap().hash(&j) as usize;
-            let first = &mut root.objects[first_key];
+            let mut l3_level = l2_level.get(j);
 
             // Minima- und Maximasetzung auf der ersten Ebene
-            first.minimum.get_or_insert(index);
-            first.maximum = Some(index);
+            l3_level.minimum.get_or_insert(index);
+            l3_level.maximum = Some(index);
 
-            let second_key = first.hash_function.as_ref().unwrap().hash(&k) as usize;
+            let target_element=l3_level.get(k);
             // Werte korrekt auf die Array-Indizes zeigen lassen:Level
-            first.objects[second_key] = Some(index);
+            *target_element = Some(index);
         }
         result
     }
@@ -290,6 +289,20 @@ impl<T> Level<T> {
         }
     }
 
+    /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
+    /// das zu `key` ein Schlüssel gehört. Anderenfalls sollte `try_hash` verwendet werden
+    /// 
+    /// # Arguments
+    ///
+    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    #[inline]
+    pub fn get(&mut self, key: u10) -> &mut T {
+        let hash = self.hash_function.as_ref().unwrap().try_hash(&key).unwrap() as usize;
+        self.objects.get_mut(hash).unwrap()
+    }
+
+    
+
     
 
     /// Hilfsfunktion, die in der Lx-Top-Tabelle das nächste Bit, dass nach dem `bit` gesetzt ist, zurückgibt. 
@@ -349,15 +362,15 @@ mod tests {
         }
  
         let check = data.clone();
-        let data_structure: STree = STree::new(data);
+        let mut data_structure: STree = STree::new(data);
 
         assert_eq!(data_structure.len(),check.len());
         assert_eq!(data_structure.minimum().unwrap(),u40::new(0));
         assert_eq!(data_structure.maximum().unwrap(),u40::new(check.len() as u64 - 1));
         for val in check {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
-            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hash_function.as_ref().unwrap().hash(&j) as usize];
-            let saved_val = second_level.objects[second_level.hash_function.as_ref().unwrap().hash(&k) as usize].unwrap();
+            let second_level = data_structure.root_table[i].get(j);
+            let saved_val = second_level.get(k).unwrap();
             assert_eq!(data_structure.element_list[saved_val],val);
         }
     }
@@ -368,7 +381,7 @@ mod tests {
     fn test_top_arrays() {
         let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101)];
         let check = data.clone();
-        let data_structure: STree = STree::new(data);
+        let mut data_structure: STree = STree::new(data);
 
         assert_eq!(data_structure.len(),check.len());
         assert_eq!(data_structure.minimum().unwrap(),u40::new(0b00000000000000000000_1010010010_0101010101));
@@ -376,8 +389,8 @@ mod tests {
 
         for val in check {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
-            let second_level = &data_structure.root_table[i].objects[data_structure.root_table[i].hash_function.as_ref().unwrap().hash(&j) as usize];
-            let saved_val = second_level.objects[second_level.hash_function.as_ref().unwrap().hash(&k) as usize].unwrap();
+            let second_level = &mut data_structure.root_table[i].get(j);
+            let saved_val = second_level.get(k).unwrap();
             assert_eq!(data_structure.element_list[saved_val],val);
         }
         // Root_TOP

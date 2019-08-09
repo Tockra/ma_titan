@@ -83,15 +83,15 @@ impl STreeBuilder {
                 build_lx_top(&mut result[i].lx_top, key);
                 let keys = self.root_table[i].hash_map.get(&key).unwrap().keys.as_ref();
 
-                result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].hash_function = 
+                result[i].get(key).hash_function = 
                     Some(Mphf::new_parallel(2.0,&keys, None));
                     
                     
                 for _ in 0..len {
                     for &sub_key in &self.root_table[i].hash_map.get(&key).unwrap().keys {
-                        build_lx_top(&mut result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].lx_top,sub_key);
+                        build_lx_top(&mut result[i].get(key).lx_top,sub_key);
                     }
-                    result[i].objects[result[i].hash_function.as_ref().unwrap().hash(&key) as usize].objects.push(None);
+                    result[i].get(key).objects.push(None);
                 } 
             }
 
