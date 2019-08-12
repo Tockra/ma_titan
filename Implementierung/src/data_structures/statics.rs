@@ -180,20 +180,20 @@ impl STree {
     ///
     /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Vorgänger" gesucht werden soll.
     fn compute_last_set_bit_deep(&self, bit: Int, level:u8) -> Option<Int> {
-        let bit = u64::from(bit) + 1;
+        let bit = u64::from(bit) - 1;
         let index = bit as usize/64;
         let in_index = bit%64;
-        let bit_mask: u64 = u64::max_value() >> in_index;
+        let bit_mask: u64 = u64::max_value() << (63-in_index);
 
         if level != 0 {
-            let nulls = (self.root_top_sub[index] & bit_mask).leading_zeros();
+            let nulls = (self.root_top_sub[index] & bit_mask).trailing_zeros();
             if nulls != 64 {
-                return Some(u40::new(index as u64 *64 + nulls as u64));
+                return Some(u40::new((index+1) as u64 *64 - nulls as u64));
             } else {
-                for i in index+1..self.root_top_sub.len() {
+                for i in (0..index).rev() {
                     if self.root_top_sub[i] != 0 {
-                        let nulls = self.root_top_sub[i].leading_zeros();
-                        return Some(u40::new(i as u64 * 64 + nulls as u64));
+                        let nulls = self.root_top_sub[i].trailing_zeros();
+                        return Some(u40::new((i+1) as u64 * 64 - nulls as u64));
                     }
                 } 
             }
@@ -201,36 +201,36 @@ impl STree {
             None
         }
         else {
-            self.compute_next_set_bit(u40::new(bit))
+            self.compute_last_set_bit(u40::new(bit+1))
         }
        
     }
 
     /// Hilfsfunktion, die in der Root-Top-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
-    /// 
+    /// Achtung diese Funktion funktioniert etwas anders als Level::compute_last_set_bit !
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top, dessen "Vorgänger" gesucht werden soll.
     fn compute_last_set_bit(&self, bit: Int) -> Option<Int> {
-        let bit = u64::from(bit) + 1;
+        let bit = u64::from(bit) - 1;
         let index = bit as usize/64;
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
-        let bit_mask: u64 = u64::max_value() >> in_index; // genau falschherum
+        let bit_mask: u64 = u64::max_value() << (63-in_index); // genau andersrum (in 111..11 werden 0en reingeschoben)
         
         // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
-        let nulls = (self.root_top[index] & bit_mask).leading_zeros();
+        let nulls = (self.root_top[index] & bit_mask).trailing_zeros();
         if nulls != 64 {
-            return Some(u40::new(index as u64 *64+nulls as u64));
+            return Some(u40::new((index + 1) as u64 *64-nulls as u64));
         }
         
         // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-        let new_index = self.compute_next_set_bit_deep(u40::new(bit as u64/64) ,1);
+        let new_index = self.compute_last_set_bit_deep(u40::new(bit as u64/64) ,1);
         new_index.and_then(|x|
-            match self.root_top[u64::from(x) as usize].leading_zeros() {
+            match self.root_top[u64::from(x) as usize].trailing_zeros() {
                 64 => None,
-                val => Some(u40::new(u64::from(x)*64 + val as u64))
+                val => Some(u40::new(u64::from(x+u40::new(1))*64 - val as u64))
             }
         )
     }
@@ -310,11 +310,12 @@ impl STree {
             None
         }
         else {
-            self.compute_next_set_bit(u40::new(bit))
+            self.compute_next_set_bit(u40::new(bit-1))
         }
     }
 
     /// Hilfsfunktion, die in der Root-Top-Tabelle das nächste Bit, dass nach Index `bit` gesetzt ist, zurückgibt. 
+    /// Achtung diese Funktion funktioniert etwas anders als Level::compute_next_set_bit !
     /// 
     /// # Arguments
     ///
@@ -325,7 +326,7 @@ impl STree {
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
-        let bit_mask: u64 = u64::max_value() >> in_index; // genau falschherum
+        let bit_mask: u64 = u64::max_value() >> in_index; // genau andersrum (in 111..11 werden 0en reingeschoben)
         
         // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
         let nulls = (self.root_top[index] & bit_mask).leading_zeros();
@@ -484,7 +485,7 @@ impl<T> Level<T> {
             let val = self.lx_top[i];
             if val != 0 {
                 let num_zeroes = val.trailing_zeros();
-                return Some(u10::new(i + 1 as u16 *64 - num_zeroes as u16));
+                return Some(u10::new((i + 1) as u16 *64 - num_zeroes as u16));
             }
         }
         None
