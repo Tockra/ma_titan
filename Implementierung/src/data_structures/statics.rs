@@ -139,14 +139,14 @@ impl STree {
         let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
 
         // Paper z.1 
-        if self.len() < 1 || element > self.maximum().unwrap() {
+        if self.len() < 1 || element < self.minimum().unwrap() {
             return None;
         } 
 
         // Paper z. 3 
-        if self.root_table[i].maximum.is_none() || self.maximum_level(&self.root_table[i]).unwrap() < element {
-            return self.compute_next_set_bit(u40::new(i as u64))
-                .map(|x| self.root_table[u64::from(x) as usize].minimum.unwrap());
+        if self.root_table[i].minimum.is_none() || element < self.minimum_level(&self.root_table[i]).unwrap() {
+            return self.compute_last_set_bit(u40::new(i as u64))
+                .map(|x| self.root_table[u64::from(x) as usize].maximum.unwrap());
         }
        
         // Paper z. 4
@@ -155,11 +155,11 @@ impl STree {
         }
 
         // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
-        if self.root_table[i].try_get(j).is_none() || self.maximum_level(&self.root_table[i].try_get(j).unwrap()).unwrap() < element {
-            let new_j = self.root_table[i].compute_next_set_bit(&(j+u10::new(1)));
+        if self.root_table[i].try_get(j).is_none() || element < self.minimum_level(&self.root_table[i].try_get(j).unwrap()).unwrap() {
+            let new_j = self.root_table[i].compute_last_set_bit(&(j-u10::new(1)));
             return new_j
                 .and_then(|x| self.root_table[i].try_get(x))
-                .map(|x| x.minimum.unwrap());
+                .map(|x| x.maximum.unwrap());
         }
     
 
@@ -169,7 +169,7 @@ impl STree {
         }
 
         // Paper z.8
-        let new_k = self.root_table[i].try_get(j).unwrap().compute_next_set_bit(&k);
+        let new_k = self.root_table[i].try_get(j).unwrap().compute_last_set_bit(&k);
         return new_k
             .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
     }
