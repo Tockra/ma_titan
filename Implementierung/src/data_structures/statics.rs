@@ -277,7 +277,7 @@ impl STree {
         }
 
         // Paper z.8
-        let new_k = self.root_table[i].try_get(j).unwrap().compute_next_set_bit(&k);
+        let new_k = self.root_table[i].try_get(j).unwrap().compute_next_set_bit(&(k));
         return new_k
             .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
 
@@ -430,7 +430,8 @@ impl<T> Level<T> {
 
     
 
-    /// Hilfsfunktion, die in der Lx-Top-Tabelle das nächste Bit, dass nach `bit` gesetzt ist, zurückgibt. 
+    /// Hilfsfunktion, die in der Lx-Top-Tabelle das nächste Bit, dass nach `bit` gesetzt ist, zurückgibt. Ist `bit=1` dann wird
+    /// `bit` selbst zurückgegeben.
     /// 
     /// # Arguments
     ///
@@ -459,7 +460,8 @@ impl<T> Level<T> {
         None
     }
 
-    /// Hilfsfunktion, die in der Lx-Top-Tabelle das letzte Bit, dass vor `bit` gesetzt ist, zurückgibt. 
+    /// Hilfsfunktion, die in der Lx-Top-Tabelle das letzte Bit, dass vor `bit` gesetzt ist, zurückgibt. Ist `bit=1` dann wird
+    /// `bit` selbst zurückgegeben. 
     /// 
     /// # Arguments
     ///
@@ -471,18 +473,18 @@ impl<T> Level<T> {
 
         if self.lx_top[index] != 0 {
             let in_index = bit%64;
-            let bit_mask: u64 = u64::max_value() >> in_index;
-            let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
+            let bit_mask: u64 = u64::max_value() << (63-in_index);
+            let num_zeroes = (self.lx_top[index] & bit_mask).trailing_zeros();
 
             if num_zeroes != 64 {
-                return Some(u10::new(index as u16 *64 + num_zeroes as u16));
+                return Some(u10::new((index + 1) as u16 *64 - num_zeroes as u16));
             }
         }
-        for i in index+1..self.lx_top.len() {
+        for i in (0..index).rev() {
             let val = self.lx_top[i];
             if val != 0 {
-                let num_zeroes = val.leading_zeros();
-                return Some(u10::new(i as u16 *64 + num_zeroes as u16));
+                let num_zeroes = val.trailing_zeros();
+                return Some(u10::new(i + 1 as u16 *64 - num_zeroes as u16));
             }
         }
         None
