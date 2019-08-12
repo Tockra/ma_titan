@@ -148,7 +148,7 @@ impl STree {
             return self.compute_last_set_bit(u40::new(i as u64))
                 .map(|x| self.root_table[u64::from(x) as usize].maximum.unwrap());
         }
-       
+
         // Paper z. 4
         if self.root_table[i].maximum == self.root_table[i].minimum {
             return Some(self.root_table[i].minimum.unwrap());
@@ -161,13 +161,13 @@ impl STree {
                 .and_then(|x| self.root_table[i].try_get(x))
                 .map(|x| x.maximum.unwrap());
         }
-    
+
 
         // Paper z.7
         if self.root_table[i].try_get(j).unwrap().maximum == self.root_table[i].try_get(j).unwrap().minimum {
             return Some(self.root_table[i].try_get(j).unwrap().minimum.unwrap());
         }
-
+ 
         // Paper z.8
         let new_k = self.root_table[i].try_get(j).unwrap().compute_last_set_bit(&k);
         return new_k
@@ -188,12 +188,12 @@ impl STree {
         if level != 0 {
             let nulls = (self.root_top_sub[index] & bit_mask).trailing_zeros();
             if nulls != 64 {
-                return Some(u40::new((index+1) as u64 *64 - nulls as u64));
+                return Some(u40::new((index+1) as u64 *64 - (nulls+1) as u64));
             } else {
                 for i in (0..index).rev() {
                     if self.root_top_sub[i] != 0 {
                         let nulls = self.root_top_sub[i].trailing_zeros();
-                        return Some(u40::new((i+1) as u64 * 64 - nulls as u64));
+                        return Some(u40::new((i+1) as u64 * 64 - (nulls+1) as u64));
                     }
                 } 
             }
@@ -222,7 +222,7 @@ impl STree {
         // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
         let nulls = (self.root_top[index] & bit_mask).trailing_zeros();
         if nulls != 64 {
-            return Some(u40::new((index + 1) as u64 *64-nulls as u64));
+            return Some(u40::new((index + 1) as u64 *64-(nulls+1) as u64));
         }
         
         // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
@@ -230,7 +230,7 @@ impl STree {
         new_index.and_then(|x|
             match self.root_top[u64::from(x) as usize].trailing_zeros() {
                 64 => None,
-                val => Some(u40::new(u64::from(x+u40::new(1))*64 - val as u64))
+                val => Some(u40::new(u64::from(x+u40::new(1))*64 - (val+1) as u64))
             }
         )
     }
@@ -478,14 +478,14 @@ impl<T> Level<T> {
             let num_zeroes = (self.lx_top[index] & bit_mask).trailing_zeros();
 
             if num_zeroes != 64 {
-                return Some(u10::new((index + 1) as u16 *64 - num_zeroes as u16));
+                return Some(u10::new((index + 1) as u16 *64 - (num_zeroes+1) as u16));
             }
         }
         for i in (0..index).rev() {
             let val = self.lx_top[i];
             if val != 0 {
                 let num_zeroes = val.trailing_zeros();
-                return Some(u10::new((i + 1) as u16 *64 - num_zeroes as u16));
+                return Some(u10::new((i + 1) as u16 *64 - (num_zeroes+1) as u16));
             }
         }
         None
@@ -672,7 +672,7 @@ mod tests {
             if index > 0 {
                 for i in (data_v1[index-1]..data_v1[index]).rev() {
                     let locate = data_structure.locate_or_pred(u40::new(i)).unwrap();
-                    assert_eq!(u40::new(data_v1[index-1]), data_structure.element_list[locate-1]);
+                    assert_eq!(u40::new(data_v1[index-1]), data_structure.element_list[locate]);
                 }
             }
         }
