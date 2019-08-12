@@ -655,4 +655,26 @@ mod tests {
             }
         }
     }
+
+    /// Die locate_or_pred-Funktion wird getestet. Dabei werden beliebige (fest gewählte) Werte in ein STree gegeben und anschließend wird
+    /// `locate_or_pred(x) mit allen x zwischen STree.min() und STree.max() getestet.
+    #[test]
+    fn test_locate_or_pred_bruteforce() {
+        let data_v1: Vec<u64> = vec![0,1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 1065983];
+        let mut data: Vec<u40> = vec![];
+        for val in data_v1.iter() {
+            data.push(u40::new(*val));
+        }
+        
+        let data_structure: STree = STree::new(data);
+        assert_eq!(u40::new(1065983), data_structure.element_list[data_structure.locate_or_pred(u40::new(1065983)).unwrap()]);
+        for (index,_) in data_v1.iter().enumerate().rev() {
+            if index > 0 {
+                for i in (data_v1[index-1]..data_v1[index]).rev() {
+                    let locate = data_structure.locate_or_pred(u40::new(i)).unwrap();
+                    assert_eq!(u40::new(data_v1[index-1]), data_structure.element_list[locate-1]);
+                }
+            }
+        }
+    }
 }
