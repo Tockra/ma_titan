@@ -652,6 +652,7 @@ mod tests {
             } else {
                 assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem).unwrap() as usize], elem);
                 assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem-u40::new(1)).unwrap() as usize], elem);
+              //??  assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem-u40::new(10000)).unwrap() as usize], elem);
             }
         }
     }
@@ -674,6 +675,75 @@ mod tests {
                     let locate = data_structure.locate_or_pred(u40::new(i)).unwrap();
                     assert_eq!(u40::new(data_v1[index-1]), data_structure.element_list[locate]);
                 }
+            }
+        }
+    }
+
+     /// # Äquivalenzklassentest mit Bruteforce
+    /// `locate_or_pred` wird getestet. Dabei werden in jeder Ebene die gesuchten Elemente einmal im Minimum, im Maximum und irgendwo dazwischen liegen.
+    #[test]
+    fn test_locate_or_pred_eqc_bruteforce_test() {
+        let data_raw: Vec<u64> = vec![
+            0b00000000000000000000_0000000000_0000000001,
+            0b00000000000000000000_0000000000_0000111000,
+            0b00000000000000000000_0000000000_1111111111,
+
+            0b00000000000000000000_0001110000_0000000000,
+            0b00000000000000000000_0001110000_0000111000,
+            0b00000000000000000000_0001110000_1111111111,
+
+            0b00000000000000000000_1111111111_0000000000,
+            0b00000000000000000000_1111111111_0000111000,
+            0b00000000000000000000_1111111111_1111111111,
+
+            0b00000000001111000000_0000000000_0000000000,
+            0b00000000001111000000_0000000000_0000111000,
+            0b00000000001111000000_0000000000_1111111111,
+
+            0b00000000001111000000_0001110000_0000000000,
+            0b00000000001111000000_0001110000_0000111000,
+            0b00000000001111000000_0001110000_1111111111,
+
+            0b00000000001111000000_1111111111_0000000000,
+            0b00000000001111000000_1111111111_0000111000,
+            0b00000000001111000000_1111111111_1111111111,
+
+            0b11111111111111111111_0000000000_0000000000,
+            0b11111111111111111111_0000000000_0000111000,
+            0b11111111111111111111_0000000000_1111111111,
+
+            0b11111111111111111111_0001110000_0000000000,
+            0b11111111111111111111_0001110000_0000111000,
+            0b11111111111111111111_0001110000_1111111111,
+
+            0b11111111111111111111_1111111111_0000000000,
+            0b11111111111111111111_1111111111_0000111000,
+            0b11111111111111111111_1111111111_1111111111,
+            
+        ];
+
+        let mut data: Vec<u40> = vec![];
+        for val in data_raw.iter() {
+            data.push(u40::new(*val));
+        }
+        let data_structure: STree = STree::new(data.clone());
+        assert_eq!(data_structure.locate_or_pred(u40::new(0)), None);
+        assert_eq!(data_structure.element_list[data_structure.locate_or_pred(u40::new(0b11111111111111111111_1111111111_1111111111)).unwrap()], u40::new(0b11111111111111111111_1111111111_1111111111));
+
+        for (i,&elem) in data.iter().enumerate().rev() {
+            if i < data.len()-1 {
+                for j in 0..16877216 {
+                    if u40::new(j) < u40::max_value() - elem {
+                        let index = elem + u40::new(j);
+                        if index < data_structure.element_list[i+1] {
+                            assert_eq!(data_structure.element_list[data_structure.locate_or_pred(index).unwrap() as usize], elem);
+                        }
+                    }
+                }
+            } else {
+                assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem).unwrap() as usize], elem);
+               // assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem+u40::new(1)).unwrap() as usize], elem);
+                // ??assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem+u40::new(10000)).unwrap() as usize], elem);
             }
         }
     }
