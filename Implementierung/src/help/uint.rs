@@ -133,12 +133,60 @@ impl Int for u8 {
 mod tests {
     use super::UIntPair;
     type u40 = UIntPair<u8>;
+
+    /// Checks the conversion from u8 to u40 
+    #[test]
+    fn test_from_u8() {
+        for i in 0..u8::max_value() {
+            assert_eq!(u64::from(u40::from(i)), i as u64);
+        }
+    }
+
+    /// Checks the conversion from i8 to u40 
+    #[test]
+    fn test_from_i8() {
+        for i in 0..i8::max_value() {
+            assert_eq!(u64::from(u40::from(i)), i as u64);
+        }
+    }
+
+    /// Checks the conversion from u16 to u40 
+    #[test]
+    fn test_from_u16() {
+        for i in 0..u16::max_value() {
+            assert_eq!(u64::from(u40::from(i)), i as u64);
+        }
+    }
+
+    /// Checks the conversion from i16 to u40 
+    #[test]
+    fn test_from_i16() {
+        for i in 0..i16::max_value() {
+            assert_eq!(u64::from(u40::from(i)), i as u64);
+        }
+    }
+
+        /// Checks the conversion from u32 to u40
     #[test]
     fn test_from_u32() {
         for i in 0..u32::max_value() {
             assert_eq!(u64::from(u40::from(i)), i as u64);
         }
     }
+
+    /// Checks the conversion from i32 to u40 
+    #[test]
+    fn test_from_i32() {
+        for i in 0..i32::max_value() {
+            assert_eq!(u64::from(u40::from(i)), i as u64);
+        }
+    }
+
+    
+
+    
+
+    
 }
 
 
