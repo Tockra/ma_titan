@@ -114,7 +114,7 @@ impl<T: Int, R: Into<Self>> Add<R> for UIntPair<T> {
         let add_high = (add_low >> Self::LOW_BITS) as u8;
         Self {
             low: (add_low & u32::max_value() as u64) as u32,
-            high: self.high.wrapping_add(other.high).wrapping_add(T::from(add_high) & T::MAX_VALUE) 
+            high: self.high + other.high + (T::from(add_high) & T::MAX_VALUE) 
         }
     }
 }
@@ -329,15 +329,15 @@ mod tests {
     #[test]
     fn test_all_addition() {
         let x: u8 = 25;
-        let y: i8 = -20;
+        let y: i8 = 20;
         let z: u16 = 30;
-        let a: i16 = -20;
+        let a: i16 = 20;
         let b: u32 = 40;
-        let c: i32 = -30;
+        let c: i32 = 30;
         let d: u64 = 80;
         let start = u40::from(0);
-        assert_eq!(u64::from(start + x + y + z + a + b + c + d), 105);
-        assert_eq!(d+(c + (b + (a + (z + (y+ (x + start)))))), 105);
+        assert_eq!(u64::from(start + x + y + z + a + b + c + d), 245);
+        assert_eq!(d+(c + (b + (a + (z + (y+ (x + start)))))), 245);
     }
 
     
