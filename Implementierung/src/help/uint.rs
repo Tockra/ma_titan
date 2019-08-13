@@ -1,5 +1,5 @@
 use std::mem;
-use std::ops::Shl;
+use std::ops::{Shl, Add, BitAnd};
 
 /// Basierend auf folgender [Repository](https://github.com/thrill/thrill/blob/master/thrill/common/uint_types.hpp)
 #[derive(Copy, Clone)]
@@ -93,6 +93,26 @@ impl<T: Int> From<UIntPair<T>> for u64 {
     }
 }
 
+/// Ermöglicht die Konvertierung von UIntPair nach i64.
+impl<T: Int> From<UIntPair<T>> for i64 {
+    fn from(item: UIntPair<T>) -> Self {
+        u64::from(item) as i64
+    }
+}
+
+impl<T: Int> Add for UIntPair<T> {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let add_low = (self.low + other.low) as u64;
+        let add_high = (add_low >> Self::LOW_BITS) as u8;
+        Self {
+            low: (add_low & u32::max_value() as u64) as u32,
+            high: (self.high + other.high + ( T::from(add_high) & T::MAX_VALUE) )
+        }
+    }
+}
+
 /// Ermöglicht die Konvertierung von u64 nach UIntPair.
 impl<T: Int + From<u32>> From<u64> for UIntPair<T> {
     fn from(item: u64) -> Self {
@@ -101,15 +121,16 @@ impl<T: Int + From<u32>> From<u64> for UIntPair<T> {
         let low = item & u32::max_value() as u64;
         let high = (item >> Self::LOW_BITS) & T::MAX_VALUE.into();
         
-        UIntPair::<T> {
+        Self {
             low: low as u32,
             high: (high as u32).into()
         }
     }
 }
 
+
 /// Stellt sicher, dass der Wert (in high) einen Maximal- und Minimalwert besitzt.
-pub trait Int: Into<u64> + From<u8> + Copy + Shl<Output=Self> {
+pub trait Int: Into<u64> + From<u8> + Copy + Shl<Output=Self> + Add<Output=Self> + BitAnd<Output=Self> {
     const MAX_VALUE: Self;
     const MIN_VALUE: Self;
 }
@@ -133,6 +154,18 @@ impl Int for u8 {
 mod tests {
     use super::UIntPair;
     type u40 = UIntPair<u8>;
+
+    #[test]
+    fn test_add_random() {
+        for i in 0..100000 {
+            for j in 0..100000 {
+                let x = u40::from(i);
+                let y = u40::from(j);
+                assert_eq!(i+j, u64::from(x+y) as i32);
+            }
+        }
+
+    }
 
     /// Checks the conversion from u8 to u40 
     #[test]
