@@ -637,8 +637,7 @@ mod tests {
         }
         let data_structure: STree = STree::new(data.clone());
         assert_eq!(data_structure.locate_or_succ(u40::new(0b11111111111111111111_1111111111_1111111111)), None);
-        assert_eq!(data_structure.locate_or_succ(u40::new(0)), Some(0));
-
+        
         for (i,&elem) in data.iter().enumerate() {
             if i > 0 {
                 for j in 0..16877216 {
@@ -652,7 +651,6 @@ mod tests {
             } else {
                 assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem).unwrap() as usize], elem);
                 assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem-u40::new(1)).unwrap() as usize], elem);
-              //??  assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem-u40::new(10000)).unwrap() as usize], elem);
             }
         }
     }
@@ -718,7 +716,7 @@ mod tests {
 
             0b11111111111111111111_1111111111_0000000000,
             0b11111111111111111111_1111111111_0000111000,
-            0b11111111111111111111_1111111111_1111111111,
+            0b11111111111111111111_1111111111_1111111110,
             
         ];
 
@@ -728,7 +726,6 @@ mod tests {
         }
         let data_structure: STree = STree::new(data.clone());
         assert_eq!(data_structure.locate_or_pred(u40::new(0)), None);
-        assert_eq!(data_structure.element_list[data_structure.locate_or_pred(u40::new(0b11111111111111111111_1111111111_1111111111)).unwrap()], u40::new(0b11111111111111111111_1111111111_1111111111));
 
         for (i,&elem) in data.iter().enumerate().rev() {
             if i < data.len()-1 {
@@ -742,8 +739,7 @@ mod tests {
                 }
             } else {
                 assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem).unwrap() as usize], elem);
-               // assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem+u40::new(1)).unwrap() as usize], elem);
-                // ??assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem+u40::new(10000)).unwrap() as usize], elem);
+                assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem+u40::new(1)).unwrap() as usize], elem);
             }
         }
     }
