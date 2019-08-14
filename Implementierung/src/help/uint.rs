@@ -47,47 +47,135 @@ impl<T: Int> UIntPair<T> {
     
 }
 
-/// partial eq (==) with right site u8
-impl<T: Int> PartialEq<u8> for UIntPair<T> {
-    fn eq(&self, other: &u8) -> bool {
-        self.eq(&Self::from(*other))
+macro_rules! impl_UIntPair_traits {
+    ($($int:ty)*) => {
+        $(
+            /// partial eq (==) with right site $int
+            impl<T: Int> PartialEq<$int> for UIntPair<T> {
+                fn eq(&self, other: &$int) -> bool {
+                    self.eq(&Self::from(*other))
+                }
+            }
+
+            /// partial eq (==) with left site $int 
+            impl<T: Int> PartialEq<UIntPair<T>> for $int {
+                fn eq(&self, other: &UIntPair<T>) -> bool {
+                    other.eq(self)
+                }
+            }
+
+            /// PartialOrd implementation (<=) for $int on the right site
+            impl<T: Int> PartialOrd<$int> for UIntPair<T> {
+                fn partial_cmp(&self, other: &$int) -> Option<Ordering> {
+                    u64::from(*self).partial_cmp(&u64::from(*other))
+                }
+            }
+
+            /// PartialOrd implementation (<=) for $int on the left site
+            impl<T: Int> PartialOrd<UIntPair<T>> for $int {
+                fn partial_cmp(&self, other: &UIntPair<T>) -> Option<Ordering> {
+                    u64::from(*self).partial_cmp(&u64::from(*other))
+                }
+            }
+
+            /// BitAnd (&) for right site $int
+            impl<T: Int> BitAnd<$int> for UIntPair<T> {
+                type Output = Self;
+
+                // rhs is the "right-hand side" of the expression `a & b`
+                fn bitand(self, rhs: $int) -> Self::Output {
+                    Self {
+                        low: self.low & rhs as u32,
+                        high: self.high 
+                    }
+                }
+            }
+
+            /// BitAnd (&) for left site $int
+            impl<T: Int> BitAnd<UIntPair<T>> for $int {
+                type Output = UIntPair<T>;
+
+                // rhs is the "right-hand side" of the expression `a & b`
+                fn bitand(self, rhs: UIntPair<T>) -> Self::Output {
+                    UIntPair {
+                        low: self as u32 & rhs.low,
+                        high: rhs.high 
+                    }
+                }
+            }
+
+            /// BitOr (|) for right site $int
+            impl<T: Int> BitOr<$int> for UIntPair<T> {
+                type Output = Self;
+
+                fn bitor(self, rhs: $int) -> Self::Output {
+                    Self {
+                        low: self.low | rhs as u32,
+                        high: self.high 
+                    }
+                }
+            }
+
+            /// BitOr (|) for left site $int
+            impl<T: Int> BitOr<UIntPair<T>> for $int {
+                type Output = UIntPair<T>;
+
+                fn bitor(self, rhs: UIntPair<T>) -> Self::Output {
+                    UIntPair {
+                        low: self as u32 | rhs.low,
+                        high: rhs.high 
+                    }
+                }
+            }
+
+            /// subtraction-assign operator right site $int
+            impl<T: Int> SubAssign<$int> for UIntPair<T> {
+                fn sub_assign(&mut self, other: $int) {
+                    *self = *self - other;
+                }
+            }
+            
+            /// subtraction operator right site $int
+            impl<T: Int> Sub<$int> for UIntPair<T> {
+                type Output = Self;
+
+                fn sub(self, other: $int) -> Self {
+                    self - Self::from(other)
+                }
+            }
+
+            /// addition operator left site $int
+            impl<T: Int> Sub<UIntPair<T>> for $int {
+                type Output = UIntPair<T>;
+
+                fn sub(self, other: UIntPair<T>) -> UIntPair<T> {
+                    UIntPair::<T>::from(self) - other
+                }
+            }
+
+            /// addition operator right site $int
+            impl<T: Int> Add<$int> for UIntPair<T> {
+                type Output = Self;
+
+                fn add(self, other: $int) -> Self {
+                    self + Self::from(other)
+                }
+            }
+
+            /// addition operator left site $int
+            impl<T: Int> Add<UIntPair<T>> for $int {
+                type Output = UIntPair<T>;
+
+                fn add(self, other: UIntPair<T>) -> UIntPair<T> {
+                    other + self
+                }
+            }
+
+        )*
     }
 }
 
-/// partial eq (==) with left site u8
-impl<T: Int> PartialEq<UIntPair<T>> for u8 {
-    fn eq(&self, other: &UIntPair<T>) -> bool {
-        other.eq(self)
-    }
-}
-
-/// partial eq (==) with right site u16
-impl<T: Int> PartialEq<u16> for UIntPair<T> {
-    fn eq(&self, other: &u16) -> bool {
-        self.eq(&Self::from(*other))
-    }
-}
-
-/// partial eq (==) with left site u16
-impl<T: Int> PartialEq<UIntPair<T>> for u16 {
-    fn eq(&self, other: &UIntPair<T>) -> bool {
-        other.eq(self)
-    }
-}
-
-/// partial eq (==) with right site u32
-impl<T: Int> PartialEq<u32> for UIntPair<T> {
-    fn eq(&self, other: &u32) -> bool {
-        self.eq(&Self::from(*other))
-    }
-}
-
-/// partial eq (==) with left site u32
-impl<T: Int> PartialEq<UIntPair<T>> for u32 {
-    fn eq(&self, other: &UIntPair<T>) -> bool {
-        other.eq(self)
-    }
-}
+impl_UIntPair_traits!(u8 u16 u32);
 
 /// partial eq (==) with right site u64
 impl<T: Int> PartialEq<u64> for UIntPair<T> {
@@ -103,52 +191,8 @@ impl<T: Int> PartialEq<UIntPair<T>> for u64 {
     }
 }
 
-
-
 /// PartialOrd implementation (<=) for UIntPair<T> on the right site
 impl<T: Int> PartialOrd for UIntPair<T> {
-    fn partial_cmp(&self, other: &UIntPair<T>) -> Option<Ordering> {
-        u64::from(*self).partial_cmp(&u64::from(*other))
-    }
-}
-
-/// PartialOrd implementation (<=) for u8 on the right site
-impl<T: Int> PartialOrd<u8> for UIntPair<T> {
-    fn partial_cmp(&self, other: &u8) -> Option<Ordering> {
-        u64::from(*self).partial_cmp(&u64::from(*other))
-    }
-}
-
-/// PartialOrd implementation (<=) for u8 on the left site
-impl<T: Int> PartialOrd<UIntPair<T>> for u8 {
-    fn partial_cmp(&self, other: &UIntPair<T>) -> Option<Ordering> {
-        u64::from(*self).partial_cmp(&u64::from(*other))
-    }
-}
-
-/// PartialOrd implementation (<=) for u16 on the right site
-impl<T: Int> PartialOrd<u16> for UIntPair<T> {
-    fn partial_cmp(&self, other: &u16) -> Option<Ordering> {
-        u64::from(*self).partial_cmp(&u64::from(*other))
-    }
-}
-
-/// PartialOrd implementation (<=) for u16 on the left site
-impl<T: Int> PartialOrd<UIntPair<T>> for u16 {
-    fn partial_cmp(&self, other: &UIntPair<T>) -> Option<Ordering> {
-        u64::from(*self).partial_cmp(&u64::from(*other))
-    }
-}
-
-/// PartialOrd implementation (<=) for u32 on the right site
-impl<T: Int> PartialOrd<u32> for UIntPair<T> {
-    fn partial_cmp(&self, other: &u32) -> Option<Ordering> {
-        u64::from(*self).partial_cmp(&u64::from(*other))
-    }
-}
-
-/// PartialOrd implementation (<=) for u32 on the left site
-impl<T: Int> PartialOrd<UIntPair<T>> for u32 {
     fn partial_cmp(&self, other: &UIntPair<T>) -> Option<Ordering> {
         u64::from(*self).partial_cmp(&u64::from(*other))
     }
@@ -181,84 +225,6 @@ impl<T: Int> BitAnd for UIntPair<T> {
     }
 }
 
-/// BitAnd (&) for right site u8
-impl<T: Int> BitAnd<u8> for UIntPair<T> {
-    type Output = Self;
-
-    // rhs is the "right-hand side" of the expression `a & b`
-    fn bitand(self, rhs: u8) -> Self::Output {
-        Self {
-            low: self.low & rhs as u32,
-            high: self.high 
-        }
-    }
-}
-
-/// BitAnd (&) for left site u8
-impl<T: Int> BitAnd<UIntPair<T>> for u8 {
-    type Output = UIntPair<T>;
-
-    // rhs is the "right-hand side" of the expression `a & b`
-    fn bitand(self, rhs: UIntPair<T>) -> Self::Output {
-        UIntPair {
-            low: self as u32 & rhs.low,
-            high: rhs.high 
-        }
-    }
-}
-
-/// BitAnd (&) for right site u16
-impl<T: Int> BitAnd<u16> for UIntPair<T> {
-    type Output = Self;
-
-    // rhs is the "right-hand side" of the expression `a & b`
-    fn bitand(self, rhs: u16) -> Self::Output {
-        Self {
-            low: self.low & rhs as u32,
-            high: self.high 
-        }
-    }
-}
-
-/// BitAnd (&) for left site u16
-impl<T: Int> BitAnd<UIntPair<T>> for u16 {
-    type Output = UIntPair<T>;
-
-    // rhs is the "right-hand side" of the expression `a & b`
-    fn bitand(self, rhs: UIntPair<T>) -> Self::Output {
-        UIntPair {
-            low: self as u32 & rhs.low,
-            high: rhs.high 
-        }
-    }
-}
-
-/// BitAnd (&) for right site u32
-impl<T: Int> BitAnd<u32> for UIntPair<T> {
-    type Output = Self;
-
-    // rhs is the "right-hand side" of the expression `a & b`
-    fn bitand(self, rhs: u32) -> Self::Output {
-        Self {
-            low: self.low & rhs as u32,
-            high: self.high 
-        }
-    }
-}
-
-/// BitAnd (&) for left site u32
-impl<T: Int> BitAnd<UIntPair<T>> for u32 {
-    type Output = UIntPair<T>;
-
-    // rhs is the "right-hand side" of the expression `a & b`
-    fn bitand(self, rhs: UIntPair<T>) -> Self::Output {
-        UIntPair {
-            low: self as u32 & rhs.low,
-            high: rhs.high 
-        }
-    }
-}
-
 /// BitAnd (&) for right site u64
 impl<T: Int> BitAnd<u64> for UIntPair<T> {
     type Output = u64;
@@ -287,78 +253,6 @@ impl<T: Int> BitOr for UIntPair<T> {
         Self {
             low: self.low | rhs.low,
             high: self.high | rhs.high
-        }
-    }
-}
-
-/// BitOr (|) for right site u8
-impl<T: Int> BitOr<u8> for UIntPair<T> {
-    type Output = Self;
-
-    fn bitor(self, rhs: u8) -> Self::Output {
-        Self {
-            low: self.low | rhs as u32,
-            high: self.high 
-        }
-    }
-}
-
-/// BitOr (|) for left site u8
-impl<T: Int> BitOr<UIntPair<T>> for u8 {
-    type Output = UIntPair<T>;
-
-    fn bitor(self, rhs: UIntPair<T>) -> Self::Output {
-        UIntPair {
-            low: self as u32 | rhs.low,
-            high: rhs.high 
-        }
-    }
-}
-
-/// BitOr (|) for right site u16
-impl<T: Int> BitOr<u16> for UIntPair<T> {
-    type Output = Self;
-
-    fn bitor(self, rhs: u16) -> Self::Output {
-        Self {
-            low: self.low | rhs as u32,
-            high: self.high 
-        }
-    }
-}
-
-/// BitOr (|) for left site u16
-impl<T: Int> BitOr<UIntPair<T>> for u16 {
-    type Output = UIntPair<T>;
-
-    fn bitor(self, rhs: UIntPair<T>) -> Self::Output {
-        UIntPair {
-            low: self as u32 | rhs.low,
-            high: rhs.high 
-        }
-    }
-}
-
-/// BitOr (|) for right site u32
-impl<T: Int> BitOr<u32> for UIntPair<T> {
-    type Output = Self;
-
-    fn bitor(self, rhs: u32) -> Self::Output {
-        Self {
-            low: self.low | rhs as u32,
-            high: self.high 
-        }
-    }
-}
-
-/// BitOr (|) for left site u32
-impl<T: Int> BitOr<UIntPair<T>> for u32 {
-    type Output = UIntPair<T>;
-
-    fn bitor(self, rhs: UIntPair<T>) -> Self::Output {
-        UIntPair {
-            low: self as u32 | rhs.low,
-            high: rhs.high 
         }
     }
 }
@@ -462,27 +356,6 @@ impl<T: Int> AddAssign<u64> for UIntPair<T> {
     }
 }
 
-/// subtraction-assign operator right site u8
-impl<T: Int> SubAssign<u8> for UIntPair<T> {
-    fn sub_assign(&mut self, other: u8) {
-        *self = *self - other;
-    }
-}
-
-/// subtraction-assign operator right site u16
-impl<T: Int> SubAssign<u16> for UIntPair<T> {
-    fn sub_assign(&mut self, other: u16) {
-        *self = *self - other;
-    }
-}
-
-/// subtraction-assign operator right site u32
-impl<T: Int> SubAssign<u32> for UIntPair<T> {
-    fn sub_assign(&mut self, other: u32) {
-        *self = *self - other;
-    }
-}
-
 /// subtraction-assign operator right site u64
 impl<T: Int> SubAssign<u64> for UIntPair<T> {
     fn sub_assign(&mut self, other: u64) {
@@ -504,66 +377,12 @@ impl<T: Int> Sub for UIntPair<T> {
     }
 }
 
-/// subtraction operator right site u8
-impl<T: Int> Sub<u8> for UIntPair<T> {
-    type Output = Self;
-
-    fn sub(self, other: u8) -> Self {
-        self - Self::from(other)
-    }
-}
-
-/// subtraction operator right site u16
-impl<T: Int> Sub<u16> for UIntPair<T> {
-    type Output = Self;
-
-    fn sub(self, other: u16) -> Self {
-        self - Self::from(other)
-    }
-}
-
-/// subtraction operator right site u32
-impl<T: Int> Sub<u32> for UIntPair<T> {
-    type Output = Self;
-
-    fn sub(self, other: u32) -> Self {
-        self - Self::from(other)
-    }
-}
-
 /// subtraction operator right site u64
 impl<T: Int> Sub<u64> for UIntPair<T> {
     type Output = u64;
 
     fn sub(self, other: u64) -> u64 {
         (self - Self::from(other)).into()
-    }
-}
-
-/// addition operator left site u8
-impl<T: Int> Sub<UIntPair<T>> for u8 {
-    type Output = UIntPair<T>;
-
-    fn sub(self, other: UIntPair<T>) -> UIntPair<T> {
-        UIntPair::<T>::from(self) - other
-    }
-}
-
-/// addition operator left site u16
-impl<T: Int> Sub<UIntPair<T>> for u16 {
-    type Output = UIntPair<T>;
-
-    fn sub(self, other: UIntPair<T>) -> UIntPair<T> {
-        UIntPair::<T>::from(self) - other
-    }
-}
-
-/// addition operator left site u32
-impl<T: Int> Sub<UIntPair<T>> for u32 {
-    type Output = UIntPair<T>;
-
-    fn sub(self, other: UIntPair<T>) -> UIntPair<T> {
-        UIntPair::<T>::from(self) - other
     }
 }
 
@@ -592,66 +411,12 @@ impl<T: Int> Add for UIntPair<T> {
     }
 }
 
-/// addition operator right site u8
-impl<T: Int> Add<u8> for UIntPair<T> {
-    type Output = Self;
-
-    fn add(self, other: u8) -> Self {
-        self + Self::from(other)
-    }
-}
-
-/// addition operator right site u16
-impl<T: Int> Add<u16> for UIntPair<T> {
-    type Output = Self;
-
-    fn add(self, other: u16) -> Self {
-        self + Self::from(other)
-    }
-}
-
-/// addition operator right site u32
-impl<T: Int> Add<u32> for UIntPair<T> {
-    type Output = Self;
-
-    fn add(self, other: u32) -> Self {
-        self + Self::from(other)
-    }
-}
-
 /// addition operator right site u64
 impl<T: Int> Add<u64> for UIntPair<T> {
     type Output = Self;
 
     fn add(self, other: u64) -> Self {
         self + Self::from(other)
-    }
-}
-
-/// addition operator left site u8
-impl<T: Int> Add<UIntPair<T>> for u8 {
-    type Output = UIntPair<T>;
-
-    fn add(self, other: UIntPair<T>) -> UIntPair<T> {
-        other + self
-    }
-}
-
-/// addition operator left site u16
-impl<T: Int> Add<UIntPair<T>> for u16 {
-    type Output = UIntPair<T>;
-
-    fn add(self, other: UIntPair<T>) -> UIntPair<T> {
-        other + self
-    }
-}
-
-/// addition operator left site u32
-impl<T: Int> Add<UIntPair<T>> for u32 {
-    type Output = UIntPair<T>;
-
-    fn add(self, other: UIntPair<T>) -> UIntPair<T> {
-        other + self
     }
 }
 
