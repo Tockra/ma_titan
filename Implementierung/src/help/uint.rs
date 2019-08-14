@@ -29,22 +29,24 @@ impl<T: Int> UIntPair<T> {
     //const BYTES: usize = mem::size_of::<u32>() + mem::size_of::<T>();
 
     /// construct unit pair from lower and higher parts.
-    pub fn new(l: u32, h: T) -> Self {
-        Self {
-            low: l,
-            high: h
-        }
+    pub fn new<E: Int + Into<Self>>(val: E) -> Self {
+        val.into()
     }
 
     pub fn min_value() -> Self {
-        Self::new(0, T::MIN_VALUE)
+        Self {
+            low: 0,
+            high: T::MIN_VALUE
+        }
     }
 
     pub fn max_value() -> Self {
-        Self::new(u32::max_value(), T::MAX_VALUE)
+        Self {
+            low: u32::max_value(),
+            high: T::MAX_VALUE
+        }
     }
 
-    
 }
 
 macro_rules! impl_UIntPair_traits {
@@ -743,3 +745,4 @@ mod tests {
 
     // TODO: Teste den ganzen BitAnd, BitOr, BitXor (+Assigns), PartialEq, Add und Sub Overflows, PartialOrd Kram
 }
+// TODO Bitshifts implementieren
