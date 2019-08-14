@@ -1,5 +1,5 @@
 use std::mem;
-use std::ops::{Shl, Add, AddAssign, Sub, SubAssign, BitAnd, BitOr, BitXor};
+use std::ops::{Shl, Add, AddAssign, Sub, SubAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign};
 use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::num::TryFromIntError;
@@ -123,6 +123,30 @@ macro_rules! impl_UIntPair_traits {
                 fn bitor(self, rhs: UIntPair<T>) -> Self::Output {
                     UIntPair {
                         low: self as u32 | rhs.low,
+                        high: rhs.high 
+                    }
+                }
+            }
+
+            /// BitXor (^) for right site $int
+            impl<T: Int> BitXor<$int> for UIntPair<T> {
+                type Output = Self;
+
+                fn bitxor(self, rhs: $int) -> Self::Output {
+                    Self {
+                        low: self.low ^ rhs as u32,
+                        high: self.high 
+                    }
+                }
+            }
+
+            /// BitXor (^) for left site $int
+            impl<T: Int> BitXor<UIntPair<T>> for $int {
+                type Output = UIntPair<T>;
+
+                fn bitxor(self, rhs: UIntPair<T>) -> Self::Output {
+                    UIntPair {
+                        low: self as u32 ^ rhs.low,
                         high: rhs.high 
                     }
                 }
@@ -275,6 +299,36 @@ impl<T: Int> BitOr<UIntPair<T>> for u64 {
     }
 }
 
+/// BitXor (^) for right site UIntPair<T>
+impl<T: Int> BitXor for UIntPair<T> {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self {
+            low: self.low ^ rhs.low,
+            high: self.high ^ rhs.high
+        }
+    }
+}
+
+/// BitXor (^) for right site u64
+impl<T: Int> BitXor<u64> for UIntPair<T> {
+    type Output = u64;
+
+    fn bitxor(self, rhs: u64) -> Self::Output {
+        u64::from(self) ^ rhs
+    }
+}
+
+/// BitXor (^)for left site u64
+impl<T: Int> BitXor<UIntPair<T>> for u64 {
+    type Output = Self;
+
+    fn bitxor(self, rhs: UIntPair<T>) -> Self::Output {
+        u64::from(rhs) ^ self
+    }
+}
+
 /// Ermöglicht die Konvertierung von u32 nach UIntPair.
 impl<T: Int> From<u32> for UIntPair<T> {
     fn from(item: u32) -> Self {
@@ -339,6 +393,48 @@ impl<T: Int> From<UIntPair<T>> for u64 {
 impl<T: Int> From<UIntPair<T>> for i64 {
     fn from(item: UIntPair<T>) -> Self {
         u64::from(item) as i64
+    }
+}
+
+/// bitAnd-assign operator right site with all possible types (except u64)
+impl<T: Int, R: BitAnd<Self, Output=Self>> BitAndAssign<R> for UIntPair<T> {
+    fn bitand_assign (&mut self, other: R) {
+        *self = other & *self;
+    }
+}
+
+/// bitAnd-assign operator right site with u64
+impl<T: Int> BitAndAssign<u64> for UIntPair<T> {
+    fn bitand_assign (&mut self, other: u64) {
+        *self = Self::from(other & *self);
+    }
+}
+
+/// bitOr-assign operator right site with all possible types (except u64)
+impl<T: Int, R: BitOr<Self, Output=Self>> BitOrAssign<R> for UIntPair<T> {
+    fn bitor_assign (&mut self, other: R) {
+        *self = other | *self;
+    }
+}
+
+/// bitOr-assign operator right site with u64
+impl<T: Int> BitOrAssign<u64> for UIntPair<T> {
+    fn bitor_assign (&mut self, other: u64) {
+        *self = Self::from(other | *self);
+    }
+}
+
+/// bitXor-assign operator right site with all possible types (except u64)
+impl<T: Int, R: BitXor<Self, Output=Self>> BitXorAssign<R> for UIntPair<T> {
+    fn bitxor_assign (&mut self, other: R) {
+        *self = other ^ *self;
+    }
+}
+
+/// bitXor-assign operator right site with u64
+impl<T: Int> BitXorAssign<u64> for UIntPair<T> {
+    fn bitxor_assign (&mut self, other: u64) {
+        *self = Self::from(other ^ *self);
     }
 }
 
@@ -645,15 +741,5 @@ mod tests {
         assert_eq!(2000 as u64 - (start-x), 1025);
     }
 
-    // TODO: Teste den ganzen BitAnd, BitOr, PartialEq und PartialOrd Kram
+    // TODO: Teste den ganzen BitAnd, BitOr, BitXor (+Assigns), PartialEq, Add und Sub Overflows, PartialOrd Kram
 }
-
-
-
-
-
-
-
-
-
-
