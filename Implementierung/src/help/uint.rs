@@ -103,13 +103,11 @@ impl<T: Int> From<UIntPair<T>> for i64 {
     }
 }
 
-
-/// addition operator right site all possible types
-impl<T: Int, R: Into<Self>> Add<R> for UIntPair<T> {
+/// addition operator right site UIntPair<T>
+impl<T: Int> Add for UIntPair<T> {
     type Output = Self;
 
-    fn add(self, other: R) -> Self {
-        let other: Self = other.into();
+    fn add(self, other: Self) -> Self {
         let add_low = (self.low as u64).wrapping_add(other.low as u64);
         let add_high = (add_low >> Self::LOW_BITS) as u8;
         Self {
@@ -119,17 +117,44 @@ impl<T: Int, R: Into<Self>> Add<R> for UIntPair<T> {
     }
 }
 
-/// addition operator left site u8
-impl<T: Int> Add<UIntPair<T>> for u8 {
-    type Output = UIntPair<T>;
+/// addition operator right site u8
+impl<T: Int> Add<u8> for UIntPair<T> {
+    type Output = Self;
 
-    fn add(self, other: UIntPair<T>) -> UIntPair<T> {
-        other + self
+    fn add(self, other: u8) -> Self {
+        self + Self::from(other)
     }
 }
 
-/// addition operator left site i8
-impl<T: Int> Add<UIntPair<T>> for i8 {
+/// addition operator right site u16
+impl<T: Int> Add<u16> for UIntPair<T> {
+    type Output = Self;
+
+    fn add(self, other: u16) -> Self {
+        self + Self::from(other)
+    }
+}
+
+/// addition operator right site u32
+impl<T: Int> Add<u32> for UIntPair<T> {
+    type Output = Self;
+
+    fn add(self, other: u32) -> Self {
+        self + Self::from(other)
+    }
+}
+
+/// addition operator right site u64
+impl<T: Int> Add<u64> for UIntPair<T> {
+    type Output = Self;
+
+    fn add(self, other: u64) -> Self {
+        self + Self::from(other)
+    }
+}
+
+/// addition operator left site u8
+impl<T: Int> Add<UIntPair<T>> for u8 {
     type Output = UIntPair<T>;
 
     fn add(self, other: UIntPair<T>) -> UIntPair<T> {
@@ -146,26 +171,8 @@ impl<T: Int> Add<UIntPair<T>> for u16 {
     }
 }
 
-/// addition operator left site i16
-impl<T: Int> Add<UIntPair<T>> for i16 {
-    type Output = UIntPair<T>;
-
-    fn add(self, other: UIntPair<T>) -> UIntPair<T> {
-        other + self
-    }
-}
-
 /// addition operator left site u32
 impl<T: Int> Add<UIntPair<T>> for u32 {
-    type Output = UIntPair<T>;
-
-    fn add(self, other: UIntPair<T>) -> UIntPair<T> {
-        other + self
-    }
-}
-
-/// addition operator left site i32
-impl<T: Int> Add<UIntPair<T>> for i32 {
     type Output = UIntPair<T>;
 
     fn add(self, other: UIntPair<T>) -> UIntPair<T> {
