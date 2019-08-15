@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use ux::{u10,u40};
+use ux::{u10};
+use crate::help::uint::u40;
+
 use boomphf::Mphf;
 
 use crate::help::internal::{Splittable};

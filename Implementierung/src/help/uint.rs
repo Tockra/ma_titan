@@ -1,4 +1,3 @@
- #[allow(non_camel_case_types)]
 use std::mem;
 use std::ops::{Shl, Shr, Add, AddAssign, Sub, SubAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign};
 use std::convert::TryFrom;
@@ -6,7 +5,10 @@ use std::fmt::Debug;
 use std::num::TryFromIntError;
 use std::cmp::Ordering;
 
+#[allow(non_camel_case_types,dead_code)]
 pub type u40 = UIntPair<u8>;
+
+#[allow(non_camel_case_types,dead_code)]
 pub type u48 = UIntPair<u16>;
 
 /// Basierend auf folgender [Repository](https://github.com/thrill/thrill/blob/master/thrill/common/uint_types.hpp)
@@ -33,7 +35,7 @@ impl<T: Int> UIntPair<T> {
     //const BYTES: usize = mem::size_of::<u32>() + mem::size_of::<T>();
 
     /// construct unit pair from lower and higher parts.
-    pub fn new<E: Int + Into<Self>>(val: E) -> Self {
+    pub fn new<E: Into<Self>>(val: E) -> Self {
         val.into()
     }
 
@@ -51,6 +53,12 @@ impl<T: Int> UIntPair<T> {
         }
     }
 
+}
+
+impl<T: Int> Debug for UIntPair<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        u64::from(*self).fmt(f)
+    }
 }
 
 macro_rules! impl_UIntPair_traits {
@@ -259,6 +267,32 @@ impl<T: Int> Shl<u64> for UIntPair<T> {
 
     fn shl(self, rhs: u64) -> u64 {
         (u64::from(self) << rhs)
+    }
+}
+
+/// Bitshift left for right site i32
+impl<T: Int> Shl<i32> for UIntPair<T> {
+    type Output = Self;
+
+    fn shl(self, rhs: i32) -> Self {
+        if rhs < 0 {
+            panic!("To small value for Bitshift.")
+        }
+
+        (u64::from(self) << rhs as u64).into()
+    }
+}
+
+/// Bitshift left for right site i32
+impl<T: Int> Shr<i32> for UIntPair<T> {
+    type Output = Self;
+
+    fn shr(self, rhs: i32) -> Self {
+        if rhs < 0 {
+            panic!("To small value for Bitshift.")
+        }
+
+        (u64::from(self) >> rhs as u64).into()
     }
 }
 
@@ -634,6 +668,14 @@ impl<T: Int> From<u64> for UIntPair<T> {
             low: low as u32,
             high: T::try_from(high).expect("From<u64> for UIntPair<T> ist schiefgelaufen.")
         }
+    }
+}
+
+/// Ermöglicht die Konvertierung von i64 nach UIntPair.
+impl<T: Int> From<i64> for UIntPair<T> {
+    fn from(item: i64) -> Self {
+        assert!(item < 0, "You tried to convert a negativ i64 into a u40. This operation isn't supported.");
+        Self::from(item as u64)
     }
 }
 
