@@ -1,9 +1,13 @@
+ #[allow(non_camel_case_types)]
 use std::mem;
 use std::ops::{Shl, Shr, Add, AddAssign, Sub, SubAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign};
 use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::num::TryFromIntError;
 use std::cmp::Ordering;
+
+pub type u40 = UIntPair<u8>;
+pub type u48 = UIntPair<u16>;
 
 /// Basierend auf folgender [Repository](https://github.com/thrill/thrill/blob/master/thrill/common/uint_types.hpp)
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -710,12 +714,12 @@ mod tests {
       /// sub a lot of u32 values
    #[test]
     fn test_sub_random() {
-        for i in 0..(u64::from(u40::max_value())) {
+        for i in 0..(u32::max_value()) {
             for j in 0..(i+1) {
                 let x = u40::from(i);
                 let y = u40::from(j);
     
-                assert_eq!(i+j, u64::from(x+y) as u64);
+                assert_eq!(i+j, u64::from(x+y) as u32);
             }
         }
     }
