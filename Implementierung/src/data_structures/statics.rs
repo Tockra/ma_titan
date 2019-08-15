@@ -3,7 +3,7 @@ use ux::{u10};
 use crate::help::uint::u40;
 use boomphf::Mphf;
 
-use crate::help::internal::{Splittable};
+use crate::help::internal::{Splittable,PredecessorSetStatic};
 use crate::help::builder::{GAMMA,STreeBuilder};
 
 /// In dieser Implementierung werden u40 Integer gespeichert.
@@ -41,6 +41,42 @@ pub struct STree {
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
     element_list: Box<[Int]>,
+}
+
+impl PredecessorSetStatic<Int> for STree {
+    fn predecessor(&self,number: u40) -> Option<u40> {
+        self.locate_or_pred(number).and_then(|x| Some(self.element_list[x]))
+    }
+
+    fn sucessor(&self,number: u40) -> Option<u40> {
+        self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
+    }
+
+    fn minimum(&self) -> Option<u40> {
+        self.minimum()
+    }
+
+    fn maximum(&self) -> Option<u40> {
+        self.maximum()
+    } 
+
+    fn contains(&self, number: u40) -> bool {
+        let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&number);
+        if self.root_table[i].minimum.is_none() {
+            return false;
+        } else {
+            let l3_level = self.root_table[i].try_get(j);
+            if l3_level.is_none() {
+                return false;
+            } else {
+                let elem = l3_level.unwrap().try_get(k);
+                if elem.is_none() {
+                    return false
+                } 
+            }
+        }
+        true
+    }
 }
 
 impl STree {
