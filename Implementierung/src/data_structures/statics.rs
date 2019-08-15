@@ -538,13 +538,13 @@ mod tests {
     /// Dieser Test ist ein Kandidat zum Entfernen oder Erweitern.
     #[test]
     fn test_top_arrays() {
-        let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101)];
+        let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101_u64)];
         let check = data.clone();
         let mut data_structure: STree = STree::new(data);
 
         assert_eq!(data_structure.len(),check.len());
         assert_eq!(data_structure.minimum().unwrap(),u40::new(0b00000000000000000000_1010010010_0101010101));
-        assert_eq!(data_structure.maximum().unwrap(),u40::new(0b11111111111111111111_1010010010_0101010101));
+        assert_eq!(data_structure.maximum().unwrap(),u40::new(0b11111111111111111111_1010010010_0101010101_u64));
 
         for val in check {
             let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
@@ -638,7 +638,7 @@ mod tests {
             data.push(u40::new(*val));
         }
         let data_structure: STree = STree::new(data.clone());
-        assert_eq!(data_structure.locate_or_succ(u40::new(0b11111111111111111111_1111111111_1111111111)), None);
+        assert_eq!(data_structure.locate_or_succ(u40::new(0b11111111111111111111_1111111111_1111111111_u64)), None);
         
         for (i,&elem) in data.iter().enumerate() {
             if i > 0 {

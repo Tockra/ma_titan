@@ -729,8 +729,7 @@ impl Int for u8 {
 
 #[cfg(test)]
 mod tests {
-    use super::UIntPair;
-    type u40 = UIntPair<u8>;
+    use super::u40;
 
     /// subs and assign values
     #[test]
