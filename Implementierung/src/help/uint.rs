@@ -1,5 +1,5 @@
 use std::mem;
-use std::ops::{Shl, Add, AddAssign, Sub, SubAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign};
+use std::ops::{Shl, Shr, Add, AddAssign, Sub, SubAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign};
 use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::num::TryFromIntError;
@@ -197,11 +197,102 @@ macro_rules! impl_UIntPair_traits {
                 }
             }
 
+            /// Bitshift left for right site $int
+            impl<T: Int> Shl<$int> for UIntPair<T> {
+                type Output = Self;
+
+                fn shl(self, rhs: $int) -> Self {
+                    (u64::from(self) << u64::from(rhs)).into()
+                }
+            }
+
+            /// Bitshift left for right site UIntPair<T> left site $int
+            impl<T: Int> Shl<UIntPair<T>> for $int {
+                type Output = UIntPair<T>;
+
+                fn shl(self, rhs: UIntPair<T>) -> UIntPair<T> {
+                    (UIntPair::<T>::from(self) << rhs)
+                }
+            }
+
+            
+            /// Bitshift right for right site $int
+            impl<T: Int> Shr<$int> for UIntPair<T> {
+                type Output = Self;
+
+                fn shr(self, rhs: $int) -> Self {
+                    (u64::from(self) >> u64::from(rhs)).into()
+                }
+            }
+
+            /// Bitshift right for right site UIntPair<T> left site $int
+            impl<T: Int> Shr<UIntPair<T>> for $int {
+                type Output = UIntPair<T>;
+
+                fn shr(self, rhs: UIntPair<T>) -> UIntPair<T> {
+                    (UIntPair::<T>::from(self) >> rhs)
+                }
+            }
+
         )*
     }
 }
 
 impl_UIntPair_traits!(u8 u16 u32);
+
+/// Bitshift left for right site UIntPair<T>
+impl<T: Int> Shl for UIntPair<T> {
+    type Output = Self;
+
+    fn shl(self, rhs: Self) -> Self {
+        (u64::from(self) << u64::from(rhs)).into()
+    }
+}
+
+/// Bitshift left for right site u64
+impl<T: Int> Shl<u64> for UIntPair<T> {
+    type Output = u64;
+
+    fn shl(self, rhs: u64) -> u64 {
+        (u64::from(self) << rhs)
+    }
+}
+
+/// Bitshift left for right site UIntPair<T> left site u64
+impl<T: Int> Shl<UIntPair<T>> for u64 {
+    type Output = u64;
+
+    fn shl(self, rhs: UIntPair<T>) -> u64 {
+        (self << u64::from(rhs))
+    }
+}
+
+/// Bitshift right for right site UIntPair<T>
+impl<T: Int> Shr for UIntPair<T> {
+    type Output = Self;
+
+    fn shr(self, rhs: Self) -> Self {
+        (u64::from(self) >> u64::from(rhs)).into()
+    }
+}
+
+/// Bitshift right for right site u64
+impl<T: Int> Shr<u64> for UIntPair<T> {
+    type Output = u64;
+
+    fn shr(self, rhs: u64) -> u64 {
+        (u64::from(self) >> rhs)
+    }
+}
+
+/// Bitshift right for right site UIntPair<T> left site u64
+impl<T: Int> Shr<UIntPair<T>> for u64 {
+    type Output = u64;
+
+    fn shr(self, rhs: UIntPair<T>) -> u64 {
+        (self >> u64::from(rhs))
+    }
+}
 
 /// partial eq (==) with right site u64
 impl<T: Int> PartialEq<u64> for UIntPair<T> {
@@ -743,6 +834,5 @@ mod tests {
         assert_eq!(2000 as u64 - (start-x), 1025);
     }
 
-    // TODO: Teste den ganzen BitAnd, BitOr, BitXor (+Assigns), PartialEq, Add und Sub Overflows, PartialOrd Kram
+    // TODO: Teste den ganzen BitAnd, BitOr, BitXor, Shr, Shl, (+Assigns), PartialEq, Add und Sub Overflows, PartialOrd Kram
 }
-// TODO Bitshifts implementieren
