@@ -3,7 +3,7 @@ use std::mem::{self};
 use std::ptr;
 
 use ux::{u10};
-use crate::help::uint::u40;
+use uint::u40;
 
 pub struct List<T> {
     pub first: Option<Box<Element<T>>>,

@@ -1,6 +1,6 @@
 #![allow(dead_code)]  
 use ux::{u10};
-use crate::help::uint::u40;
+use uint::u40;
 use boomphf::Mphf;
 
 use crate::help::internal::{Splittable,PredecessorSetStatic};
@@ -540,7 +540,7 @@ impl<T> Level<T> {
 #[cfg(test)]
 mod tests {
     use ux::{u10};
-    use crate::help::uint::u40;
+    use uint::u40;
     use super::{STree,LX_ARRAY_SIZE};
     use crate::help::internal::{Splittable};
 

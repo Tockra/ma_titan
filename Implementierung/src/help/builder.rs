@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ux::{u10};
-use crate::help::uint::u40;
+use uint::u40;
 
 use boomphf::Mphf;
 
