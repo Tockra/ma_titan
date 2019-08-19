@@ -5,3 +5,7 @@ authors = ["Tim <tim.tannert@tu-dortmund.de>"]
 edition = "2018"
 
 [dependencies]
+serde = "1.0.99"
+rmp-serde = "0.13.7"
+rand = "0.7.0"
+uint = { path = "../uint" }
