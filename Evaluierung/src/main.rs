@@ -11,17 +11,21 @@ use uint::u40;
 use std::thread;
 
 const SEED: u128 = 0xcafef00dd15ea5e5;
+const TWO: u32 = 2;
 fn main() {
-    let two: u64 = 2;
-    let mut counter = 0;
+    let mut threads = vec![];
+
     for i in 0..41 {
-        thread::spawn(move || {
-                generate_values(two.pow(i) as usize);
-                counter +=1;
-                println!("Fortschritt: {}%",((counter as f32/41.) *100.) as u8);
-        });
-        
-        
+        threads.push(thread::spawn(move || {
+                generate_values(TWO.pow(i) as usize);
+        }));
+    }
+
+    let mut counter = 0;
+    for thread in threads {
+        thread.join().unwrap();
+        counter += 1;
+        println!("Fortschritt: {}%",((counter as f32/41.) *100.) as u8);
     }
 }
 
