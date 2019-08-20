@@ -8,13 +8,20 @@ use std::io::BufWriter;
 use rand::Rng;
 use rand_pcg::Mcg128Xsl64;
 use uint::u40;
+use std::thread;
 
 const SEED: u128 = 0xcafef00dd15ea5e5;
 fn main() {
     let two: u64 = 2;
+    let mut counter = 0;
     for i in 0..41 {
-        generate_values(two.pow(i) as usize);
-        println!("Fortschritt: {}%",((i as f32/41.) *100.) as u8);
+        thread::spawn(move || {
+                generate_values(two.pow(i) as usize);
+                counter +=1;
+                println!("Fortschritt: {}%",((counter as f32/41.) *100.) as u8);
+        });
+        
+        
     }
 }
 
