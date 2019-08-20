@@ -14,6 +14,7 @@ fn main() {
     let two: u64 = 2;
     for i in 0..41 {
         generate_values(two.pow(i) as usize);
+        println!("Fortschritt: {}%",((i as f32/41.) *100.) as u8);
     }
 }
 
@@ -27,7 +28,6 @@ fn generate_values(n: usize) {
             x = state.gen_range(0, u64::from(u40::max_value()));
         }
         values.push(u40::from(x));
-        //println!("Random: {}",x);
     }
     write_to_file(format!("testdata/u40/{}.data", n), &values);
 }
