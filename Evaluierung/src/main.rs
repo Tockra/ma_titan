@@ -29,7 +29,7 @@ fn generate_values(n: usize) {
         //values.push(u40::from(x));
         println!("Random: {}",x);
     }
-    write_to_file(format!("testdata/u40/{}.data", n), &values);
+   // write_to_file(format!("testdata/u40/{}.data", n), &values);
 }
 
 /// Serializiert den übergebenen Vector und schreibt diesen in eine Datei namens `name`.
