@@ -54,37 +54,41 @@ impl PredecessorSetStatic<Int> for BinarySearch {
 
 impl BinarySearch {
     fn succ(&self, element: Int, l: usize, r: usize) -> Option<Int> {
-        if l == r {
-            if self.element_list[l] >= element {
-                Some(self.element_list[l])
-            } else {
-                None
-            }
-            
-        } else {
+        let mut l = l;
+        let mut r = r;
+
+        while r != l {
             let m = (l+r)/2;
             if self.element_list[m] > element {
-                self.succ(element, l, m)
+                r = m;
             } else {
-                self.succ(element, m+1, r)
+                l = m+1;
             }
+        }
+        if self.element_list[l] >= element {
+            Some(self.element_list[l])
+        } else {
+            None
         }
     }
 
     fn pred(&self, element: Int, l: usize, r: usize) -> Option<Int> {
-        if l == r {
-            if element >= self.element_list[l] {
-                Some(self.element_list[l])
-            } else {
-                None
-            }
-        } else {
+        let mut l = l;
+        let mut r = r;
+
+        while l != r {
             let m = (l+r)/2;
             if self.element_list[m] < element {
-                self.succ(element, l, m)
+                r = m
             } else {
-                self.succ(element, m+1, r)
+                l = m+1;
             }
+        }
+ 
+        if element >= self.element_list[l] {
+            Some(self.element_list[l])
+        } else {
+            None
         }
     }
 

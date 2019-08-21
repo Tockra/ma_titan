@@ -22,6 +22,7 @@ use predecessor_list::data_structures::binary::BinarySearch;
 
 use uint::u40;
 
+const SEED: u128 = 0xcafef00dd15ea5e5;
 
 fn static_build_benchmark<T: PredecessorSetStatic<u40>>(c: &mut Criterion) {
     for dir in read_dir("testdata/u40/").unwrap() {
@@ -37,8 +38,9 @@ fn static_build_benchmark<T: PredecessorSetStatic<u40>>(c: &mut Criterion) {
     }
 }
 
-fn pred_and_succ_benchmark(c: &mut Criterion) {
+fn pred_and_succ_benchmark<T: PredecessorSetStatic<u40>>(c: &mut Criterion) {
     for dir in read_dir("testdata/u40/").unwrap() {
+        let mut state = Mcg128Xsl64::new(SEED);
         let dir = dir.unwrap();
         let path = dir.path();
 
@@ -47,7 +49,9 @@ fn pred_and_succ_benchmark(c: &mut Criterion) {
         let values: Vec<u64> = Deserialize::deserialize(&mut values).unwrap();
         let values = values.into_iter().map(|v| u40::from(v)).collect::<Vec<u40>>();
 
-        c.bench_function(&format!("{}::new <{}>",T::TYPE,values.len())[..], move 
+        
+        let test_values: Vec<u64> = (u64::from(values[0]+1u32)..u64::from(values[values.len()-1])).choose_multiple(&mut state, 1000);
+        c.bench_function(&format!("{}::pred <{}>",T::TYPE,values.len())[..], move 
                                     |b| b.iter_batched(|| values.clone(), |data| STree::new(data), BatchSize::SmallInput));
     }
 }
