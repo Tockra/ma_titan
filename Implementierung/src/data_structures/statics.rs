@@ -44,6 +44,10 @@ pub struct STree {
 }
 
 impl PredecessorSetStatic<Int> for STree {
+    fn new(elements: Vec<Int>) -> Self {
+        STree::new(elements)
+    }
+
     fn predecessor(&self,number: u40) -> Option<u40> {
         self.locate_or_pred(number).and_then(|x| Some(self.element_list[x]))
     }
