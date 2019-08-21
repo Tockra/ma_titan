@@ -12,7 +12,8 @@ const SEED: u128 = 0xcafef00dd15ea5e5;
 const TWO: u32 = 2;
 fn main() {
     let mut state = Mcg128Xsl64::new(SEED);
-    let mut result: Vec<u64> = (0..((1u64<<40))).choose_multiple(&mut state, ((1u64<<40)-1) as usize);
+
+    let mut result: Vec<u64> = (0..((1u64<<40))).choose_multiple(&mut state, ((1u64<<34)) as usize);
     let mut clone = result.clone();
     clone.sort();
     write_to_file(format!("testdata/u40/{}.data", TWO.pow(40)),&clone);
