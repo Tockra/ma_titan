@@ -24,7 +24,7 @@ fn generate_test_data<T: Typable + Into<u64>>(exponent: u64) {
 
     for i in 0..exponent {
         let cut = result.len() - (max_value - (1<<i) as usize); 
-        let (result, _) = result.split_at_mut(cut);
+        let result = &mut result[..cut];
         result.sort();
         write_to_file(format!("../testdata/{}/2^{}.data",T::TYPE, i),&result.to_vec());
     }
