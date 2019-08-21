@@ -9,6 +9,8 @@ use rand_pcg::Mcg128Xsl64;
 use rand::seq::IteratorRandom;
 
 use uint::Int;
+use uint::Typable;
+
 
 const SEED: u128 = 0xcafef00dd15ea5e5;
 const TWO: u32 = 2;
@@ -29,19 +31,19 @@ fn main() {
 }
 
 // (1u64<<34)
-fn generate_test_data<T: Int>(max_value: usize) {
+fn generate_test_data<T: Typable + Into<u64>>(max_value: usize) {
     let mut state = Mcg128Xsl64::new(SEED);
 
-    let mut result: Vec<u64> = (0..u64::from(T::max_value())).choose_multiple(&mut state, max_value);
+    let mut result: Vec<u64> = (0u64..(T::max_value()).into()).choose_multiple(&mut state, max_value);
     let mut clone = result.clone();
     clone.sort();
-    write_to_file(format!("testdata/u40/2^{}.data", 40),&clone);
+    write_to_file(format!("../testdata/{}/2^{}.data", T::TYPE,40),&clone);
     for i in (0..40).rev() {
         let cut = result.len() - (max_value - (1<<i) as usize); 
         result = result.split_off(cut);
         let mut clone = result.clone();
         clone.sort();
-        write_to_file(format!("testdata/u40/2^{}.data", i),&clone);
+        write_to_file(format!("../testdata/{}/2^{}.data",T::TYPE, i),&clone);
     }
 }
 
