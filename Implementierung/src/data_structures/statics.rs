@@ -44,6 +44,8 @@ pub struct STree {
 }
 
 impl PredecessorSetStatic<Int> for STree {
+    const TYPE: &'static str = "STree";
+
     fn new(elements: Vec<Int>) -> Self {
         STree::new(elements)
     }

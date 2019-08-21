@@ -8,6 +8,8 @@ use std::io::BufWriter;
 use rand_pcg::Mcg128Xsl64;
 use rand::seq::IteratorRandom;
 
+use uint::Int;
+
 const SEED: u128 = 0xcafef00dd15ea5e5;
 const TWO: u32 = 2;
 fn main() {
@@ -16,13 +18,30 @@ fn main() {
     let mut result: Vec<u64> = (0..((1u64<<40))).choose_multiple(&mut state, ((1u64<<34)) as usize);
     let mut clone = result.clone();
     clone.sort();
-    write_to_file(format!("testdata/u40/{}.data", TWO.pow(40)),&clone);
+    write_to_file(format!("testdata/u40/2^{}.data", 40),&clone);
     for i in (0..40).rev() {
         let cut = result.len() - ((1u64<<40) - (1<<i)) as usize; 
         result = result.split_off(cut);
         let mut clone = result.clone();
         clone.sort();
-        write_to_file(format!("testdata/u40/{}.data", TWO.pow(i)),&clone);
+        write_to_file(format!("testdata/u40/2^{}.data", i),&clone);
+    }
+}
+
+// (1u64<<34)
+fn generate_test_data<T: Int>(max_value: usize) {
+    let mut state = Mcg128Xsl64::new(SEED);
+
+    let mut result: Vec<u64> = (0..u64::from(T::max_value())).choose_multiple(&mut state, max_value);
+    let mut clone = result.clone();
+    clone.sort();
+    write_to_file(format!("testdata/u40/2^{}.data", 40),&clone);
+    for i in (0..40).rev() {
+        let cut = result.len() - (max_value - (1<<i) as usize); 
+        result = result.split_off(cut);
+        let mut clone = result.clone();
+        clone.sort();
+        write_to_file(format!("testdata/u40/2^{}.data", i),&clone);
     }
 }
 

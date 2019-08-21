@@ -32,6 +32,8 @@ pub trait PredecessorSetStatic<T> {
     fn minimum(&self) -> Option<T>;
     fn maximum(&self) -> Option<T>; 
     fn contains(&self, number: T) -> bool;
+
+    const TYPE: &'static str;
 }
 
 pub struct Element<T> {

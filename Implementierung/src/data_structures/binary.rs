@@ -48,6 +48,8 @@ impl PredecessorSetStatic<Int> for BinarySearch {
     fn contains(&self, number: Int) -> bool {
         self.element_list.contains(&number)
     }
+
+    const TYPE: &'static str = "BinarySearch";
 }
 
 impl BinarySearch {
