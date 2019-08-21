@@ -8,29 +8,15 @@ use std::io::BufWriter;
 use rand_pcg::Mcg128Xsl64;
 use rand::seq::IteratorRandom;
 
-use uint::Int;
+use uint::u40;
 use uint::Typable;
 
 
 const SEED: u128 = 0xcafef00dd15ea5e5;
-const TWO: u32 = 2;
 fn main() {
-    let mut state = Mcg128Xsl64::new(SEED);
-
-    let mut result: Vec<u64> = (0..((1u64<<40))).choose_multiple(&mut state, ((1u64<<34)) as usize);
-    let mut clone = result.clone();
-    clone.sort();
-    write_to_file(format!("testdata/u40/2^{}.data", 40),&clone);
-    for i in (0..40).rev() {
-        let cut = result.len() - ((1u64<<40) - (1<<i)) as usize; 
-        result = result.split_off(cut);
-        let mut clone = result.clone();
-        clone.sort();
-        write_to_file(format!("testdata/u40/2^{}.data", i),&clone);
-    }
+    generate_test_data::<u40>((1u64<<34) as usize);
 }
 
-// (1u64<<34)
 fn generate_test_data<T: Typable + Into<u64>>(max_value: usize) {
     let mut state = Mcg128Xsl64::new(SEED);
 
