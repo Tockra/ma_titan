@@ -17,17 +17,22 @@ use std::fs::read_dir;
 use std::io::BufReader;
 use std::fs::File;
 use std::rc::Rc;
+use std::ops::Add;
+use std::fmt::Debug;
 
 use predecessor_list::help::internal::PredecessorSetStatic;
 use predecessor_list::data_structures::statics::STree;
 use predecessor_list::data_structures::binary::BinarySearch;
 
 use uint::u40;
+use uint::Typable;
 
 const SEED: u128 = 0xcafef00dd15ea5e5;
 
-fn static_build_benchmark<T: PredecessorSetStatic<u40>>(c: &mut Criterion) {
-    for dir in read_dir("testdata/u40/").unwrap() {
+/// Diese Methode lädt die Testdaten aus ../testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
+/// Datenstruktur T. Dabei wird die Laufzeit gemessen.
+fn static_build_benchmark<E: Typable, T: PredecessorSetStatic<E>>(c: &mut Criterion) {
+    for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
         let dir = dir.unwrap();
         let path = dir.path();
 
@@ -40,8 +45,11 @@ fn static_build_benchmark<T: PredecessorSetStatic<u40>>(c: &mut Criterion) {
     }
 }
 
-fn pred_and_succ_benchmark<T: 'static + PredecessorSetStatic<u40>>(c: &mut Criterion) {
-    for dir in read_dir("testdata/u40/").unwrap() {
+/// Lädt die Testdaten aus ../testdata/{u40,u48,u64}/ und erzeugt mit Hilfe dieser die zu testende Datenstruktur T. 
+/// Anschließend werden 1000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor- und Sucessor-Methode 
+/// werden mit Hilfe dieser gemessen
+fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + PredecessorSetStatic<E>>(c: &mut Criterion) {
+    for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
         let mut state = Mcg128Xsl64::new(SEED);
         let dir = dir.unwrap();
         let path = dir.path();
@@ -49,24 +57,24 @@ fn pred_and_succ_benchmark<T: 'static + PredecessorSetStatic<u40>>(c: &mut Crite
         let buf = BufReader::new(File::create(path).unwrap());
         let mut values = Deserializer::new(buf);
         let values: Vec<u64> = Deserialize::deserialize(&mut values).unwrap();
-        let values = values.into_iter().map(|v| u40::from(v)).collect::<Vec<u40>>();
+        let values = values.into_iter().map(|v| E::from(v)).collect::<Vec<E>>();
 
         
-        let test_values: Vec<u64> = (u64::from(values[0]+1u32)..u64::from(values[values.len()-1])).choose_multiple(&mut state, 1000);
-        let test_values = test_values.into_iter().map(|v| u40::from(v)).collect::<Vec<u40>>();
+        let test_values: Vec<u64> = ((values[0]+1u32).into()..(values[values.len()-1]).into()).choose_multiple(&mut state, 1000);
+        let test_values = test_values.into_iter().map(|v| E::from(v)).collect::<Vec<E>>();
 
         let data_structure: Rc<T> = Rc::new(T::new(values));
         let data_strucuture_succ:Rc<T> = Rc::clone(&data_structure);
 
         c.bench_function_over_inputs(&format!("{}::predecessor",T::TYPE)[..],move
-            |b: &mut Bencher, elem: &u40| {
+            |b: &mut Bencher, elem: &E| {
                 b.iter(|| data_structure.predecessor(*elem));
             },
             test_values.clone()
         );
 
         c.bench_function_over_inputs(&format!("{}::sucessor",T::TYPE)[..],move
-            |b: &mut Bencher, elem: &u40| {
+            |b: &mut Bencher, elem: &E| {
                 b.iter(|| data_strucuture_succ.sucessor(*elem));
             },
             test_values
@@ -74,10 +82,10 @@ fn pred_and_succ_benchmark<T: 'static + PredecessorSetStatic<u40>>(c: &mut Crite
     }
 }
 
-criterion_group!(stree_gen, static_build_benchmark<STree>);
-criterion_group!(binary_search_gen, static_build_benchmark<BinarySearch>);
-criterion_group!(stree_instr, pred_and_succ_benchmark<STree>);
-criterion_group!(binary_search_instr, pred_and_succ_benchmark<BinarySearch>);
+criterion_group!(stree_gen, static_build_benchmark<u40,STree>);
+criterion_group!(binary_search_gen, static_build_benchmark<u40,BinarySearch>);
+criterion_group!(stree_instr, pred_and_succ_benchmark<u40,STree>);
+criterion_group!(binary_search_instr, pred_and_succ_benchmark<u40,BinarySearch>);
 
 
 criterion_main!(stree_gen, binary_search_gen, stree_instr, binary_search_instr);
