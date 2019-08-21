@@ -14,17 +14,17 @@ use uint::Typable;
 
 const SEED: u128 = 0xcafef00dd15ea5e5;
 fn main() {
-    generate_test_data::<u40>((1u64<<34) as usize);
+    generate_test_data::<u40>(18);
 }
 
-fn generate_test_data<T: Typable + Into<u64>>(max_value: usize) {
+fn generate_test_data<T: Typable + Into<u64>>(exponent: u64) {
     let mut state = Mcg128Xsl64::new(SEED);
-
+    let max_value = (1u64<<exponent) as usize;
     let mut result: Vec<u64> = (0u64..(T::max_value()).into()).choose_multiple(&mut state, max_value);
     let mut clone = result.clone();
     clone.sort();
-    write_to_file(format!("../testdata/{}/2^{}.data", T::TYPE,40),&clone);
-    for i in (0..40).rev() {
+    write_to_file(format!("../testdata/{}/2^{}.data", T::TYPE,exponent),&clone);
+    for i in (0..exponent).rev() {
         let cut = result.len() - (max_value - (1<<i) as usize); 
         result = result.split_off(cut);
         let mut clone = result.clone();

@@ -51,6 +51,9 @@ fn pred_and_succ_benchmark<T: PredecessorSetStatic<u40>>(c: &mut Criterion) {
 
         
         let test_values: Vec<u64> = (u64::from(values[0]+1u32)..u64::from(values[values.len()-1])).choose_multiple(&mut state, 1000);
+
+        let data_structure: T = T::new(values);
+        
         c.bench_function(&format!("{}::pred <{}>",T::TYPE,values.len())[..], move 
                                     |b| b.iter_batched(|| values.clone(), |data| STree::new(data), BatchSize::SmallInput));
     }
