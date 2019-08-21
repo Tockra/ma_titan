@@ -5,32 +5,28 @@ use serde::{ Serialize};
 use rmps::{ Serializer};
 use std::fs::File;
 use std::io::BufWriter;
-use rand::Rng;
 use rand_pcg::Mcg128Xsl64;
-use uint::u40;
-use std::thread;
+use rand::seq::IteratorRandom;
 
 const SEED: u128 = 0xcafef00dd15ea5e5;
 const TWO: u32 = 2;
 fn main() {
-    let mut threads = vec![];
-
-    for i in 0..41 {
-        threads.push(thread::spawn(move || {
-                generate_values(TWO.pow(i) as usize);
-        }));
-    }
-
-    let mut counter = 0;
-    for thread in threads {
-        thread.join().unwrap();
-        counter += 1;
-        println!("Fortschritt: {}%",((counter as f32/41.) *100.) as u8);
+    let mut state = Mcg128Xsl64::new(SEED);
+    let mut result: Vec<u64> = (0..((1u64<<40))).choose_multiple(&mut state, ((1u64<<40)-1) as usize);
+    let mut clone = result.clone();
+    clone.sort();
+    write_to_file(format!("testdata/u40/{}.data", TWO.pow(40)),&clone);
+    for i in (0..40).rev() {
+        let cut = result.len() - ((1u64<<40) - (1<<i)) as usize; 
+        result = result.split_off(cut);
+        let mut clone = result.clone();
+        clone.sort();
+        write_to_file(format!("testdata/u40/{}.data", TWO.pow(i)),&clone);
     }
 }
 
 /// Generiert `n` Normalverteilte Werte im u40 BereichDateien und speichert diese in der Datei "`n`.data"
-fn generate_values(n: usize) {
+/*fn generate_values(n: usize) {
     let mut values = vec![];
     let mut state = Mcg128Xsl64::new(SEED);
     for _ in 0..n {
@@ -41,10 +37,10 @@ fn generate_values(n: usize) {
         values.push(u40::from(x));
     }
     write_to_file(format!("testdata/u40/{}.data", n), &values);
-}
+}*/
 
 /// Serializiert den übergebenen Vector und schreibt diesen in eine Datei namens `name`.
-fn write_to_file(name: String, val: &Vec<u40>) {
+fn write_to_file(name: String, val: &Vec<u64>) {
     let mut buf = BufWriter::new(File::create(name).unwrap());
     val.serialize(&mut Serializer::new(&mut buf)).unwrap();
 }
