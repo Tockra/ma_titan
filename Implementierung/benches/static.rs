@@ -26,17 +26,21 @@ use self::bench_data::BinarySearch;
 
 use uint::u40;
 use uint::Typable;
-
+// TODO: Laufzeit von der Summe aller Succ-Instruktionen messen
+// Generierung anpassen in den Benchmarks
 const SEED: u128 = 0xcafef00dd15ea5e5;
 
 /// Diese Methode lädt die Testdaten aus ../testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
 /// Datenstruktur T. Dabei wird die Laufzeit gemessen.
 fn static_build_benchmark<E: Typable, T: PredecessorSetStatic<E>>(c: &mut Criterion) {
-    for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
+    for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
         let dir = dir.unwrap();
         let path = dir.path();
+        println!("{:?}",path);
 
-        let buf = BufReader::new(File::create(path).unwrap());
+        let buf = BufReader::new(File::open(path).unwrap());
+        
+       
         let mut values = Deserializer::new(buf);
         let values: Vec<u64> = Deserialize::deserialize(&mut values).unwrap();
         let values = values.into_iter().map(|v| u40::from(v)).collect::<Vec<u40>>();
@@ -49,17 +53,18 @@ fn static_build_benchmark<E: Typable, T: PredecessorSetStatic<E>>(c: &mut Criter
 /// Anschließend werden 1000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor- und Sucessor-Methode 
 /// werden mit Hilfe dieser gemessen
 fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + PredecessorSetStatic<E>>(c: &mut Criterion) {
-    for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
+    for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
         let mut state = Mcg128Xsl64::new(SEED);
         let dir = dir.unwrap();
         let path = dir.path();
+        println!("{:?}",path);
 
-        let buf = BufReader::new(File::create(path).unwrap());
+        let buf = BufReader::new(File::open(path).unwrap());
         let mut values = Deserializer::new(buf);
         let values: Vec<u64> = Deserialize::deserialize(&mut values).unwrap();
         let values = values.into_iter().map(|v| E::from(v)).collect::<Vec<E>>();
 
-        
+        // let test_values: Vec<u64> = ((values[0]+1u32).into()..(values[0]+100u32).into()).choose_multiple(&mut state, 10);
         let test_values: Vec<u64> = ((values[0]+1u32).into()..(values[values.len()-1]).into()).choose_multiple(&mut state, 1000);
         let test_values = test_values.into_iter().map(|v| E::from(v)).collect::<Vec<E>>();
 
@@ -86,7 +91,6 @@ criterion_group!(stree_gen, static_build_benchmark<u40,STree>);
 criterion_group!(binary_search_gen, static_build_benchmark<u40,BinarySearch>);
 criterion_group!(stree_instr, pred_and_succ_benchmark<u40,STree>);
 criterion_group!(binary_search_instr, pred_and_succ_benchmark<u40,BinarySearch>);
-
 
 criterion_main!(stree_gen, binary_search_gen, stree_instr, binary_search_instr);
 
@@ -152,12 +156,22 @@ mod bench_data {
             let mut r = r;
 
             while r != l {
-                let m = (l+r)/2;
-                if self.element_list[m] > element {
-                    r = m;
+                // Todo 1000 Werte iterativ
+                if r - l +1 <= 1000 {
+                    for i in l..r {
+                        if self.element_list[i] > element  {
+                            return Some(self.element_list[i])
+                        }
+                    }
                 } else {
-                    l = m+1;
+                    let m = (l+r)/2;
+                    if self.element_list[m] > element {
+                        r = m;
+                    } else {
+                        l = m+1;
+                    }
                 }
+         
             }
             if self.element_list[l] >= element {
                 Some(self.element_list[l])
