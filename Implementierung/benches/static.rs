@@ -6,6 +6,8 @@ extern crate rmp_serde as rmps;
 use criterion::Criterion;
 use criterion::Bencher;
 use criterion::BatchSize;
+use criterion::ParameterizedBenchmark;
+use criterion::Benchmark;
 
 use serde::{Deserialize};
 use rmps::{Deserializer};
@@ -29,11 +31,11 @@ use uint::Typable;
 // TODO: Laufzeit von der Summe aller Succ-Instruktionen messen
 // Generierung anpassen in den Benchmarks
 const SEED: u128 = 0xcafef00dd15ea5e5;
-
+const SAMPLE_SIZE: usize = 5;
 /// Diese Methode lädt die Testdaten aus ../testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
 /// Datenstruktur T. Dabei wird die Laufzeit gemessen.
 fn static_build_benchmark<E: Typable, T: PredecessorSetStatic<E>>(c: &mut Criterion) {
-    for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
+    for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
         let dir = dir.unwrap();
         let path = dir.path();
         println!("{:?}",path);
@@ -44,8 +46,9 @@ fn static_build_benchmark<E: Typable, T: PredecessorSetStatic<E>>(c: &mut Criter
         let mut values = Deserializer::new(buf);
         let values: Vec<u64> = Deserialize::deserialize(&mut values).unwrap();
         let values = values.into_iter().map(|v| u40::from(v)).collect::<Vec<u40>>();
-        c.bench_function(&format!("{}::new <{}>",T::TYPE,values.len())[..], move 
-                                    |b| b.iter_batched(|| values.clone(), |data| STree::new(data), BatchSize::SmallInput));
+        let id = &format!("{}::new <{}>",T::TYPE,values.len())[..];
+        c.bench(id ,Benchmark::new(id, move 
+                                    |b| b.iter_batched(|| values.clone(), |data| STree::new(data), BatchSize::SmallInput)).sample_size(SAMPLE_SIZE));
     }
 }
 
@@ -53,7 +56,7 @@ fn static_build_benchmark<E: Typable, T: PredecessorSetStatic<E>>(c: &mut Criter
 /// Anschließend werden 1000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor- und Sucessor-Methode 
 /// werden mit Hilfe dieser gemessen
 fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + PredecessorSetStatic<E>>(c: &mut Criterion) {
-    for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
+    for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
         let mut state = Mcg128Xsl64::new(SEED);
         let dir = dir.unwrap();
         let path = dir.path();
@@ -73,19 +76,21 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Int
         let data_structure: Rc<T> = Rc::new(T::new(values));
         let data_strucuture_succ:Rc<T> = Rc::clone(&data_structure);
 
-        c.bench_function_over_inputs(&format!("{}::predecessor",T::TYPE)[..],move
+        let id = &format!("{}::predecessor",T::TYPE)[..];
+        c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elem: &E| {
                 b.iter(|| data_structure.predecessor(*elem));
             },
             test_values.clone()
-        );
+        ).sample_size(SAMPLE_SIZE));
 
-        c.bench_function_over_inputs(&format!("{}::sucessor",T::TYPE)[..],move
+        let id = &format!("{}::sucessor",T::TYPE)[..];
+        c.bench(id,ParameterizedBenchmark::new(id, move
             |b: &mut Bencher, elem: &E| {
                 b.iter(|| data_strucuture_succ.sucessor(*elem));
             },
             test_values
-        );
+        ).sample_size(SAMPLE_SIZE));
     }
 }
 
