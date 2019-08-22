@@ -11,7 +11,7 @@ use serde::{Deserialize};
 use rmps::{Deserializer};
 
 use rand_pcg::Mcg128Xsl64;
-use rand::seq::IteratorRandom;
+use rand::Rng;
 
 use std::fs::read_dir;
 use std::io::BufReader;
@@ -65,9 +65,11 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Int
         let values = values.into_iter().map(|v| E::from(v)).collect::<Vec<E>>();
 
         // let test_values: Vec<u64> = ((values[0]+1u32).into()..(values[0]+100u32).into()).choose_multiple(&mut state, 10);
-        let test_values: Vec<u64> = ((values[0]+1u32).into()..(values[values.len()-1]).into()).choose_multiple(&mut state, 1000);
-        let test_values = test_values.into_iter().map(|v| E::from(v)).collect::<Vec<E>>();
+        let mut test_values: Vec<E> = Vec::with_capacity(1000);
 
+        while test_values.len() != 1000 {
+            test_values.push(E::from(state.gen_range((values[0]+1u32).into(),(values[values.len()-1]).into())));
+        }
         let data_structure: Rc<T> = Rc::new(T::new(values));
         let data_strucuture_succ:Rc<T> = Rc::clone(&data_structure);
 
