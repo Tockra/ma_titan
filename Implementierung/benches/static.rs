@@ -158,8 +158,8 @@ mod bench_data {
             while r != l {
                 // Todo 1000 Werte iterativ
                 if r - l +1 <= 1000 {
-                    for i in l..r {
-                        if self.element_list[i] > element  {
+                    for i in l..(r+1) {
+                        if self.element_list[i] >= element  {
                             return Some(self.element_list[i])
                         }
                     }
@@ -185,11 +185,19 @@ mod bench_data {
             let mut r = r;
 
             while l != r {
-                let m = (l+r)/2;
-                if self.element_list[m] < element {
-                    r = m
+                if r - l <= 1000 {
+                    for i in (l..(r+1)).rev() {
+                        if self.element_list[i] <= element  {
+                            return Some(self.element_list[i])
+                        }
+                    }
                 } else {
-                    l = m+1;
+                    let m = (l+r)/2;
+                    if self.element_list[m] < element {
+                        r = m
+                    } else {
+                        l = m+1;
+                    }
                 }
             }
     
