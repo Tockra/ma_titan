@@ -110,7 +110,7 @@ criterion_group!(binary_search_gen, static_build_benchmark<u40,BinarySearch>);
 criterion_group!(stree_instr, pred_and_succ_benchmark<u40,STree>);
 criterion_group!(binary_search_instr, pred_and_succ_benchmark<u40,BinarySearch>);
 
-criterion_main!(stree_gen, binary_search_gen, stree_instr, binary_search_instr);
+criterion_main!( stree_gen, binary_search_gen, stree_instr, binary_search_instr);
 
 
 mod bench_data {
@@ -203,19 +203,11 @@ mod bench_data {
             let mut r = r;
 
             while l != r {
-                if r - l <= 1000 {
-                    for i in (l..(r+1)).rev() {
-                        if self.element_list[i] <= element  {
-                            return Some(self.element_list[i])
-                        }
-                    }
+                let m = (l+r)/2;
+                if self.element_list[m] < element {
+                    r = m
                 } else {
-                    let m = (l+r)/2;
-                    if self.element_list[m] < element {
-                        r = m
-                    } else {
-                        l = m+1;
-                    }
+                    l = m+1;
                 }
             }
     

@@ -36,43 +36,27 @@ fn main() {
         // let test_values: Vec<u64> = ((values[0]+1u32).into()..(values[0]+100u32).into()).choose_multiple(&mut state, 10);
         let mut test_values: Vec<u40> = Vec::with_capacity(1000);
 
-        while test_values.len() != 10 {
-            let val: u64 = state.gen_range(u64::from(values[0]+1u32),u64::from(values[values.len()-1]));
-            test_values.push(u40::from(val));
+        while test_values.len() != 1000 {
+            test_values.push(u40::from(state.gen_range(u64::from(values[0]+1u64),u64::from(values[values.len()-1]))));
         }
-
-        let bs: BinarySearch = BinarySearch::new(values.clone());
-
-        let start_init = Instant::now();
         let data_structure: Rc<STree> = Rc::new(STree::new(values));
-        println!("Init dauer: {} ns", start_init.elapsed().as_nanos());
         let data_strucuture_succ:Rc<STree> = Rc::clone(&data_structure);
 
-        let ds = data_structure.as_ref();
-        let start_init = Instant::now();
-
-        for i in 0..100 {
-            let start_init = Instant::now();
-            ds.sucessor(test_values[0]);
-            let end = start_init.elapsed().as_nanos();
-            println!("{}  Suc: {} ns", i,end);
+        let id = &format!("{}::predecessor",STree::TYPE)[..];
+        let cp = test_values.clone();
+        let mut sum = 0;
+        let now = Instant::now();
+        for i in 0..10 {
+            let cp = cp.clone();
+            let now = Instant::now();
+            for elem in cp {
+                data_structure.predecessor(elem);
+            }
+            sum += now.elapsed().as_micros();
         }
-        
 
-        let start_init = Instant::now();
-        bs.sucessor(test_values[0]);
-        println!("BS Erster Suc: {} ns", start_init.elapsed().as_nanos());
+        println!("Messung: {} us",sum as f64 / 10.);
 
-        let start_init = Instant::now();
-        bs.sucessor(test_values[0]);
-        println!("BS Zweiter Suc: {} ns", start_init.elapsed().as_nanos());
-
-        let start_init = Instant::now();
-        bs.sucessor(test_values[0]);
-        println!("BS Dritter Suc: {} ns", start_init.elapsed().as_nanos());
-        
-        
-    
     }
 
    
