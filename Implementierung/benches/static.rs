@@ -29,8 +29,8 @@ use self::bench_data::BinarySearch;
 
 use uint::u40;
 use uint::Typable;
-// TODO: Laufzeit von der Summe aller Succ-Instruktionen messen
-// Generierung anpassen in den Benchmarks
+// TODO: Cache clears vor den Succ und Pred Instruktionen
+
 const SEED: u128 = 0xcafef00dd15ea5e5;
 const SAMPLE_SIZE: usize = 10;
 /// Diese Methode lädt die Testdaten aus ../testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
