@@ -27,7 +27,7 @@ fn generate_test_data<T: Typable + Serialize + Ord + Copy + Into<u64> + From<u64
     let mut result: Vec<u64> = (0u64..(T::max_value()).into()).choose_multiple(&mut state, max_value);
     let mut result = result.into_iter().map(|v| T::from(v)).collect::<Vec<T>>();
     for i in 0..exponent {
-        let cut = result.len() - (max_value - (1<<i) as usize); 
+        let cut = result.len() - (max_value - (1u64<<i) as usize); 
         let result = &mut result[..cut];
         result.sort();
         write_to_file(format!("../testdata/{}/2^{}.data",T::TYPE, i),&result.to_vec());
