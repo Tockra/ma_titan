@@ -4,7 +4,10 @@ extern crate serde;
 extern crate rmp_serde as rmps;
 
 use criterion::Criterion;
+
 use criterion::Bencher;
+use criterion::black_box;
+
 use criterion::BatchSize;
 use criterion::ParameterizedBenchmark;
 use criterion::Benchmark;
@@ -48,7 +51,7 @@ fn static_build_benchmark<E: Typable, T: PredecessorSetStatic<E>>(c: &mut Criter
         let values = values.into_iter().map(|v| u40::from(v)).collect::<Vec<u40>>();
         let id = &format!("{}::new <{}>",T::TYPE,values.len())[..];
         c.bench(id ,Benchmark::new(id, move 
-                                    |b| b.iter_batched(|| values.clone(), |data| STree::new(data), BatchSize::SmallInput)).sample_size(SAMPLE_SIZE));
+                                    |b| b.iter_batched(|| values.clone(), |data| T::new(data), BatchSize::SmallInput)).sample_size(SAMPLE_SIZE));
     }
 }
 
@@ -77,19 +80,29 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Int
         let data_strucuture_succ:Rc<T> = Rc::clone(&data_structure);
 
         let id = &format!("{}::predecessor",T::TYPE)[..];
+        let cp = test_values.clone();
         c.bench(id,ParameterizedBenchmark::new(id,move
-            |b: &mut Bencher, elem: &E| {
-                b.iter(|| data_structure.predecessor(*elem));
+            |b: &mut Bencher, elems: &Vec<E>| {
+                b.iter(|| {
+                    // Laufzeit der For-Schleife wird mitgemessen.
+                    for elem in elems {
+                        data_structure.predecessor(*elem);
+                    }
+                });
             },
-            test_values.clone()
+            vec![cp]
         ).sample_size(SAMPLE_SIZE));
 
         let id = &format!("{}::sucessor",T::TYPE)[..];
-        c.bench(id,ParameterizedBenchmark::new(id, move
-            |b: &mut Bencher, elem: &E| {
-                b.iter(|| data_strucuture_succ.sucessor(*elem));
+        c.bench(id,ParameterizedBenchmark::new(id,move
+            |b: &mut Bencher, elems: &Vec<E>| {
+                b.iter(|| {
+                    for elem in elems {
+                        data_strucuture_succ.sucessor(*elem);
+                    }
+                });
             },
-            test_values
+            vec![test_values]
         ).sample_size(SAMPLE_SIZE));
     }
 }
