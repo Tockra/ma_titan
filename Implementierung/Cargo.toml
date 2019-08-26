@@ -15,7 +15,7 @@ boomphf = "0.5.2"
 uint = { git = "https://github.com/Tockra/uint.git" }
 
 [dev-dependencies]
-criterion = "0.2.11"
+criterion = "0.3.0"
 
 [[bench]]
 name = "static"

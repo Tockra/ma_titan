@@ -6,8 +6,6 @@ extern crate rmp_serde as rmps;
 use criterion::Criterion;
 
 use criterion::Bencher;
-use criterion::black_box;
-
 use criterion::BatchSize;
 use criterion::ParameterizedBenchmark;
 use criterion::Benchmark;
@@ -34,10 +32,10 @@ use uint::Typable;
 // TODO: Laufzeit von der Summe aller Succ-Instruktionen messen
 // Generierung anpassen in den Benchmarks
 const SEED: u128 = 0xcafef00dd15ea5e5;
-const SAMPLE_SIZE: usize = 5;
+const SAMPLE_SIZE: usize = 10;
 /// Diese Methode lädt die Testdaten aus ../testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
 /// Datenstruktur T. Dabei wird die Laufzeit gemessen.
-fn static_build_benchmark<E: Typable, T: PredecessorSetStatic<E>>(c: &mut Criterion) {
+fn static_build_benchmark<E: 'static + Typable + Copy + Debug + From<u64>, T: PredecessorSetStatic<E>>(c: &mut Criterion) {
     for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
         let dir = dir.unwrap();
         let path = dir.path();
@@ -48,7 +46,7 @@ fn static_build_benchmark<E: Typable, T: PredecessorSetStatic<E>>(c: &mut Criter
        
         let mut values = Deserializer::new(buf);
         let values: Vec<u64> = Deserialize::deserialize(&mut values).unwrap();
-        let values = values.into_iter().map(|v| u40::from(v)).collect::<Vec<u40>>();
+        let values = values.into_iter().map(|v| E::from(v)).collect::<Vec<E>>();
         let id = &format!("{}::new <{}>",T::TYPE,values.len())[..];
         c.bench(id ,Benchmark::new(id, move 
                                     |b| b.iter_batched(|| values.clone(), |data| T::new(data), BatchSize::SmallInput)).sample_size(SAMPLE_SIZE));
