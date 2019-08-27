@@ -22,11 +22,14 @@ use std::fs::File;
 use std::rc::Rc;
 use std::ops::Add;
 use std::fmt::Debug;
+use std::io::BufWriter;
+use std::fs::File;
+use std::io::prelude::*;
 
 use predecessor_list::help::internal::PredecessorSetStatic;
 use predecessor_list::data_structures::statics::STree;
 use self::bench_data::BinarySearch;
-
+use std::ptr::write_volatile;
 use uint::u40;
 use uint::Typable;
 // TODO: Cache clears vor den Succ und Pred Instruktionen
@@ -81,12 +84,17 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Int
         let cp = test_values.clone();
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
-                b.iter(|| {
+                b.iter_batched(|| {
+                    let result = Rc::clone(&data_structure);
+                    cache_clear();
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    result
+                } , |data| {
                     // Laufzeit der For-Schleife wird mitgemessen.
                     for elem in elems {
-                        data_structure.predecessor(*elem);
+                        data.predecessor(*elem);
                     }
-                });
+                }, BatchSize::SmallInput);
             },
             vec![cp]
         ).sample_size(SAMPLE_SIZE));
@@ -105,12 +113,37 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Int
     }
 }
 
+// Diese Methode löscht (hoffentlich) 12 Mbyte des Caches. 
+pub fn cache_clear() {
+    let mut data = vec![23u64];
+
+    for i in 1 .. 3_750_000u64 {
+        data.push(data[i as usize -1] + i);
+    }
+
+    let mut buf = BufWriter::new(File::create("cache").unwrap());
+    buf.write_fmt(format_args!("{}", data[data.len()-1])).unwrap();
+}
+
+
 criterion_group!(stree_gen, static_build_benchmark<u40,STree>);
 criterion_group!(binary_search_gen, static_build_benchmark<u40,BinarySearch>);
 criterion_group!(stree_instr, pred_and_succ_benchmark<u40,STree>);
 criterion_group!(binary_search_instr, pred_and_succ_benchmark<u40,BinarySearch>);
 
-criterion_main!( stree_gen, binary_search_gen, stree_instr, binary_search_instr);
+fn test(c: &mut Criterion) {
+    c.bench_function("with_setup", move |b| {
+        // This will avoid timing the to_vec call.
+        b.iter_batched(|| {std::thread::sleep(std::time::Duration::from_millis(500));}, |_| {
+            let mut v = vec![];
+            for i in 0..1000000 {
+                v.push(i);
+            }
+        }, BatchSize::SmallInput)
+    });
+}
+criterion_group!(test1, test);
+criterion_main!(test1);
 
 
 mod bench_data {

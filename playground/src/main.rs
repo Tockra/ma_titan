@@ -46,7 +46,7 @@ fn main() {
         let cp = test_values.clone();
         let mut sum = 0;
         let now = Instant::now();
-        for i in 0..10 {
+        for i in 0..1 {
             let cp = cp.clone();
             let now = Instant::now();
             for elem in cp {
@@ -55,7 +55,7 @@ fn main() {
             sum += now.elapsed().as_micros();
         }
 
-        println!("Messung: {} us",sum as f64 / 10.);
+        println!("Messung: {} us",sum as f64);
 
     }
 

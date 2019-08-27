@@ -536,13 +536,6 @@ impl<T> Level<T> {
 
 }
 
-
-
-
-
-
-
-
 #[cfg(test)]
 mod tests {
     use ux::{u10};
