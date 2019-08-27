@@ -67,7 +67,7 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Int
         let mut values = Deserializer::new(buf);
         let values: Vec<u64> = Deserialize::deserialize(&mut values).unwrap();
         let values = values.into_iter().map(|v| E::from(v)).collect::<Vec<E>>();
-
+        let len = values.len();
         // let test_values: Vec<u64> = ((values[0]+1u32).into()..(values[0]+100u32).into()).choose_multiple(&mut state, 10);
         let mut test_values: Vec<E> = Vec::with_capacity(1000);
 
@@ -77,7 +77,7 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Int
         let data_structure = T::new(values);
         let data_strucuture_succ:T = data_structure.clone();
 
-        let id = &format!("{}::predecessor <{}>",T::TYPE, values.len())[..];
+        let id = &format!("{}::predecessor <{}>",T::TYPE, len)[..];
         let cp = test_values.clone();
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
@@ -96,7 +96,7 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Int
             vec![cp]
         ).sample_size(SAMPLE_SIZE));
 
-        let id = &format!("{}::sucessor <{}>",T::TYPE, values.len())[..];
+        let id = &format!("{}::sucessor <{}>",T::TYPE, len)[..];
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
                 b.iter(|| {
@@ -131,7 +131,7 @@ criterion_group!(binary_search_instr, pred_and_succ_benchmark<u40,BinarySearch>)
 fn test(c: &mut Criterion) {
     c.bench_function("with_setup", move |b| {
         // This will avoid timing the to_vec call.
-        b.iter_batched(|| {std::thread::sleep(std::time::Duration::from_millis(1000));}, |_| {
+        b.iter_batched(|| {let x = 1; x}, |_| {
             let mut v = vec![];
             for i in 0..1 {
                 v.push(i);
