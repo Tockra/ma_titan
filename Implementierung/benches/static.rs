@@ -18,8 +18,6 @@ use rand::Rng;
 
 use std::fs::read_dir;
 use std::io::BufReader;
-use std::fs::File;
-use std::rc::Rc;
 use std::ops::Add;
 use std::fmt::Debug;
 use std::io::BufWriter;
@@ -29,7 +27,6 @@ use std::io::prelude::*;
 use predecessor_list::help::internal::PredecessorSetStatic;
 use predecessor_list::data_structures::statics::STree;
 use self::bench_data::BinarySearch;
-use std::ptr::write_volatile;
 use uint::u40;
 use uint::Typable;
 // TODO: Cache clears vor den Succ und Pred Instruktionen
@@ -59,7 +56,7 @@ fn static_build_benchmark<E: 'static + Typable + Copy + Debug + From<u64>, T: Pr
 /// Lädt die Testdaten aus ../testdata/{u40,u48,u64}/ und erzeugt mit Hilfe dieser die zu testende Datenstruktur T. 
 /// Anschließend werden 1000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor- und Sucessor-Methode 
 /// werden mit Hilfe dieser gemessen
-fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + PredecessorSetStatic<E>>(c: &mut Criterion) {
+fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>(c: &mut Criterion) {
     for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
         let mut state = Mcg128Xsl64::new(SEED);
         let dir = dir.unwrap();
@@ -77,15 +74,15 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + From<u64> + Int
         while test_values.len() != 1000 {
             test_values.push(E::from(state.gen_range((values[0]+1u32).into(),(values[values.len()-1]).into())));
         }
-        let data_structure: Rc<T> = Rc::new(T::new(values));
-        let data_strucuture_succ:Rc<T> = Rc::clone(&data_structure);
+        let data_structure = T::new(values);
+        let data_strucuture_succ:T = data_structure.clone();
 
         let id = &format!("{}::predecessor",T::TYPE)[..];
         let cp = test_values.clone();
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
                 b.iter_batched(|| {
-                    let result = Rc::clone(&data_structure);
+                    let result = data_structure.clone();
                     cache_clear();
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     result
@@ -151,6 +148,7 @@ mod bench_data {
     use predecessor_list::help::internal::{PredecessorSetStatic};
 
     type Int = u40;
+    #[derive(Clone)]
     pub struct BinarySearch {
         element_list: Box<[Int]>
     }
