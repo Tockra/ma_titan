@@ -8,5 +8,7 @@ edition = "2018"
 
 [dependencies]
 stats_alloc = "0.1.8"
-predecessor_list = { path = "../Implementierung/" }
+stree = { path = "../Implementierung/" }
 uint = { git = "https://github.com/Tockra/uint.git" }
+serde = "1.0.99"
+rmp-serde = "0.13.7"

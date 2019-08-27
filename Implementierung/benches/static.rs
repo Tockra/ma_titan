@@ -10,8 +10,8 @@ use criterion::BatchSize;
 use criterion::ParameterizedBenchmark;
 use criterion::Benchmark;
 
-use serde::{Deserialize};
-use rmps::{Deserializer};
+use serde::Deserialize;
+use rmps::Deserializer;
 
 use rand_pcg::Mcg128Xsl64;
 use rand::Rng;
@@ -24,8 +24,8 @@ use std::io::BufWriter;
 use std::fs::File;
 use std::io::prelude::*;
 
-use predecessor_list::help::internal::PredecessorSetStatic;
-use predecessor_list::data_structures::statics::STree;
+use stree::internal::PredecessorSetStatic;
+use stree::u40::stat::STree;
 use self::bench_data::BinarySearch;
 use uint::u40;
 use uint::Typable;
