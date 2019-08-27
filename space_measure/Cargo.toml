@@ -7,4 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
- stats_alloc = "0.1.8"
+stats_alloc = "0.1.8"
+predecessor_list = { path = "../Implementierung/" }
+uint = { git = "https://github.com/Tockra/uint.git" }
