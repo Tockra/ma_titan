@@ -25,6 +25,7 @@ pub type L3Ebene = Level<Option<usize>>;
 
 /// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
+#[derive(Clone)]
 pub struct STree {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
@@ -390,6 +391,7 @@ impl STree {
 }
 
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
+#[derive(Clone)]
 pub struct Level<T> {
     /// Perfekte Hashfunktion, die immer (außer zur Inialisierung) gesetzt ist. 
     pub hash_function: Option<Mphf<u10>>,
