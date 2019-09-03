@@ -3,7 +3,7 @@ use std::mem::{self};
 use std::ptr;
 
 use ux::{u10};
-use uint::u40;
+use uint::{u40, u48};
 
 pub struct List<T> {
     pub first: Option<Box<Element<T>>>,
@@ -224,6 +224,21 @@ impl Splittable<usize,u10> for u40 {
         let j: u10 = u10::new((low >> 10) as u16) ;
         // Die niedrigwertigsten 8 Bits element[0..7]
         let k: u10 = u10::new((u64::from(*self) & 0x3FF) as u16);
+        (i, j, k) 
+    }
+}
+
+impl Splittable<usize,u16> for u48 {
+    #[inline]
+    fn split_integer_down(&self) -> (usize,u16,u16) {
+        // TODO: Achtung funktioniert nicht korrekt mit negativen Zahlen
+        let i: usize = u64::from(*self >> 24) as usize;
+        // Die niedrigwertigsten 16 Bits element[16..31]
+        let low = u64::from(*self) & 0xFFFFFF;
+        // Bits 16 bis 23 element[8..15]
+        let j: u16 = (low >> 12) as u16 ;
+        // Die niedrigwertigsten 8 Bits element[0..7]
+        let k: u16 = (u64::from(*self) & 0xFFF) as u16;
         (i, j, k) 
     }
 }

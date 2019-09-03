@@ -59,7 +59,6 @@ fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned
 /// Anschließend werden 10000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor- und Sucessor-Methode 
 /// werden mit Hilfe dieser gemessen
 fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>(c: &mut Criterion) {
-    
     for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
         let mut state = Mcg128Xsl64::new(SEED);
         let dir = dir.unwrap();
@@ -131,7 +130,6 @@ mod bench_data {
     use uint::u40;
     use stree::internal::PredecessorSetStatic;
 
-    type Int = u40;
     #[derive(Clone)]
     pub struct BinarySearch {
         element_list: Box<[Int]>
