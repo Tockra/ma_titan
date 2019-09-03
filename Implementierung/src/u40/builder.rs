@@ -3,13 +3,8 @@ use std::collections::HashMap;
 use boomphf::Mphf;
 
 use crate::internal::{Splittable};
-use crate::u40::stat::{L2Ebene, L3Ebene};
+use crate::u40::stat::{L2Ebene, L3Ebene, Int};
 
-
-/// In dieser Implementierung werden u40 Integer gespeichert.
-
-/// Die Länge des Root-Arrays, des STrees (basierend auf 40-Bit geteilt durch 2.).
-const ROOT_ARRAY_SIZE: usize = 1<<20;
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 /// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
@@ -40,10 +35,11 @@ impl STreeBuilder {
     /// # Arguments
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new<T: Splittable>(elements: Vec<T>) ->  Self{
+    pub fn new<T: Int>(elements: Vec<T>) ->  Self{
         let mut root_indexs = vec![];
 
-        let mut tmp: Vec<L2EbeneBuilder> = Vec::with_capacity(ROOT_ARRAY_SIZE);
+        // Hier wird ein root_array der Länge T::root_array_size() angelegt, was 2^i entspricht. Dabei entspricht bei einem u40 Integer i=40 .
+        let mut tmp: Vec<L2EbeneBuilder> = Vec::with_capacity(T::root_array_size());
         for _ in 0..tmp.capacity() {
             tmp.push(L2EbeneBuilder::new(LX_ARRAY_SIZE/64));
         }
@@ -69,8 +65,8 @@ impl STreeBuilder {
 
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
     /// angelegt und miteinander verbunden. 
-    pub fn build(&self) -> Box<[L2Ebene]> {
-        let mut tmp: Vec<L2Ebene> = Vec::with_capacity(ROOT_ARRAY_SIZE);
+    pub fn build<T: Int>(&self) -> Box<[L2Ebene]> {
+        let mut tmp: Vec<L2Ebene> = Vec::with_capacity(T::root_array_size());
         for i in 0..tmp.capacity() {
             tmp.push(L2Ebene::new(LX_ARRAY_SIZE/64, Some(self.root_table[i].keys.clone())));
         }
@@ -101,10 +97,10 @@ impl STreeBuilder {
     }
 
     /// Baut das Root-Top-Array mit Hilfe der sich in der Datenstruktur befindenden Werte.
-    pub fn build_root_top(&self) -> (Box<[u64]>,Box<[u64]>) {
+    pub fn build_root_top<T: Int>(&self) -> (Box<[u64]>,Box<[u64]>) {
         
-        let mut root_top: Vec<u64> = vec![0; ROOT_ARRAY_SIZE/64];
-        let mut root_top_sub: Vec<u64> = vec![0; ROOT_ARRAY_SIZE/64/64];
+        let mut root_top: Vec<u64> = vec![0; T::root_array_size()/64];
+        let mut root_top_sub: Vec<u64> = vec![0; T::root_array_size()/64/64];
 
         for &bit in &self.root_indexs {
             // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle

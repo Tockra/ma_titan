@@ -5,15 +5,6 @@ use uint::{u40,u48};
 use crate::internal::{Splittable,PredecessorSetStatic};
 use crate::u40::builder::{GAMMA,STreeBuilder};
 
-/// In dieser Implementierung werden u40 Integer gespeichert.
-//pub type Int = u40;
-
-/// Die Länge des Root-Arrays, des STrees (basierend auf 40-Bit /2/2.).
-const ROOT_ARRAY_SIZE: usize = 1 << 20;
-
-/// Die Länge der L2- und L3-Top-Arrays, des STrees (basierend auf 40-Bit /2/2.).
-const LX_ARRAY_SIZE: usize = 1 << 10;
-
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene = Level<L3Ebene>;
@@ -46,7 +37,7 @@ pub struct STree<T> {
 /// Dieser Trait dient als Platzhalter für u40, u48 und u64. 
 /// Er stellt sicher das der generische Parameter gewisse Traits implementiert und die New-Methode besitzt.
 /// Zusätzlich wird die Größe des Root-Arrays in Form einer Funktion rückgebar gemacht.
-pub trait Int: PartialOrd + From<u64> + Into<u64> + Copy { 
+pub trait Int: PartialOrd + From<u64> + Into<u64> + Copy + Splittable { 
     fn new(k: u64) -> Self;
     fn root_array_size() -> usize;
 }
@@ -75,7 +66,7 @@ impl Int for u48 {
     }
 }
 
-impl<T: Splittable + Int> PredecessorSetStatic<T> for STree<T> {
+impl<T: Int> PredecessorSetStatic<T> for STree<T> {
     const TYPE: &'static str = "STree";
 
     fn new(elements: Vec<T>) -> Self {
@@ -117,7 +108,7 @@ impl<T: Splittable + Int> PredecessorSetStatic<T> for STree<T> {
     }
 }
 
-impl<T: Splittable + Int> STree<T> {
+impl<T: Int> STree<T> {
     /// Gibt einen STree mit den in `elements` enthaltenen Werten zurück.
     ///
     /// # Arguments
@@ -126,9 +117,9 @@ impl<T: Splittable + Int> STree<T> {
     pub fn new(elements: Vec<T>) -> Self {
         let builder = STreeBuilder::new(elements.clone());
 
-        let (root_top,root_top_sub) = builder.build_root_top();
+        let (root_top,root_top_sub) = builder.build_root_top::<T>();
         let mut result = STree{
-            root_table: builder.build(),
+            root_table: builder.build::<T>(),
             root_top: root_top,
             root_top_sub: root_top_sub, 
             element_list: elements.into_boxed_slice(),
@@ -572,8 +563,11 @@ impl<T> Level<T> {
 #[cfg(test)]
 mod tests {
     use uint::u40;
-    use super::{STree,LX_ARRAY_SIZE};
-    use crate::internal::{Splittable};
+    use super::STree;
+    use crate::internal::Splittable;
+
+    /// Größe der LX-Top-Arrays
+    const LX_ARRAY_SIZE: usize = 1 << 10;
 
     /// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
     #[test]

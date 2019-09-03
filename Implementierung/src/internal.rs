@@ -10,10 +10,6 @@ pub struct List<T> {
     pub len: usize,
 }
 
-pub const fn root_size<T:>() -> usize {
-    1 << 8*mem::size_of::<T>() / 2
-}
-
 pub trait PredecessorSet<T> {
     fn insert(&mut self,element: T);
     fn delete(&mut self,element: T);
