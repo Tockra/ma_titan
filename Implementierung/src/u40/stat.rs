@@ -1,6 +1,6 @@
 #![allow(dead_code)]  
 use boomphf::Mphf;
-use uint::u40;
+use uint::{u40,u48};
 
 use crate::internal::{Splittable,PredecessorSetStatic};
 use crate::u40::builder::{GAMMA,STreeBuilder};
@@ -45,13 +45,33 @@ pub struct STree<T> {
 
 /// Dieser Trait dient als Platzhalter für u40, u48 und u64. 
 /// Er stellt sicher das der generische Parameter gewisse Traits implementiert und die New-Methode besitzt.
+/// Zusätzlich wird die Größe des Root-Arrays in Form einer Funktion rückgebar gemacht.
 pub trait Int: PartialOrd + From<u64> + Into<u64> + Copy { 
     fn new(k: u64) -> Self;
+    fn root_array_size() -> usize;
 }
 
 impl Int for u40 {
     fn new(k: u64) -> Self {
         Self::from(k)
+    }
+
+    /// Gibt den Wert 2^20 zurück, da u40 40 Bit besitzt und die hälfte davon mit 2^20 Werten adressiert werden
+    /// können.
+    fn root_array_size() -> usize {
+        1 << 20
+    }
+}
+
+impl Int for u48 {
+    fn new(k: u64) -> Self {
+        Self::from(k)
+    }
+
+    /// Gibt den Wert 2^20 zurück, da u40 40 Bit besitzt und die hälfte davon mit 2^20 Werten adressiert werden
+    /// können.
+    fn root_array_size() -> usize {
+        1 << 24
     }
 }
 
