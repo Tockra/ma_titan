@@ -2,7 +2,6 @@
 use std::mem::{self};
 use std::ptr;
 
-use ux::{u10};
 use uint::{u40, u48};
 
 pub struct List<T> {
@@ -209,26 +208,26 @@ impl<T> Element<T> {
 }
 
 
-pub trait Splittable<T,V> {
-    fn split_integer_down(&self) -> (T,V,V);
+pub trait Splittable {
+    fn split_integer_down(&self) -> (usize,u16,u16);
 }
 
-impl Splittable<usize,u10> for u40 {
+impl Splittable for u40 {
     #[inline]
-    fn split_integer_down(&self) -> (usize,u10,u10) {
+    fn split_integer_down(&self) -> (usize,u16,u16) {
         // TODO: Achtung funktioniert nicht korrekt mit negativen Zahlen
         let i: usize = u64::from(*self >> 20) as usize;
         // Die niedrigwertigsten 16 Bits element[16..31]
         let low = u64::from(*self) & 0xFFFFF;
         // Bits 16 bis 23 element[8..15]
-        let j: u10 = u10::new((low >> 10) as u16) ;
+        let j: u16 = (low >> 10) as u16 ;
         // Die niedrigwertigsten 8 Bits element[0..7]
-        let k: u10 = u10::new((u64::from(*self) & 0x3FF) as u16);
+        let k: u16 = (u64::from(*self) & 0x3FF) as u16;
         (i, j, k) 
     }
 }
 
-impl Splittable<usize,u16> for u48 {
+impl Splittable for u48 {
     #[inline]
     fn split_integer_down(&self) -> (usize,u16,u16) {
         // TODO: Achtung funktioniert nicht korrekt mit negativen Zahlen
@@ -243,16 +242,16 @@ impl Splittable<usize,u16> for u48 {
     }
 }
 
-impl Splittable<usize,u8> for i32 {
+impl Splittable for i32 {
     #[inline]
-    fn split_integer_down(&self) -> (usize,u8,u8) {
+    fn split_integer_down(&self) -> (usize,u16,u16) {
         let i: usize = (*self >> 16) as usize;
         // Die niedrigwertigsten 16 Bits element[16..31]
         let low = *self & 0xFFFF;
         // Bits 16 bis 23 element[8..15]
-        let j: u8 = (low >> 8) as u8;
+        let j: u16 = (low >> 8) as u16;
         // Die niedrigwertigsten 8 Bits element[0..7]
-        let k: u8 = (*self & 255) as u8;
+        let k: u16 = (*self & 255) as u16;
         (i,j,k)
     }
 }

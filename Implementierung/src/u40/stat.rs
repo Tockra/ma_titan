@@ -1,13 +1,12 @@
 #![allow(dead_code)]  
-use ux::{u10};
-use uint::u40;
 use boomphf::Mphf;
+use uint::u40;
 
 use crate::internal::{Splittable,PredecessorSetStatic};
 use crate::u40::builder::{GAMMA,STreeBuilder};
 
 /// In dieser Implementierung werden u40 Integer gespeichert.
-pub type Int = u40;
+//pub type Int = u40;
 
 /// Die Länge des Root-Arrays, des STrees (basierend auf 40-Bit /2/2.).
 const ROOT_ARRAY_SIZE: usize = 1 << 20;
@@ -26,31 +25,86 @@ pub type L3Ebene = Level<Option<usize>>;
 /// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 #[derive(Clone)]
-pub struct STree {
+pub struct STree<T> {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
     root_table: Box<[L2Ebene]>,
     
     /// Das Root-Top-Array speichert für jeden Eintrag `root_table[x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
     /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert. 
-    root_top: Box<[u64; ROOT_ARRAY_SIZE/64]>,
-
-    //TODO CHANGE TO BOXED SLICE!
+    root_top: Box<[u64]>,
 
     /// Das Root-Top-Sub-Array ist ein Hilfsarray. Dabei werden immer 64-Bit des Root-Top-Arrays (also ein Index) verodert und zu einem 
     /// Bit in `root_top_sub`. Somit können die nächsten gesetzten Bits in `root_top` gefunden werden, ohne alle Einträge zu überprüfen.
     /// Die Länge des Arrays beträgt somit [u64;2^20 / 64 / 64].
-    root_top_sub: Box<[u64; ROOT_ARRAY_SIZE/64/64]>, 
+    root_top_sub: Box<[u64]>, 
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
-    element_list: Box<[Int]>,
+    element_list: Box<[T]>,
 }
 
-impl PredecessorSetStatic<Int> for STree {
+/// Dieser Trait dient als Platzhalter für u40, u48 und u64. 
+/// Er stellt sicher das der generische Parameter gewisse Traits implementiert und die New-Methode besitzt.
+pub trait Int: PartialOrd + From<u64> + Into<u64> + Copy { 
+    fn new(k: u64) -> Self;
+}
+
+impl Int for u40 {
+    fn new(k: u64) -> Self {
+        Self::from(k)
+    }
+}
+
+impl<T: Splittable + Int> PredecessorSetStatic<T> for STree<T> {
     const TYPE: &'static str = "STree";
 
-    fn new(elements: Vec<Int>) -> Self {
-         let builder = STreeBuilder::new(elements.clone());
+    fn new(elements: Vec<T>) -> Self {
+         STree::<T>::new(elements)
+    }
+
+    fn predecessor(&self,number: T) -> Option<T> {
+        self.locate_or_pred(number).and_then(|x| Some(self.element_list[x]))
+    }
+
+    fn sucessor(&self,number: T) -> Option<T> {
+        self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
+    }
+
+    fn minimum(&self) -> Option<T> {
+        self.minimum()
+    }
+
+    fn maximum(&self) -> Option<T> {
+        self.maximum()
+    } 
+
+    fn contains(&self, number: T) -> bool {
+        let (i,j,k) = Splittable::split_integer_down(&number);
+        if self.root_table[i].minimum.is_none() {
+            return false;
+        } else {
+            let l3_level = self.root_table[i].try_get(j);
+            if l3_level.is_none() {
+                return false;
+            } else {
+                let elem = l3_level.unwrap().try_get(k);
+                if elem.is_none() {
+                    return false
+                } 
+            }
+        }
+        true
+    }
+}
+
+impl<T: Splittable + Int> STree<T> {
+    /// Gibt einen STree mit den in `elements` enthaltenen Werten zurück.
+    ///
+    /// # Arguments
+    ///
+    /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
+    pub fn new(elements: Vec<T>) -> Self {
+        let builder = STreeBuilder::new(elements.clone());
 
         let (root_top,root_top_sub) = builder.build_root_top();
         let mut result = STree{
@@ -62,7 +116,7 @@ impl PredecessorSetStatic<Int> for STree {
         for (index,element) in result.element_list.iter().enumerate() {
             // Dadurch das die Reihenfolge sortiert ist, wird das letzte hinzugefügte Element das größte und das erste das kleinste sein.
 
-            let (i,j,k) = Splittable::<usize,u10>::split_integer_down(element);
+            let (i,j,k) = Splittable::split_integer_down(element);
 
             let l2_level = &mut result.root_table[i];
             l2_level.minimum.get_or_insert(index);
@@ -81,51 +135,6 @@ impl PredecessorSetStatic<Int> for STree {
         result
     }
 
-    fn predecessor(&self,number: u40) -> Option<u40> {
-        self.locate_or_pred(number).and_then(|x| Some(self.element_list[x]))
-    }
-
-    fn sucessor(&self,number: u40) -> Option<u40> {
-        self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
-    }
-
-    fn minimum(&self) -> Option<u40> {
-        self.minimum()
-    }
-
-    fn maximum(&self) -> Option<u40> {
-        self.maximum()
-    } 
-
-    fn contains(&self, number: u40) -> bool {
-        let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&number);
-        if self.root_table[i].minimum.is_none() {
-            return false;
-        } else {
-            let l3_level = self.root_table[i].try_get(j);
-            if l3_level.is_none() {
-                return false;
-            } else {
-                let elem = l3_level.unwrap().try_get(k);
-                if elem.is_none() {
-                    return false
-                } 
-            }
-        }
-        true
-    }
-}
-
-impl STree {
-    /// Gibt einen STree mit den in `elements` enthaltenen Werten zurück.
-    ///
-    /// # Arguments
-    ///
-    /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new(elements: Vec<Int>) -> STree {
-       PredecessorSetStatic::new(elements)
-    }
-
 
     /// Gibt die Anzahl der in self enthaltenen Elemente zurück.
     #[inline]
@@ -135,7 +144,7 @@ impl STree {
 
     /// Gibt das in der Datenstruktur gespeicherte Minimum zurück. Falls die Datenstruktur leer ist, wird None zurückgegeben.
     #[inline]
-    pub fn minimum(&self) -> Option<Int> {
+    pub fn minimum(&self) -> Option<T> {
         if self.len() == 0 {
             return None;
         }
@@ -144,7 +153,7 @@ impl STree {
 
     /// Gibt das in der Datenstruktur gespeicherte Minimum zurück. Falls die Datenstruktur leer ist, wird None zurückgegeben.
     #[inline]
-    pub fn maximum(&self) -> Option<Int> {
+    pub fn maximum(&self) -> Option<T> {
         if self.len() == 0 {
             return None;
         }
@@ -157,7 +166,7 @@ impl STree {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Maximum zurückgegeben werden soll.
     #[inline]
-    fn maximum_level<T>(&self, lx: &Level<T>) -> Option<Int>{
+    fn maximum_level<E>(&self, lx: &Level<E>) -> Option<T>{
         lx.maximum.and_then(|x| Some(self.element_list[x]))
     }
 
@@ -167,7 +176,7 @@ impl STree {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Minimum zurückgegeben werden soll.
     #[inline]
-    fn minimum_level<T>(&self, lx: &Level<T>) -> Option<Int>{
+    fn minimum_level<E>(&self, lx: &Level<E>) -> Option<T>{
         lx.minimum.and_then(|x| Some(self.element_list[x]))
     }
 
@@ -181,8 +190,8 @@ impl STree {
     ///
     /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Vorgängers von `element` zurückgegeben.
     #[inline]
-    pub fn locate_or_pred(&self, element: Int) -> Option<usize> {
-        let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
+    pub fn locate_or_pred(&self, element: T) -> Option<usize> {
+        let (i,j,k) = Splittable::split_integer_down(&element);
 
         // Paper z.1 
         if self.len() < 1 || element < self.minimum().unwrap() {
@@ -191,8 +200,8 @@ impl STree {
 
         // Paper z. 3 
         if self.root_table[i].minimum.is_none() || element < self.minimum_level(&self.root_table[i]).unwrap() {
-            return self.compute_last_set_bit(u40::new(i as u64))
-                .map(|x| self.root_table[u64::from(x) as usize].maximum.unwrap());
+            return self.compute_last_set_bit(T::new(i as u64))
+                .map(|x| self.root_table[x].maximum.unwrap());
         }
 
         // Paper z. 4
@@ -202,7 +211,7 @@ impl STree {
 
         // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
         if self.root_table[i].try_get(j).is_none() || element < self.minimum_level(&self.root_table[i].try_get(j).unwrap()).unwrap() {
-            let new_j = self.root_table[i].compute_last_set_bit(&(j-u10::new(1)));
+            let new_j = self.root_table[i].compute_last_set_bit(&(j-1u16));
             return new_j
                 .and_then(|x| self.root_table[i].try_get(x))
                 .map(|x| x.maximum.unwrap());
@@ -225,8 +234,8 @@ impl STree {
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Vorgänger" gesucht werden soll.
-    fn compute_last_set_bit_deep(&self, bit: Int, level:u8) -> Option<Int> {
-        let bit = u64::from(bit) - 1;
+    fn compute_last_set_bit_deep(&self, bit: T, level:u8) -> Option<usize> {
+        let bit: u64 = bit.into() - 1u64;
         let index = bit as usize/64;
         let in_index = bit%64;
         let bit_mask: u64 = u64::max_value() << (63-in_index);
@@ -234,12 +243,12 @@ impl STree {
         if level != 0 {
             let nulls = (self.root_top_sub[index] & bit_mask).trailing_zeros();
             if nulls != 64 {
-                return Some(u40::new((index+1) as u64 *64 - (nulls+1) as u64));
+                return Some(((index+1) as u64 *64 - (nulls+1) as u64) as usize);
             } else {
                 for i in (0..index).rev() {
                     if self.root_top_sub[i] != 0 {
                         let nulls = self.root_top_sub[i].trailing_zeros();
-                        return Some(u40::new((i+1) as u64 * 64 - (nulls+1) as u64));
+                        return Some(((i+1) as u64 * 64 - (nulls+1) as u64) as usize);
                     }
                 } 
             }
@@ -247,7 +256,7 @@ impl STree {
             None
         }
         else {
-            self.compute_last_set_bit(u40::new(bit+1))
+            self.compute_last_set_bit(T::new(bit+1))
         }
        
     }
@@ -257,8 +266,8 @@ impl STree {
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top, dessen "Vorgänger" gesucht werden soll.
-    fn compute_last_set_bit(&self, bit: Int) -> Option<Int> {
-        let bit = u64::from(bit) - 1;
+    fn compute_last_set_bit(&self, bit: T) -> Option<usize> {
+        let bit: u64 = bit.into() - 1u64;
         let index = bit as usize/64;
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
@@ -268,15 +277,15 @@ impl STree {
         // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
         let nulls = (self.root_top[index] & bit_mask).trailing_zeros();
         if nulls != 64 {
-            return Some(u40::new((index + 1) as u64 *64-(nulls+1) as u64));
+            return Some(((index + 1) as u64 *64-(nulls+1) as u64) as usize);
         }
         
         // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-        let new_index = self.compute_last_set_bit_deep(u40::new(bit as u64/64) ,1);
+        let new_index = self.compute_last_set_bit_deep(T::new(bit as u64/64) ,1);
         new_index.and_then(|x|
-            match self.root_top[u64::from(x) as usize].trailing_zeros() {
+            match self.root_top[x].trailing_zeros() {
                 64 => None,
-                val => Some(u40::new(u64::from(x+u40::new(1))*64 - (val+1) as u64))
+                val => Some(((x+1) as u64 *64 - (val+1) as u64) as usize)
             }
         )
     }
@@ -289,8 +298,8 @@ impl STree {
     ///
     /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Nachfolgers von element zurückgegeben.
     #[inline]
-    pub fn locate_or_succ(&self, element: Int) -> Option<usize> {
-        let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
+    pub fn locate_or_succ(&self, element: T) -> Option<usize> {
+        let (i,j,k) = Splittable::split_integer_down(&element);
 
         // Paper z.1 
         if self.len() < 1 || element > self.maximum().unwrap() {
@@ -299,8 +308,8 @@ impl STree {
 
         // Paper z. 3 
         if self.root_table[i].maximum.is_none() || self.maximum_level(&self.root_table[i]).unwrap() < element {
-            return self.compute_next_set_bit(u40::new(i as u64))
-                .map(|x| self.root_table[u64::from(x) as usize].minimum.unwrap());
+            return self.compute_next_set_bit(T::new(i as u64))
+                .map(|x| self.root_table[x].minimum.unwrap());
         }
        
         // Paper z. 4
@@ -310,7 +319,7 @@ impl STree {
 
         // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
         if self.root_table[i].try_get(j).is_none() || self.maximum_level(&self.root_table[i].try_get(j).unwrap()).unwrap() < element {
-            let new_j = self.root_table[i].compute_next_set_bit(&(j+u10::new(1)));
+            let new_j = self.root_table[i].compute_next_set_bit(&(j+1u16));
             return new_j
                 .and_then(|x| self.root_table[i].try_get(x))
                 .map(|x| x.minimum.unwrap());
@@ -334,8 +343,8 @@ impl STree {
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Nachfolger" gesucht werden soll.
-    fn compute_next_set_bit_deep(&self, bit: Int, level:u8) -> Option<Int> {
-        let bit = u64::from(bit) + 1;
+    fn compute_next_set_bit_deep(&self, bit: T, level:u8) -> Option<usize> {
+        let bit: u64 = bit.into() + 1u64;
         let index = bit as usize/64;
         let in_index = bit%64;
         let bit_mask: u64 = u64::max_value() >> in_index;
@@ -343,12 +352,12 @@ impl STree {
         if level != 0 {
             let nulls = (self.root_top_sub[index] & bit_mask).leading_zeros();
             if nulls != 64 {
-                return Some(u40::new(index as u64 *64 + nulls as u64));
+                return Some((index as u64 *64 + nulls as u64) as usize);
             } else {
                 for i in index+1..self.root_top_sub.len() {
                     if self.root_top_sub[i] != 0 {
                         let nulls = self.root_top_sub[i].leading_zeros();
-                        return Some(u40::new(i as u64 * 64 + nulls as u64));
+                        return Some((i as u64 * 64 + nulls as u64) as usize);
                     }
                 } 
             }
@@ -356,7 +365,7 @@ impl STree {
             None
         }
         else {
-            self.compute_next_set_bit(u40::new(bit-1))
+            self.compute_next_set_bit(T::new(bit-1))
         }
     }
 
@@ -366,8 +375,8 @@ impl STree {
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top, dessen "Nachfolger" gesucht werden soll.
-    fn compute_next_set_bit(&self, bit: Int) -> Option<Int> {
-        let bit = u64::from(bit) + 1;
+    fn compute_next_set_bit(&self, bit: T) -> Option<usize> {
+        let bit: u64 = bit.into() + 1u64;
         let index = bit as usize/64;
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
@@ -377,15 +386,15 @@ impl STree {
         // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
         let nulls = (self.root_top[index] & bit_mask).leading_zeros();
         if nulls != 64 {
-            return Some(u40::new(index as u64 *64+nulls as u64));
+            return Some((index as u64 *64+nulls as u64) as usize);
         }
         
         // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-        let new_index = self.compute_next_set_bit_deep(u40::new(bit as u64/64) ,1);
+        let new_index = self.compute_next_set_bit_deep(T::new(bit as u64/64) ,1);
         new_index.and_then(|x|
-            match self.root_top[u64::from(x) as usize].leading_zeros() {
+            match self.root_top[x].leading_zeros() {
                 64 => None,
-                val => Some(u40::new(u64::from(x)*64 + val as u64))
+                val => Some(((x as u64)*64 + val as u64) as usize)
             }
         )
         
@@ -396,7 +405,7 @@ impl STree {
 #[derive(Clone)]
 pub struct Level<T> {
     /// Perfekte Hashfunktion, die immer (außer zur Inialisierung) gesetzt ist. 
-    pub hash_function: Option<Mphf<u10>>,
+    pub hash_function: Option<Mphf<u16>>,
 
     /// Array, das mit Hilfe der perfekten Hashfunktion `hash_function` auf Objekte zeigt. 
     /// In objects sind alle Objekte gespeichert, auf die die Hashfunktion zeigen kann. Diese Objekte sind vom Typ T.
@@ -422,7 +431,7 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(level: usize, keys: Option<Vec<u10>>) -> Level<T> {
+    pub fn new(level: usize, keys: Option<Vec<u16>>) -> Level<T> {
         match keys {
             Some(x) => Level {
                 hash_function: Some(Mphf::new_parallel(GAMMA,&x,None)),
@@ -448,7 +457,7 @@ impl<T> Level<T> {
     ///
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
-    pub fn try_get(&self, key: u10) -> Option<&T> {
+    pub fn try_get(&self, key: u16) -> Option<&T> {
         let k = u16::from(key);
         let index = (k/64) as usize;
         let in_index_mask = 1<<(63-(k % 64));
@@ -469,7 +478,7 @@ impl<T> Level<T> {
     ///
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
-    pub fn get(&mut self, key: u10) -> &mut T {
+    pub fn get(&mut self, key: u16) -> &mut T {
         let hash = self.hash_function.as_ref().unwrap().try_hash(&key).unwrap() as usize;
         self.objects.get_mut(hash).unwrap()
     }
@@ -485,7 +494,7 @@ impl<T> Level<T> {
     ///
     /// * `bit` - Bitgenauer Index in self.root_top, dessen "Nachfolger" gesucht werden soll.
     #[inline]
-    pub fn compute_next_set_bit(&self, bit: &u10) -> Option<u10> {
+    pub fn compute_next_set_bit(&self, bit: &u16) -> Option<u16> {
         let bit = u16::from(*bit);
         let index = bit as usize/64;
 
@@ -495,14 +504,14 @@ impl<T> Level<T> {
             let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
 
             if num_zeroes != 64 {
-                return Some(u10::new(index as u16 *64 + num_zeroes as u16));
+                return Some(index as u16 *64 + num_zeroes as u16);
             }
         }
         for i in index+1..self.lx_top.len() {
             let val = self.lx_top[i];
             if val != 0 {
                 let num_zeroes = val.leading_zeros();
-                return Some(u10::new(i as u16 *64 + num_zeroes as u16));
+                return Some(i as u16 *64 + num_zeroes as u16);
             }
         }
         None
@@ -515,7 +524,7 @@ impl<T> Level<T> {
     ///
     /// * `bit` - Bitgenauer Index in self.root_top, dessen "Vorgänger" gesucht werden soll.
     #[inline]
-    pub fn compute_last_set_bit(&self, bit: &u10) -> Option<u10> {
+    pub fn compute_last_set_bit(&self, bit: &u16) -> Option<u16> {
         let bit = u16::from(*bit);
         let index = bit as usize/64;
 
@@ -525,14 +534,14 @@ impl<T> Level<T> {
             let num_zeroes = (self.lx_top[index] & bit_mask).trailing_zeros();
 
             if num_zeroes != 64 {
-                return Some(u10::new((index + 1) as u16 *64 - (num_zeroes+1) as u16));
+                return Some((index + 1) as u16 *64 - (num_zeroes+1) as u16);
             }
         }
         for i in (0..index).rev() {
             let val = self.lx_top[i];
             if val != 0 {
                 let num_zeroes = val.trailing_zeros();
-                return Some(u10::new((i + 1) as u16 *64 - (num_zeroes+1) as u16));
+                return Some((i + 1) as u16 *64 - (num_zeroes+1) as u16);
             }
         }
         None
@@ -542,7 +551,6 @@ impl<T> Level<T> {
 
 #[cfg(test)]
 mod tests {
-    use ux::{u10};
     use uint::u40;
     use super::{STree,LX_ARRAY_SIZE};
     use crate::internal::{Splittable};
@@ -560,13 +568,13 @@ mod tests {
         }
  
         let check = data.clone();
-        let mut data_structure: STree = STree::new(data);
+        let mut data_structure: STree<u40> = STree::new(data);
 
         assert_eq!(data_structure.len(),check.len());
         assert_eq!(data_structure.minimum().unwrap(),u40::new(0));
         assert_eq!(data_structure.maximum().unwrap(),u40::new(check.len() as u64 - 1));
         for val in check {
-            let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
+            let (i,j,k) = Splittable::split_integer_down(&val);
             let second_level = data_structure.root_table[i].get(j);
             let saved_val = second_level.get(k).unwrap();
             assert_eq!(data_structure.element_list[saved_val],val);
@@ -579,14 +587,14 @@ mod tests {
     fn test_top_arrays() {
         let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101_u64)];
         let check = data.clone();
-        let mut data_structure: STree = STree::new(data);
+        let mut data_structure: STree<u40> = STree::new(data);
 
         assert_eq!(data_structure.len(),check.len());
         assert_eq!(data_structure.minimum().unwrap(),u40::new(0b00000000000000000000_1010010010_0101010101));
         assert_eq!(data_structure.maximum().unwrap(),u40::new(0b11111111111111111111_1010010010_0101010101_u64));
 
         for val in check {
-            let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&val);
+            let (i,j,k) = Splittable::split_integer_down(&val);
             let second_level = &mut data_structure.root_table[i].get(j);
             let saved_val = second_level.get(k).unwrap();
             assert_eq!(data_structure.element_list[saved_val],val);
@@ -618,7 +626,7 @@ mod tests {
             data.push(u40::new(*val));
         }
         
-        let data_structure: STree = STree::new(data);
+        let data_structure: STree<u40> = STree::new(data);
         for (index,_) in data_v1.iter().enumerate() {
             if index < data_v1.len()-1 {
                 for i in data_v1[index]+1..data_v1[index+1]+1 {
@@ -676,7 +684,7 @@ mod tests {
         for val in data_raw.iter() {
             data.push(u40::new(*val));
         }
-        let data_structure: STree = STree::new(data.clone());
+        let data_structure: STree<u40> = STree::new(data.clone());
         assert_eq!(data_structure.locate_or_succ(u40::new(0b11111111111111111111_1111111111_1111111111_u64)), None);
         
         for (i,&elem) in data.iter().enumerate() {
@@ -706,7 +714,7 @@ mod tests {
             data.push(u40::new(*val));
         }
         
-        let data_structure: STree = STree::new(data);
+        let data_structure: STree<u40> = STree::new(data);
         assert_eq!(u40::new(1065983), data_structure.element_list[data_structure.locate_or_pred(u40::new(1065983)).unwrap()]);
         for (index,_) in data_v1.iter().enumerate().rev() {
             if index > 0 {
@@ -765,7 +773,7 @@ mod tests {
         for val in data_raw.iter() {
             data.push(u40::new(*val));
         }
-        let data_structure: STree = STree::new(data.clone());
+        let data_structure: STree<u40> = STree::new(data.clone());
         assert_eq!(data_structure.locate_or_pred(u40::new(0)), None);
 
         for (i,&elem) in data.iter().enumerate().rev() {

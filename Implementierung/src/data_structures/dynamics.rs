@@ -29,7 +29,7 @@ pub struct STree {
 // 1. max/min sind RAW-Pointer auf Elemente
 // 2. min/max sind u8 Werte und hashMap ist entweder ein RAW-Pointer auf eine FnvHashMap oder ein RAW Pointer auf ein Element (falls min==max) evtl. mit Union
 pub struct Level<T,V> {
-    pub hash_map: FnvHashMap<u8,T>,
+    pub hash_map: FnvHashMap<u16,T>,
     pub maximum: *mut Element<V>,
     pub minimum: *mut Element<V>,
     pub lx_top: Vec<u64>,
@@ -39,7 +39,7 @@ impl<T,V> Level<T,V> {
     #[inline]
     pub fn new(level: usize) -> Level<T,Int> {
         Level {
-            hash_map: (FnvHashMap::<u8,T>::default()),
+            hash_map: (FnvHashMap::<u16,T>::default()),
             maximum: ptr::null_mut(),
             minimum: ptr::null_mut(),
             lx_top: vec![0;level],
@@ -49,7 +49,7 @@ impl<T,V> Level<T,V> {
     // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 8 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
     // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^8 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
     #[inline]
-    pub fn locate_top_level(&mut self, bit: u8) -> Option<u8> {
+    pub fn locate_top_level(&mut self, bit: u16) -> Option<u16> {
         let index = bit as usize/64;
 
         if self.lx_top[index] != 0 {
@@ -57,13 +57,13 @@ impl<T,V> Level<T,V> {
             let bit_mask: u64 = u64::max_value() >> in_index;
             let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
 
-            return Some(index as u8 *64 + num_zeroes as u8);
+            return Some(index as u16 *64 + num_zeroes as u16);
         }
         for i in index+1..self.lx_top.len() {
             let val = self.lx_top[i];
             if val != 0 {
                 let num_zeroes = val.leading_zeros();
-                return Some(i as u8 *64 + num_zeroes as u8);
+                return Some(i as u16 *64 + num_zeroes as u16);
             }
         }
         None
@@ -102,7 +102,7 @@ impl STree {
      */
     #[inline]
     pub fn locate(&mut self, element: Int) -> Option<*mut Element<Int>> {
-        let (i,j,k) = Splittable::<usize,u8>::split_integer_down(&element);
+        let (i,j,k) = Splittable::split_integer_down(&element);
 
         // Paper z.1 
         if self.len() < 1 || element > self.maximum().unwrap(){
@@ -149,7 +149,7 @@ impl STree {
      * Hierbei beachten, dass j zwar Bitweise adressiert wird, die Level-Arrays allerdings ganze 64-Bit-Blöcke besitzen. Somit ist z.B: root_top[5] nicht das 6. 
      * Bit sondern, der 6. 64-Bit-Block. Die Methode gibt aber die Bit-Position zurück!
      */ 
-    pub fn locate_top_level(&mut self, bit: Int, level: u8) -> Option<Int> {
+    pub fn locate_top_level(&mut self, bit: Int, level: u16) -> Option<Int> {
         let index = bit as usize/64;
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.

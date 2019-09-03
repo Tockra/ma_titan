@@ -1,15 +1,12 @@
 use std::collections::HashMap;
 
-use ux::{u10};
-use uint::u40;
-
 use boomphf::Mphf;
 
 use crate::internal::{Splittable};
 use crate::u40::stat::{L2Ebene, L3Ebene};
 
+
 /// In dieser Implementierung werden u40 Integer gespeichert.
-type Int = u40;
 
 /// Die Länge des Root-Arrays, des STrees (basierend auf 40-Bit geteilt durch 2.).
 const ROOT_ARRAY_SIZE: usize = 1<<20;
@@ -43,7 +40,7 @@ impl STreeBuilder {
     /// # Arguments
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new(elements: Vec<Int>) ->  STreeBuilder{
+    pub fn new<T: Splittable>(elements: Vec<T>) ->  Self{
         let mut root_indexs = vec![];
 
         let mut tmp: Vec<L2EbeneBuilder> = Vec::with_capacity(ROOT_ARRAY_SIZE);
@@ -53,7 +50,7 @@ impl STreeBuilder {
         let mut root_table: Box<[L2EbeneBuilder]> = tmp.into_boxed_slice();
     
         for element in elements {
-            let (i,j,k) = Splittable::<usize,u10>::split_integer_down(&element);
+            let (i,j,k) = Splittable::split_integer_down(&element);
 
             if !root_indexs.contains(&i) {
                 root_indexs.push(i);
@@ -67,7 +64,7 @@ impl STreeBuilder {
             // Hier ist keine Prüfung notwendig, da die Elemente einmalig sind.
             root_table[i].hash_map.get_mut(&j).unwrap().keys.push(k);
         }
-        STreeBuilder {root_table: root_table, root_indexs: root_indexs}
+        Self {root_table: root_table, root_indexs: root_indexs}
     }
 
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
@@ -104,9 +101,11 @@ impl STreeBuilder {
     }
 
     /// Baut das Root-Top-Array mit Hilfe der sich in der Datenstruktur befindenden Werte.
-    pub fn build_root_top(&self) -> (Box<[u64; ROOT_ARRAY_SIZE/64]>,Box<[u64; ROOT_ARRAY_SIZE/64/64]>) {
-        let mut root_top: [u64; ROOT_ARRAY_SIZE/64] = [0; ROOT_ARRAY_SIZE/64];
-        let mut root_top_sub: [u64; ROOT_ARRAY_SIZE/64/64] = [0; ROOT_ARRAY_SIZE/64/64];
+    pub fn build_root_top(&self) -> (Box<[u64]>,Box<[u64]>) {
+        
+        let mut root_top: Vec<u64> = vec![0; ROOT_ARRAY_SIZE/64];
+        let mut root_top_sub: Vec<u64> = vec![0; ROOT_ARRAY_SIZE/64/64];
+
         for &bit in &self.root_indexs {
             // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
             let index = bit/64;
@@ -118,18 +117,18 @@ impl STreeBuilder {
             let bit_mask_sub: u64 = 1<<(63-(index%64));
             root_top_sub[index_sub] = root_top_sub[index_sub] | bit_mask_sub;
         }
-        (Box::new(root_top),Box::new(root_top_sub))
+        (root_top.into_boxed_slice(),root_top_sub.into_boxed_slice())
     }
 }
 
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 pub struct BuilderLevel<T> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
-    pub hash_map: std::collections::HashMap<u10,T>,
+    pub hash_map: std::collections::HashMap<u16,T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
     /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.
-    pub keys: Vec<u10>,
+    pub keys: Vec<u16>,
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
@@ -146,7 +145,7 @@ impl<T> BuilderLevel<T> {
     #[inline]
     pub fn new(lx_top_size: usize) -> BuilderLevel<T> {
         BuilderLevel {
-            hash_map: (HashMap::<u10,T>::default()),
+            hash_map: (HashMap::<u16,T>::default()),
             keys: vec![],
             lx_top: vec![0;lx_top_size],
         }
@@ -161,7 +160,7 @@ impl<T> BuilderLevel<T> {
 /// * `lx_top` - Mutable Referenz auf ein Array, das nach diesem Funktionsaufruf das Bit für `key` gesetzt hat. 
 /// * `key` - Ein Schlüssel, dessen Index als Bit im LX-Top-Array gesetzt wird. 
 
-fn build_lx_top(lx_top: &mut Vec<u64>, key: u10) {
+fn build_lx_top(lx_top: &mut Vec<u64>, key: u16) {
     let key = u16::from(key);
 
     let index = (key/64) as usize;

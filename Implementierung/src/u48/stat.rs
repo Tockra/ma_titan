@@ -64,7 +64,7 @@ impl PredecessorSetStatic<Int> for STree {
         for (index,element) in result.element_list.iter().enumerate() {
             // Dadurch das die Reihenfolge sortiert ist, wird das letzte hinzugefügte Element das größte und das erste das kleinste sein.
 
-            let (i,j,k) = Splittable::<usize,u16>::split_integer_down(element);
+            let (i,j,k) = Splittable::split_integer_down(element);
 
             let l2_level = &mut result.root_table[i];
             l2_level.minimum.get_or_insert(index);
@@ -542,7 +542,7 @@ impl<T> Level<T> {
 
 }
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod tests {
     use super::Int; 
     use super::{STree,LX_ARRAY_SIZE};
@@ -786,6 +786,6 @@ mod tests {
             }
         }
     }
-}
+}*/
 
 //TODO Tests anpassen
