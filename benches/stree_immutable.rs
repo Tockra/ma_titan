@@ -56,7 +56,7 @@ fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned
 }
 
 /// Lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und erzeugt mit Hilfe dieser die zu testende Datenstruktur T. 
-/// Anschließend werden 10000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor- und Sucessor-Methode 
+/// Anschließend werden 10000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor- und successor-Methode 
 /// werden mit Hilfe dieser gemessen
 fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>(c: &mut Criterion) {
     for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
@@ -79,7 +79,7 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwne
         let data_structure = T::new(values);
         let data_strucuture_succ:T = data_structure.clone();
 
-        let id = &format!("{}::predecessor <{}>",T::TYPE, len)[..];
+        let id = &format!("algo={} method=predecessor size={}",T::TYPE, len)[..];
         let cp = test_values.clone();
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
@@ -92,12 +92,12 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwne
             vec![cp]
         ).sample_size(SAMPLE_SIZE).warm_up_time(Duration::new(0, 1)));
 
-        let id = &format!("{}::sucessor <{}>",T::TYPE, len)[..];
+        let id = &format!("algo={} method=successor size={}",T::TYPE, len)[..];
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
                 b.iter(|| {
                     for elem in elems {
-                        data_strucuture_succ.sucessor(*elem);
+                        data_strucuture_succ.successor(*elem);
                     }
                 });
             },
@@ -167,7 +167,7 @@ mod bench_data {
             }
         }
 
-        fn sucessor(&self,number: Int) -> Option<Int>{
+        fn successor(&self,number: Int) -> Option<Int>{
             if self.element_list.len() == 0 {
                 None
             } else {
