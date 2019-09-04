@@ -77,7 +77,7 @@ impl<T: Int> PredecessorSetStatic<T> for STree<T> {
         self.locate_or_pred(number).and_then(|x| Some(self.element_list[x]))
     }
 
-    fn sucessor(&self,number: T) -> Option<T> {
+    fn successor(&self,number: T) -> Option<T> {
         self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
     }
 

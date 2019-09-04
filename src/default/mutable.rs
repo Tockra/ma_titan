@@ -7,7 +7,7 @@ use crate::internal::{List,Element, PredecessorSet, Splittable,root_size};
 /*
     Diese Datenstruktur agiert als Menge, die Zahlenwerte speichert. Explizit wird hier eine Implementierung für i32, i40, i48 und i64 geschaffen, 
     wobei die Datentypen i40 und i48 eigene Datentypen sind. 
-    Diese Datenstruktur bietet predecessor(x) und sucessor(x) Methoden, welche den Vorgänger bzw. Nachfolger einer beliebigen Zahl x (egal ob enthalten oder nicht) ausgibt.
+    Diese Datenstruktur bietet predecessor(x) und successor(x) Methoden, welche den Vorgänger bzw. Nachfolger einer beliebigen Zahl x (egal ob enthalten oder nicht) ausgibt.
 
     Folgender Trait definiert die Methoden, die eine PredecessorSet beinhalten soll.
 */
@@ -277,7 +277,7 @@ impl PredecessorSet<Int> for STree {
 
     // Gibt den kleinsten Wert, der echt größer als number ist und in der Datenstruktur enthalten ist, aus.
     #[inline]
-    fn sucessor(&self, _number: Int) -> Option<Int> {
+    fn successor(&self, _number: Int) -> Option<Int> {
         unimplemented!();
     }
 
