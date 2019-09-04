@@ -27,8 +27,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::time::Duration;
 
-use stree::internal::PredecessorSetStatic;
-use stree::u40::stat::STree;
+use ma_titan::internal::PredecessorSetStatic;
+use ma_titan::default::immutable::STree;
 use self::bench_data::BinarySearch;
 use uint::u40;
 use uint::Typable;
@@ -49,7 +49,7 @@ fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned
         let mut values = Deserializer::new(buf);
         let values: Vec<E> = Deserialize::deserialize(&mut values).unwrap();
 
-        let id = &format!("{}::new <{}>",T::TYPE,values.len())[..];
+        let id = &format!("algo={} method=new size={}",T::TYPE,values.len())[..];
         c.bench(id ,Benchmark::new(id, move 
                                     |b| b.iter_batched(|| values.clone(), |data| T::new(data), BatchSize::SmallInput)).sample_size(SAMPLE_SIZE).warm_up_time(Duration::new(0, 1)));
     }
@@ -119,16 +119,33 @@ pub fn cache_clear() {
 }
 
 
-criterion_group!(stree_gen_u40, static_build_benchmark<u40,STree>);
+criterion_group!(stree_gen_u40, static_build_benchmark<u40,STree<u40>>);
 criterion_group!(binary_search_gen_u40, static_build_benchmark<u40,BinarySearch>);
-criterion_group!(stree_instr_u40, pred_and_succ_benchmark<u40,STree>);
+criterion_group!(stree_instr_u40, pred_and_succ_benchmark<u40,STree<u40>>);
 criterion_group!(binary_search_instr_u40, pred_and_succ_benchmark<u40,BinarySearch>);
-criterion_main!(binary_search_instr_u40);
+criterion_main!(binary_search_gen_u40);
+
+/// Diese Methode darf erst am Ende einer Bench-Methode aufgerufen werden, da ansonsten /target/criterion/ nicht existiert
+/// Außerdem muss sichergestellt werden, dass man sich zum Zeitpunkt des Aufrufs im Hauptverzeichnis des Rust-Projects befindet.
+fn generate_sql_plot_input() {
+    for entry in read_dir("./target/criterion/").unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.is_dir() {
+            // Todo checken op der Path path//new/  aussieht.
+            let raw = File::open(format!("{}/new/", path.to_str().unwrap())).unwrap();
+            // nun ist kann mit Hilfe der raw.csv (raw) das Output-File erzeugt werden
+        } 
+    }
+}
 
 
 mod bench_data {
     use uint::u40;
-    use stree::internal::PredecessorSetStatic;
+    use ma_titan::internal::PredecessorSetStatic;
+
+    // Todo Generics
+    type Int = u40;
 
     #[derive(Clone)]
     pub struct BinarySearch {
