@@ -1,5 +1,5 @@
 [package]
-name = "stree"
+name = "titan_ma"
 version = "0.1.0"
 authors = ["Tim <tim.tannert@tu-dortmund.de>"]
 edition = "2018"
@@ -18,5 +18,5 @@ uint = { git = "https://github.com/Tockra/uint.git" }
 criterion = "0.3.0"
 
 [[bench]]
-name = "static"
+name = "stree_unmutable"
 harness = false

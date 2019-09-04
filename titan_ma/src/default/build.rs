@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use boomphf::Mphf;
 
 use crate::internal::{Splittable};
-use crate::u40::stat::{L2Ebene, L3Ebene, Int};
+use crate::default::unmutable::{L2Ebene, L3Ebene, Int};
 
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
