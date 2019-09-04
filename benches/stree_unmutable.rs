@@ -35,10 +35,10 @@ use uint::Typable;
 
 const SEED: u128 = 0xcafef00dd15ea5e5;
 const SAMPLE_SIZE: usize = 10;
-/// Diese Methode lädt die Testdaten aus ../testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
+/// Diese Methode lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
 /// Datenstruktur T. Dabei wird die Laufzeit gemessen.
 fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned, T: PredecessorSetStatic<E>>(c: &mut Criterion) {
-    for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
+    for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
         let dir = dir.unwrap();
         let path = dir.path();
         println!("{:?}",path);
@@ -55,11 +55,11 @@ fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned
     }
 }
 
-/// Lädt die Testdaten aus ../testdata/{u40,u48,u64}/ und erzeugt mit Hilfe dieser die zu testende Datenstruktur T. 
+/// Lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und erzeugt mit Hilfe dieser die zu testende Datenstruktur T. 
 /// Anschließend werden 10000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor- und Sucessor-Methode 
 /// werden mit Hilfe dieser gemessen
 fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>(c: &mut Criterion) {
-    for dir in read_dir(format!("../testdata/{}/", E::TYPE)).unwrap() {
+    for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
         let mut state = Mcg128Xsl64::new(SEED);
         let dir = dir.unwrap();
         let path = dir.path();
