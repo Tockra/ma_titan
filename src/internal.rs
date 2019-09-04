@@ -14,7 +14,7 @@ pub trait PredecessorSet<T> {
     fn insert(&mut self,element: T);
     fn delete(&mut self,element: T);
     fn predecessor(&self,number: T) -> Option<T>;
-    fn sucessor(&self,number: T) -> Option<T>; // Optional
+    fn successor(&self,number: T) -> Option<T>; // Optional
     fn minimum(&self) -> Option<T>;
     fn maximum(&self) -> Option<T>; 
     fn contains(&self, number: T) -> bool;
@@ -23,7 +23,7 @@ pub trait PredecessorSet<T> {
 pub trait PredecessorSetStatic<T> {
     fn new(elements: Vec<T>) -> Self;
     fn predecessor(&self,number: T) -> Option<T>;
-    fn sucessor(&self,number: T) -> Option<T>; // Optional
+    fn successor(&self,number: T) -> Option<T>; // Optional
     fn minimum(&self) -> Option<T>;
     fn maximum(&self) -> Option<T>; 
     fn contains(&self, number: T) -> bool;
