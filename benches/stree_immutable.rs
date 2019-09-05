@@ -129,25 +129,33 @@ criterion_group!(stree_gen_u40, static_build_benchmark<u40,STree<u40>>);
 criterion_group!(binary_search_gen_u40, static_build_benchmark<u40,BinarySearch>);
 criterion_group!(stree_instr_u40, pred_and_succ_benchmark<u40,STree<u40>>);
 criterion_group!(binary_search_instr_u40, pred_and_succ_benchmark<u40,BinarySearch>);
-criterion_main!(binary_search_gen_u40);
+
+criterion_main!(stree_gen_u40, binary_search_gen_u40, stree_instr_u40, binary_search_instr_u40, generate_sql_plot_input);
 
 /// Diese Methode darf erst am Ende einer Bench-Methode aufgerufen werden, da ansonsten /target/criterion/ nicht existiert
 /// Außerdem muss sichergestellt werden, dass man sich zum Zeitpunkt des Aufrufs im Hauptverzeichnis des Rust-Projects befindet.
 fn generate_sql_plot_input() {
+    let mut result = BufWriter::new(OpenOptions::new()
+        .read(true)
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open("stats.txt").expect("Hallo"));
     for entry in read_dir("./target/criterion/").unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         if path.is_dir() {
             // Todo checken op der Path path//new/  aussieht.
-            let raw = File::open(path.join("new")).unwrap();
+            let raw = BufReader::new(File::open(path.join("new").join("raw.csv")).unwrap());
             // nun ist kann mit Hilfe der raw.csv (raw) das Output-File erzeugt werden
-            let result = BufWriter::new(OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create_new(true)
-                .open("stats.txt").unwrap());
             
+            for line in raw.lines().skip(1) {
+                let line = line.unwrap();
+                let line: Vec<&str> = line.split(",").collect();
 
+                writeln!(result, "RESULT {} time={} unit={}",line[0],line[5],line[6]).unwrap(); 
+            } 
+            result.flush().unwrap();
 
         } 
     }
