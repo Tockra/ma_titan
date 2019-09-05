@@ -139,7 +139,7 @@ fn generate_sql_plot_input() {
         let path = entry.path();
         if path.is_dir() {
             // Todo checken op der Path path//new/  aussieht.
-            let raw = File::open(format!("{}/new/", path.to_str().unwrap())).unwrap();
+            let raw = File::open(path.join("new")).unwrap();
             // nun ist kann mit Hilfe der raw.csv (raw) das Output-File erzeugt werden
             let result = BufWriter::new(OpenOptions::new()
                 .read(true)
