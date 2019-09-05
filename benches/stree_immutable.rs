@@ -19,13 +19,13 @@ use rand_pcg::Mcg128Xsl64;
 use rand::Rng;
 
 use std::fs::read_dir;
-use std::io::BufReader;
+use std::io::{BufWriter, BufReader};
 use std::ops::Add;
 use std::fmt::Debug;
-use std::io::BufWriter;
 use std::fs::File;
 use std::io::prelude::*;
 use std::time::Duration;
+use std::fs::OpenOptions;
 
 use ma_titan::internal::PredecessorSetStatic;
 use ma_titan::default::immutable::STree;
@@ -83,11 +83,14 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwne
         let cp = test_values.clone();
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
-                b.iter(|| {
+                b.iter_batched(|| {
+                    cache_clear();
+                    ()
+                }, |_| {
                     for elem in elems {
                         data_structure.predecessor(*elem);
                     }
-                });
+                }, BatchSize::SmallInput);
             },
             vec![cp]
         ).sample_size(SAMPLE_SIZE).warm_up_time(Duration::new(0, 1)));
@@ -95,11 +98,14 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwne
         let id = &format!("algo={} method=successor size={}",T::TYPE, len)[..];
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
-                b.iter(|| {
+                b.iter_batched(|| {
+                    cache_clear();
+                    ()
+                }, |_| {
                     for elem in elems {
                         data_strucuture_succ.successor(*elem);
                     }
-                });
+                }, BatchSize::SmallInput);
             },
             vec![test_values]
         ).sample_size(SAMPLE_SIZE).warm_up_time(Duration::new(0, 1)));
@@ -135,6 +141,14 @@ fn generate_sql_plot_input() {
             // Todo checken op der Path path//new/  aussieht.
             let raw = File::open(format!("{}/new/", path.to_str().unwrap())).unwrap();
             // nun ist kann mit Hilfe der raw.csv (raw) das Output-File erzeugt werden
+            let result = BufWriter::new(OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .open("stats.txt").unwrap());
+            
+
+
         } 
     }
 }
