@@ -24,7 +24,7 @@ pub struct STreeBuilder {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2EbeneBuilder je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
     root_table: Box<[L2EbeneBuilder]>,
-
+    
     /// Eine Liste, die alle belegten Indizes von `root_table` speichert. 
     root_indexs: Vec<usize>,
 }
@@ -118,6 +118,7 @@ impl STreeBuilder {
 }
 
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
+#[derive(Clone)]
 pub struct BuilderLevel<T> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
     pub hash_map: std::collections::HashMap<u16,T>,
@@ -155,7 +156,7 @@ impl<T> BuilderLevel<T> {
 ///
 /// * `lx_top` - Mutable Referenz auf ein Array, das nach diesem Funktionsaufruf das Bit für `key` gesetzt hat. 
 /// * `key` - Ein Schlüssel, dessen Index als Bit im LX-Top-Array gesetzt wird. 
-
+#[inline]
 fn build_lx_top(lx_top: &mut Vec<u64>, key: u16) {
     let key = u16::from(key);
 

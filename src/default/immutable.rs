@@ -793,7 +793,7 @@ mod tests {
         for (i,&elem) in data.iter().enumerate().rev() {
             if i < data.len()-1 {
                 for j in 0..16877216 {
-                    if u40::new(j) < u40::max_value() - elem {
+                    if u40::max_value() > elem && u40::new(j) < u40::max_value() - elem {
                         let index = elem + u40::new(j);
                         if index < data_structure.element_list[i+1] {
                             assert_eq!(data_structure.element_list[data_structure.locate_or_pred(index).unwrap() as usize], elem);
