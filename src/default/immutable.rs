@@ -115,9 +115,9 @@ impl<T: Int> STree<T> {
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
     pub fn new(elements: Vec<T>) -> Self {
-        let builder = STreeBuilder::new(elements.clone());
+        let mut builder = STreeBuilder::new(elements.clone());
 
-        let (root_top,root_top_sub) = builder.build_root_top::<T>();
+        let (root_top,root_top_sub) = builder.get_root_tops();
         let mut result = STree{
             root_table: builder.build::<T>(),
             root_top: root_top,
