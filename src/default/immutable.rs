@@ -21,14 +21,16 @@ pub struct STree<T> {
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
     root_table: Box<[L2Ebene]>,
     
-    /// Das Root-Top-Array speichert für jeden Eintrag `root_table[x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
-    /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert. 
-    root_top: Box<[u64]>,
+    /// Das Root-Top-Array speichert für jeden Eintrag `root_table[i][x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
+    /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert.
+    /// i steht dabei für die Ebene der root_tabelle. Ebene i+1 beinhaltet an Index [x] immer 64 Veroderungen aus Ebene i. 
+    /// Somit gilt |root_table[i+1]| = |root_table[i]|/64  
+    root_top: Box<[Box<[u64]>]>,
 
     /// Das Root-Top-Sub-Array ist ein Hilfsarray. Dabei werden immer 64-Bit des Root-Top-Arrays (also ein Index) verodert und zu einem 
     /// Bit in `root_top_sub`. Somit können die nächsten gesetzten Bits in `root_top` gefunden werden, ohne alle Einträge zu überprüfen.
     /// Die Länge des Arrays beträgt somit [u64;2^20 / 64 / 64].
-    root_top_sub: Box<[u64]>, 
+   // root_top_sub: Box<[u64]>, 
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
     element_list: Box<[T]>,
@@ -118,10 +120,10 @@ impl<T: Int> STree<T> {
         let mut builder = STreeBuilder::new(elements.clone());
 
         let (root_top,root_top_sub) = builder.get_root_tops();
+        let root_top: Box<[Box<[u64]>]> = vec![root_top,root_top_sub].into_boxed_slice();
         let mut result = STree{
             root_table: builder.build::<T>(),
             root_top: root_top,
-            root_top_sub: root_top_sub, 
             element_list: elements.into_boxed_slice(),
         };
         for (index,element) in result.element_list.iter().enumerate() {
@@ -211,7 +213,7 @@ impl<T: Int> STree<T> {
 
         // Paper z. 3 
         if self.root_table[i].minimum.is_none() || element < self.minimum_level(&self.root_table[i]).unwrap() {
-            return self.compute_last_set_bit(T::new(i as u64))
+            return self.compute_last_set_bit_deep(T::new(i as u64),0)
                 .map(|x| self.root_table[x].maximum.unwrap());
         }
 
@@ -240,65 +242,55 @@ impl<T: Int> STree<T> {
             .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
     }
 
-    /// Hilfsfunktion, die in der Root-Top-Sub-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
+    /// Hilfsfunktion, die in der Root-Top-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
+    /// Achtung diese Funktion funktioniert etwas anders als Level::compute_last_set_bit_deep !
     /// 
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Vorgänger" gesucht werden soll.
-    fn compute_last_set_bit_deep(&self, bit: T, level:u8) -> Option<usize> {
-        let bit: u64 = bit.into() - 1u64;
-        let index = bit as usize/64;
-        let in_index = bit%64;
-        let bit_mask: u64 = u64::max_value() << (63-in_index);
-
-        if level != 0 {
-            let nulls = (self.root_top_sub[index] & bit_mask).trailing_zeros();
-            if nulls != 64 {
-                return Some(((index+1) as u64 *64 - (nulls+1) as u64) as usize);
-            } else {
-                for i in (0..index).rev() {
-                    if self.root_top_sub[i] != 0 {
-                        let nulls = self.root_top_sub[i].trailing_zeros();
-                        return Some(((i+1) as u64 * 64 - (nulls+1) as u64) as usize);
-                    }
-                } 
-            }
-
-            None
-        }
-        else {
-            self.compute_last_set_bit(T::new(bit+1))
-        }
-       
-    }
-
-    /// Hilfsfunktion, die in der Root-Top-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
-    /// Achtung diese Funktion funktioniert etwas anders als Level::compute_last_set_bit !
-    /// # Arguments
-    ///
-    /// * `bit` - Bitgenauer Index in self.root_top, dessen "Vorgänger" gesucht werden soll.
-    fn compute_last_set_bit(&self, bit: T) -> Option<usize> {
+    fn compute_last_set_bit_deep(&self, bit: T, level:usize) -> Option<usize> {
         let bit: u64 = bit.into() - 1u64;
         let index = bit as usize/64;
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
         let bit_mask: u64 = u64::max_value() << (63-in_index); // genau andersrum (in 111..11 werden 0en reingeschoben)
-        
-        // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
-        let nulls = (self.root_top[index] & bit_mask).trailing_zeros();
-        if nulls != 64 {
-            return Some(((index + 1) as u64 *64-(nulls+1) as u64) as usize);
-        }
-        
-        // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-        let new_index = self.compute_last_set_bit_deep(T::new(bit as u64/64) ,1);
-        new_index.and_then(|x|
-            match self.root_top[x].trailing_zeros() {
-                64 => None,
-                val => Some(((x+1) as u64 *64 - (val+1) as u64) as usize)
+
+        if level != self.root_top.len()-1 {
+            // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
+            let nulls = (self.root_top[0][index] & bit_mask).trailing_zeros();
+            if nulls != 64 {
+                return Some(((index + 1) as u64 *64-(nulls+1) as u64) as usize);
             }
-        )
+            
+            // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
+            let new_index = self.compute_last_set_bit_deep(T::new(bit as u64/64) ,1);
+            new_index.and_then(|x|
+                match self.root_top[0][x].trailing_zeros() {
+                    64 => None,
+                    val => Some(((x+1) as u64 *64 - (val+1) as u64) as usize)
+                }
+            )
+        }
+        else {
+            let nulls = (self.root_top[1][index] & bit_mask).trailing_zeros();
+            if nulls != 64 {
+                return Some(((index+1) as u64 *64 - (nulls+1) as u64) as usize);
+            } else {
+                for i in (0..index).rev() {
+                    if self.root_top[1][i] != 0 {
+                        let nulls = self.root_top[1][i].trailing_zeros();
+                        return Some(((i+1) as u64 * 64 - (nulls+1) as u64) as usize);
+                    }
+                } 
+            }
+            
+            None
+        }
+        /*else {
+            //self.compute_last_set_bit_deep(T::new(bit+1))
+        }*/
+       
     }
 
     /// Diese Methode gibt den Index INDEX des kleinsten Elements zurück für das gilt element<=element_list[INDEX].
@@ -319,7 +311,7 @@ impl<T: Int> STree<T> {
 
         // Paper z. 3 
         if self.root_table[i].maximum.is_none() || self.maximum_level(&self.root_table[i]).unwrap() < element {
-            return self.compute_next_set_bit(T::new(i as u64))
+            return self.compute_next_set_bit_deep(T::new(i as u64),0)
                 .map(|x| self.root_table[x].minimum.unwrap());
         }
        
@@ -349,66 +341,51 @@ impl<T: Int> STree<T> {
 
     }
 
-    /// Hilfsfunktion, die in der Root-Top-Sub-Tabelle das nächste Bit, dass nach Index `bit` gesetzt ist, zurückgibt. 
-    /// 
+    /// Hilfsfunktion, die in der Root-Top-Tabelle das nächste Bit, dass nach Index `bit` gesetzt ist, zurückgibt. 
+    /// Achtung diese Funktion funktioniert etwas anders als Level::compute_next_set_bit_deep !
     /// # Arguments
     ///
     /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Nachfolger" gesucht werden soll.
-    fn compute_next_set_bit_deep(&self, bit: T, level:u8) -> Option<usize> {
-        let bit: u64 = bit.into() + 1u64;
-        let index = bit as usize/64;
-        let in_index = bit%64;
-        let bit_mask: u64 = u64::max_value() >> in_index;
-
-        if level != 0 {
-            let nulls = (self.root_top_sub[index] & bit_mask).leading_zeros();
-            if nulls != 64 {
-                return Some((index as u64 *64 + nulls as u64) as usize);
-            } else {
-                for i in index+1..self.root_top_sub.len() {
-                    if self.root_top_sub[i] != 0 {
-                        let nulls = self.root_top_sub[i].leading_zeros();
-                        return Some((i as u64 * 64 + nulls as u64) as usize);
-                    }
-                } 
-            }
-
-            None
-        }
-        else {
-            self.compute_next_set_bit(T::new(bit-1))
-        }
-    }
-
-    /// Hilfsfunktion, die in der Root-Top-Tabelle das nächste Bit, dass nach Index `bit` gesetzt ist, zurückgibt. 
-    /// Achtung diese Funktion funktioniert etwas anders als Level::compute_next_set_bit !
-    /// 
-    /// # Arguments
-    ///
-    /// * `bit` - Bitgenauer Index in self.root_top, dessen "Nachfolger" gesucht werden soll.
-    fn compute_next_set_bit(&self, bit: T) -> Option<usize> {
+    fn compute_next_set_bit_deep(&self, bit: T, level:usize) -> Option<usize> {
         let bit: u64 = bit.into() + 1u64;
         let index = bit as usize/64;
         let in_index = bit%64;
         // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
         // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
         let bit_mask: u64 = u64::max_value() >> in_index; // genau andersrum (in 111..11 werden 0en reingeschoben)
-        
-        // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
-        let nulls = (self.root_top[index] & bit_mask).leading_zeros();
-        if nulls != 64 {
-            return Some((index as u64 *64+nulls as u64) as usize);
-        }
-        
-        // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-        let new_index = self.compute_next_set_bit_deep(T::new(bit as u64/64) ,1);
-        new_index.and_then(|x|
-            match self.root_top[x].leading_zeros() {
-                64 => None,
-                val => Some(((x as u64)*64 + val as u64) as usize)
+
+        if level != self.root_top.len()-1 {
+            // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
+            let nulls = (self.root_top[0][index] & bit_mask).leading_zeros();
+            if nulls != 64 {
+                return Some((index as u64 *64+nulls as u64) as usize);
             }
-        )
-        
+            
+            // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
+            let new_index = self.compute_next_set_bit_deep(T::new(bit as u64/64) ,1);
+            new_index.and_then(|x|
+                match self.root_top[0][x].leading_zeros() {
+                    64 => None,
+                    val => Some(((x as u64)*64 + val as u64) as usize)
+                }
+            )
+        } else {
+            let nulls = (self.root_top[1][index] & bit_mask).leading_zeros();
+            if nulls != 64 {
+                return Some((index as u64 *64 + nulls as u64) as usize);
+            } else {
+                for i in index+1..self.root_top[1].len() {
+                    if self.root_top[1][i] != 0 {
+                        let nulls = self.root_top[1][i].leading_zeros();
+                        return Some((i as u64 * 64 + nulls as u64) as usize);
+                    }
+                } 
+            }
+            None
+        }
+        /*else {
+            self.compute_next_set_bit(T::new(bit-1))
+        }*/
     }
 }
 
@@ -615,18 +592,18 @@ mod tests {
         }
         // Root_TOP
         // 61 Nullen
-        assert_eq!(data_structure.root_top[0],0b1000000000000000000000000000000000000000000000000000000000000000);
+        assert_eq!(data_structure.root_top[0][0],0b1000000000000000000000000000000000000000000000000000000000000000);
         for i in 1..16383 {
-            assert_eq!(data_structure.root_top[i],0);
+            assert_eq!(data_structure.root_top[0][i],0);
         }
-        assert_eq!(data_structure.root_top[16383],1);
+        assert_eq!(data_structure.root_top[0][16383],1);
 
         // ROOT_TOP_SUB
-        assert_eq!(data_structure.root_top_sub[0], 0b1000000000000000000000000000000000000000000000000000000000000000);
+        assert_eq!(data_structure.root_top[1][0], 0b1000000000000000000000000000000000000000000000000000000000000000);
         for i in 1..255 {
-            assert_eq!(data_structure.root_top_sub[i],0);
+            assert_eq!(data_structure.root_top[1][i],0);
         }
-        assert_eq!(data_structure.root_top_sub[255], 1);
+        assert_eq!(data_structure.root_top[1][255], 1);
         
     }
 
