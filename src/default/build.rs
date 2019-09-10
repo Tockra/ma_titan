@@ -39,11 +39,7 @@ impl STreeBuilder {
         let mut root_indexs = vec![];
 
         // Hier wird ein root_array der Länge T::root_array_size() angelegt, was 2^i entspricht. Dabei entspricht bei einem u40 Integer i=40 .
-        let mut tmp: Vec<L2EbeneBuilder> = Vec::with_capacity(T::root_array_size());
-        for _ in 0..tmp.capacity() {
-            tmp.push(L2EbeneBuilder::new(LX_ARRAY_SIZE/64));
-        }
-        let mut root_table: Box<[L2EbeneBuilder]> = tmp.into_boxed_slice();
+        let mut root_table: Box<[L2EbeneBuilder]> = vec![L2EbeneBuilder::new(LX_ARRAY_SIZE/64);T::root_array_size()].into_boxed_slice();
     
         for element in elements {
             let (i,j,k) = Splittable::split_integer_down(&element);
