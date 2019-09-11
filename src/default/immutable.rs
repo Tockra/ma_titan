@@ -368,7 +368,7 @@ impl<T: Int> STree<T> {
                     64 => None,
                     val => Some(((x as u64)*64 + val as u64) as usize)
                 }
-            )
+            ) 
         } else {
             let nulls = (self.root_top[1][index] & bit_mask).leading_zeros();
             if nulls != 64 {
