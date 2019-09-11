@@ -140,7 +140,7 @@ fn generate_sql_plot_input() {
         .write(true)
         .truncate(true)
         .create(true)
-        .open("stats.txt").expect("Hallo"));
+        .open("stats.txt").unwrap());
     for entry in read_dir("./target/criterion/").unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
