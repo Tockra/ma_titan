@@ -32,7 +32,7 @@ use ma_titan::default::immutable::STree;
 use self::bench_data::BinarySearch;
 use uint::u40;
 use uint::Typable;
-
+const REPEATS: usize = 10_000;
 const SEED: u128 = 0xcafef00dd15ea5e5;
 const SAMPLE_SIZE: usize = 10;
 /// Diese Methode lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
@@ -71,15 +71,15 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwne
 
         let len = values.len();
 
-        let mut test_values: Vec<E> = Vec::with_capacity(10000);
+        let mut test_values: Vec<E> = Vec::with_capacity(REPEATS);
 
-        while test_values.len() != 10000 {
+        while test_values.len() != REPEATS {
             test_values.push(E::from(state.gen_range((values[0]+1u32).into(),(values[values.len()-1]).into())));
         }
         let data_structure = T::new(values);
         let data_strucuture_succ:T = data_structure.clone();
 
-        let id = &format!("algo={} method=predecessor size={}",T::TYPE, len)[..];
+        let id = &format!("algo={}<{}> method=predecessor size={}",T::TYPE,E::TYPE, len)[..];
         let cp = test_values.clone();
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
@@ -95,7 +95,7 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwne
             vec![cp]
         ).sample_size(SAMPLE_SIZE).warm_up_time(Duration::new(0, 1)));
 
-        let id = &format!("algo={} method=successor size={}",T::TYPE, len)[..];
+        let id = &format!("algo={}<{}> method=successor size={}",T::TYPE,E::TYPE, len)[..];
         c.bench(id,ParameterizedBenchmark::new(id,move
             |b: &mut Bencher, elems: &Vec<E>| {
                 b.iter_batched(|| {
@@ -153,7 +153,7 @@ fn generate_sql_plot_input() {
                 let line = line.unwrap();
                 let line: Vec<&str> = line.split(",").collect();
 
-                writeln!(result, "RESULT {} time={} unit={}",line[0],line[5],line[6]).unwrap(); 
+                writeln!(result, "RESULT {} time={} unit={} repeats={}",line[0],line[5],line[6], REPEATS).unwrap(); 
             } 
             result.flush().unwrap();
 
