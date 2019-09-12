@@ -401,12 +401,24 @@ impl<T> Level<T> {
     #[inline]
     pub fn new(lx_size: usize, keys: Option<&Vec<u16>>, minimum: Option<usize>, maximum: Option<usize>) -> Level<T> {
         match keys {
-            Some(x) => Level {
-                hash_function: Some(Mphf::new_parallel(GAMMA,x,None)),
-                objects: Vec::with_capacity(x.len()),
-                minimum: minimum,
-                maximum: maximum,
-                lx_top: vec![0;lx_size],
+            Some(x) => {
+                if minimum != maximum {
+                    Level {
+                        hash_function: Some(Mphf::new_parallel(GAMMA,x,None)),
+                        objects: Vec::with_capacity(x.len()),
+                        minimum: minimum,
+                        maximum: maximum,
+                        lx_top: vec![0;lx_size],
+                    }
+                } else {
+                    Level {
+                        hash_function: None,
+                        objects: Vec::with_capacity(x.len()),
+                        minimum: minimum,
+                        maximum: maximum,
+                        lx_top: vec![0;lx_size],
+                    }
+                }
             },
             None => Level {
                 hash_function: None,
