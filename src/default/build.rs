@@ -113,22 +113,26 @@ impl STreeBuilder {
                     
                     // Die L3-Elemente bekommen die Symantik aus dem L3BuilderStruct und die perfekte Hashfunktion wird berechnet
                     result[i].get(j).minimum = l3_level.minimum;
-                    result[i].get(j).maximum =l3_level.maximum;
-                    result[i].get(j).hash_function = Some(Mphf::new_parallel(GAMMA,keys, None));
+                    result[i].get(j).maximum = l3_level.maximum;
 
-                    
-                    // Die leeren usizes, die auf die Element-Liste zeigen werden angelegt
-                    result[i].get(j).objects = Vec::with_capacity(l3_level.keys.len());
-                    for _ in &l3_level.keys {
-                        result[i].get(j).objects.push(None);
+                    // Verhindert das Anlegen einer Hashfunktion, wenn nur ein Element existiert
+                    if l3_level.minimum != l3_level.maximum {
+                        result[i].get(j).hash_function = Some(Mphf::new_parallel(GAMMA,keys, None));
+
+                        // Die leeren usizes, die auf die Element-Liste zeigen werden angelegt
+                        result[i].get(j).objects = Vec::with_capacity(l3_level.keys.len());
+                        for _ in &l3_level.keys {
+                            result[i].get(j).objects.push(None);
+                        }
+
+                        // Die usizes werden sinnvoll belegt + die L3-Top-Tabellen werden gefüllt
+                        for &k in &l3_level.keys {
+                            Self::build_lx_top(&mut result[i].get(j).lx_top,k);
+                            let result = result[i].get(j).get(k);
+                            *result = l3_level.hash_map.get(&k).map(|x| *x);
+                        }      
                     }
-
-                    // Die usizes werden sinnvoll belegt + die L3-Top-Tabellen werden gefüllt
-                    for &k in &l3_level.keys {
-                        Self::build_lx_top(&mut result[i].get(j).lx_top,k);
-                        let result = result[i].get(j).get(k);
-                        *result = l3_level.hash_map.get(&k).map(|x| *x);
-                    }         
+                       
                 }
             }
             

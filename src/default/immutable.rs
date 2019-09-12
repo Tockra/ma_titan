@@ -580,8 +580,13 @@ mod tests {
             let (i,j,k) = Splittable::split_integer_down(&val);
             if data_structure.root_table[i].minimum != data_structure.root_table[i].maximum {
                 let second_level = &mut data_structure.root_table[i].get(j);
-                let saved_val = second_level.get(k).unwrap();
-                assert_eq!(data_structure.element_list[saved_val],val);
+                if second_level.minimum != second_level.maximum {
+                    let saved_val = second_level.get(k).unwrap();
+                    assert_eq!(data_structure.element_list[saved_val],val);
+                } else {
+                    assert_eq!(data_structure.element_list[second_level.minimum.unwrap()],val);
+                }
+
             } else {
                 assert_eq!(data_structure.element_list[data_structure.root_table[i].minimum.unwrap()],val);
             }
