@@ -50,21 +50,34 @@ impl STreeBuilder {
         // Hier wird ein root_array der Länge T::root_array_size() angelegt, was 2^i entspricht. Dabei entspricht bei einem u40 Integer i=40 .
         let mut root_table: Box<[L2EbeneBuilder]> = vec![L2EbeneBuilder::new(LX_ARRAY_SIZE/64);T::root_array_size()].into_boxed_slice();
     
-        for element in elements {
-            let (i,j,k) = Splittable::split_integer_down(&element);
+        for (index,element) in elements.iter().enumerate() {
+            let (i,j,k) = Splittable::split_integer_down(element);
 
             if !root_indexs.contains(&i) {
                 Self::build_root_top(&mut root_top, &mut root_top_sub, &i);
                 root_indexs.push(i);
             }
+
+            let l2_level = &mut root_table[i];
+            // Minima- und Maximasetzung auf der ersten Ebene
+            l2_level.minimum.get_or_insert(index);
+            l2_level.maximum = Some(index);
             
             if !root_table[i].hash_map.contains_key(&j) {
                 root_table[i].keys.push(j);
-                root_table[i].hash_map.insert(j,L3EbeneBuilder::new(LX_ARRAY_SIZE/64));
+
+                let l3_level = L3EbeneBuilder::new(LX_ARRAY_SIZE/64);
+
+                root_table[i].hash_map.insert(j,l3_level);
             }
-            
+            let mut l3_level = root_table[i].hash_map.get_mut(&j).unwrap();
+            // Minima- und Maximasetzung auf der zweiten Ebene
+            l3_level.minimum.get_or_insert(index);
+            l3_level.maximum = Some(index);
+
             // Hier ist keine Prüfung notwendig, da die Elemente einmalig sind.
-            root_table[i].hash_map.get_mut(&j).unwrap().keys.push(k);
+            l3_level.keys.push(k);
+            l3_level.hash_map.insert(k,index);
         }
         Self {root_table: root_table, root_top: root_top.into_boxed_slice(), root_top_sub: root_top_sub.into_boxed_slice(), root_indexs: root_indexs}
     }
@@ -72,34 +85,50 @@ impl STreeBuilder {
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
     /// angelegt und miteinander verbunden. Nachdem die Struktur mit normalen Hashfunktionen gebaut wurde können nun perfekte Hashfunktionen berechnet 
     /// werden!
-    pub fn build<T: Int>(&self) -> Box<[L2Ebene]> {
+    pub fn build<T: Int>(&mut self) -> Box<[L2Ebene]> {
         let mut tmp: Vec<L2Ebene> = Vec::with_capacity(T::root_array_size());
+        // Die L2Level-Elemente werden angelegt. Hierbei wird direkt in der new()-Funktion die perfekte Hashfunktion berechnet
         for i in 0..tmp.capacity() {
-            tmp.push(L2Ebene::new(LX_ARRAY_SIZE/64, Some(self.root_table[i].keys.clone())));
+            tmp.push(L2Ebene::new(LX_ARRAY_SIZE/64, Some(&self.root_table[i].keys),self.root_table[i].minimum, self.root_table[i].maximum));
         }
         let mut result: Box<[L2Ebene]> = tmp.into_boxed_slice();
 
         for &i in &self.root_indexs {
-            for _ in &self.root_table[i].keys {
-                result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE/64, None));
+            let l2_level = &mut self.root_table[i];
+
+            // Die leeren L3Level-Elemente auf die L2 später zeigt werden angelegt
+            for _ in &l2_level.keys {
+                result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE/64, None, None, None));
             }
 
-            for &key in &self.root_table[i].keys {
-                let len = self.root_table[i].hash_map.get(&key).unwrap().keys.len();
-                Self::build_lx_top(&mut result[i].lx_top, key);
-                let keys = self.root_table[i].hash_map.get(&key).unwrap().keys.as_ref();
+            for &j in &l2_level.keys {
+                // Die L2-Top-Tabellen werden gefüllt und die 
+                let l3_level = &mut l2_level.hash_map.get_mut(&j).unwrap();
+                Self::build_lx_top(&mut result[i].lx_top, j);
+                let keys = l3_level.keys.as_ref();
                 
-                //if keys.len() > 1 {
-                    result[i].get(key).hash_function = Some(Mphf::new_parallel(GAMMA,keys, None));
+                
+                // Die L3-Elemente bekommen die Symantik aus dem L3BuilderStruct und die perfekte Hashfunktion wird berechnet
+                result[i].get(j).minimum = l3_level.minimum;
+                result[i].get(j).maximum =l3_level.maximum;
+                result[i].get(j).hash_function = Some(Mphf::new_parallel(GAMMA,keys, None));
+
+                
+                // Die leeren usizes, die auf die Element-Liste zeigen werden angelegt
+                for _ in &l3_level.keys {
+                    result[i].get(j).objects.push(None);
+                }
+
+                // Die usizes werden sinnvoll belegt + die L3-Top-Tabellen werden gefüllt
+                for &k in &l3_level.keys {
+                    Self::build_lx_top(&mut result[i].get(j).lx_top,k);
+                    let result = result[i].get(j).get(k);
+                    *result = l3_level.hash_map.get(&k).map(|x| *x);
+                }
+
+                                    
                // }
                 
-                    
-                for _ in 0..len {
-                    for &sub_key in &self.root_table[i].hash_map.get(&key).unwrap().keys {
-                        Self::build_lx_top(&mut result[i].get(key).lx_top,sub_key);
-                    }
-                    result[i].get(key).objects.push(None);
-                } 
             }
 
         }
@@ -155,6 +184,12 @@ pub struct BuilderLevel<T> {
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     /// Dieses Array wird später an den `Level`-Struct weitergegeben
     pub lx_top: Vec<u64>,
+
+    /// Speichert das Maximum des Levels zwischen
+    pub maximum: Option<usize>,
+
+    /// Speichert das Minimum des Levels zwischen
+    pub minimum: Option<usize>,
 }
 
 impl<T> BuilderLevel<T> {
@@ -169,6 +204,8 @@ impl<T> BuilderLevel<T> {
             hash_map: (HashMap::<u16,T>::default()),
             keys: vec![],
             lx_top: vec![0;lx_top_size],
+            maximum: None,
+            minimum: None
         }
     }
 }

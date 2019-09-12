@@ -121,31 +121,11 @@ impl<T: Int> STree<T> {
 
         let (root_top,root_top_sub) = builder.get_root_tops();
         let root_top: Box<[Box<[u64]>]> = vec![root_top,root_top_sub].into_boxed_slice();
-        let mut result = STree{
+        STree{
             root_table: builder.build::<T>(),
             root_top: root_top,
             element_list: elements.into_boxed_slice(),
-        };
-        for (index,element) in result.element_list.iter().enumerate() {
-            // Dadurch das die Reihenfolge sortiert ist, wird das letzte hinzugefügte Element das größte und das erste das kleinste sein.
-
-            let (i,j,k) = Splittable::split_integer_down(element);
-
-            let l2_level = &mut result.root_table[i];
-            l2_level.minimum.get_or_insert(index);
-            l2_level.maximum = Some(index);
-
-            let mut l3_level = l2_level.get(j);
-
-            // Minima- und Maximasetzung auf der ersten Ebene
-            l3_level.minimum.get_or_insert(index);
-            l3_level.maximum = Some(index);
-
-            let target_element=l3_level.get(k);
-            // Werte korrekt auf die Array-Indizes zeigen lassen:Level
-            *target_element = Some(index);
         }
-        result
     }
 
 
@@ -419,20 +399,20 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(level: usize, keys: Option<Vec<u16>>) -> Level<T> {
+    pub fn new(level: usize, keys: Option<&Vec<u16>>, minimum: Option<usize>, maximum: Option<usize>) -> Level<T> {
         match keys {
             Some(x) => Level {
                 hash_function: Some(Mphf::new_parallel(GAMMA,&x,None)),
                 objects: vec![],
-                maximum: None,
-                minimum: None,
+                minimum: minimum,
+                maximum: maximum,
                 lx_top: vec![0;level],
             },
             None => Level {
                 hash_function: None,
                 objects: vec![],
-                maximum: None,
-                minimum: None,
+                minimum: minimum,
+                maximum: maximum,
                 lx_top: vec![0;level],
             }
         }
