@@ -94,44 +94,44 @@ impl STreeBuilder {
         let mut result: Box<[L2Ebene]> = tmp.into_boxed_slice();
 
         for &i in &self.root_indexs {
-            let l2_level = &mut self.root_table[i];
+            // L3-Level werden nur angelegt, falls mehr als 1 Wert in der DS existiert.
+            if result[i].maximum != result[i].minimum {
+                let l2_level = &mut self.root_table[i];
 
-            // Die leeren L3Level-Elemente auf die L2 später zeigt werden angelegt
-            result[i].objects = Vec::with_capacity(l2_level.keys.len());
-            for _ in &l2_level.keys {
-                result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE/64, None, None, None));
-            }
-
-            for &j in &l2_level.keys {
-                // Die L2-Top-Tabellen werden gefüllt und die 
-                let l3_level = &mut l2_level.hash_map.get_mut(&j).unwrap();
-                Self::build_lx_top(&mut result[i].lx_top, j);
-                let keys = l3_level.keys.as_ref();
-                
-                
-                // Die L3-Elemente bekommen die Symantik aus dem L3BuilderStruct und die perfekte Hashfunktion wird berechnet
-                result[i].get(j).minimum = l3_level.minimum;
-                result[i].get(j).maximum =l3_level.maximum;
-                result[i].get(j).hash_function = Some(Mphf::new_parallel(GAMMA,keys, None));
-
-                
-                // Die leeren usizes, die auf die Element-Liste zeigen werden angelegt
-                result[i].get(j).objects = Vec::with_capacity(l3_level.keys.len());
-                for _ in &l3_level.keys {
-                    result[i].get(j).objects.push(None);
+                // Die leeren L3Level-Elemente auf die L2 später zeigt werden angelegt
+                result[i].objects = Vec::with_capacity(l2_level.keys.len());
+                for _ in &l2_level.keys {
+                    result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE/64, None, None, None));
                 }
 
-                // Die usizes werden sinnvoll belegt + die L3-Top-Tabellen werden gefüllt
-                for &k in &l3_level.keys {
-                    Self::build_lx_top(&mut result[i].get(j).lx_top,k);
-                    let result = result[i].get(j).get(k);
-                    *result = l3_level.hash_map.get(&k).map(|x| *x);
-                }
+                for &j in &l2_level.keys {
+                    // Die L2-Top-Tabellen werden gefüllt und die 
+                    let l3_level = &mut l2_level.hash_map.get_mut(&j).unwrap();
+                    Self::build_lx_top(&mut result[i].lx_top, j);
+                    let keys = l3_level.keys.as_ref();
+                    
+                    
+                    // Die L3-Elemente bekommen die Symantik aus dem L3BuilderStruct und die perfekte Hashfunktion wird berechnet
+                    result[i].get(j).minimum = l3_level.minimum;
+                    result[i].get(j).maximum =l3_level.maximum;
+                    result[i].get(j).hash_function = Some(Mphf::new_parallel(GAMMA,keys, None));
 
-                                    
-               // }
-                
+                    
+                    // Die leeren usizes, die auf die Element-Liste zeigen werden angelegt
+                    result[i].get(j).objects = Vec::with_capacity(l3_level.keys.len());
+                    for _ in &l3_level.keys {
+                        result[i].get(j).objects.push(None);
+                    }
+
+                    // Die usizes werden sinnvoll belegt + die L3-Top-Tabellen werden gefüllt
+                    for &k in &l3_level.keys {
+                        Self::build_lx_top(&mut result[i].get(j).lx_top,k);
+                        let result = result[i].get(j).get(k);
+                        *result = l3_level.hash_map.get(&k).map(|x| *x);
+                    }         
+                }
             }
+            
 
         }
         result
