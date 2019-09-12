@@ -97,6 +97,7 @@ impl STreeBuilder {
             let l2_level = &mut self.root_table[i];
 
             // Die leeren L3Level-Elemente auf die L2 später zeigt werden angelegt
+            result[i].objects = Vec::with_capacity(l2_level.keys.len());
             for _ in &l2_level.keys {
                 result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE/64, None, None, None));
             }
@@ -115,6 +116,7 @@ impl STreeBuilder {
 
                 
                 // Die leeren usizes, die auf die Element-Liste zeigen werden angelegt
+                result[i].get(j).objects = Vec::with_capacity(l3_level.keys.len());
                 for _ in &l3_level.keys {
                     result[i].get(j).objects.push(None);
                 }

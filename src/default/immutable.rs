@@ -399,21 +399,21 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(level: usize, keys: Option<&Vec<u16>>, minimum: Option<usize>, maximum: Option<usize>) -> Level<T> {
+    pub fn new(lx_size: usize, keys: Option<&Vec<u16>>, minimum: Option<usize>, maximum: Option<usize>) -> Level<T> {
         match keys {
             Some(x) => Level {
-                hash_function: Some(Mphf::new_parallel(GAMMA,&x,None)),
-                objects: vec![],
+                hash_function: Some(Mphf::new_parallel(GAMMA,x,None)),
+                objects: Vec::with_capacity(x.len()),
                 minimum: minimum,
                 maximum: maximum,
-                lx_top: vec![0;level],
+                lx_top: vec![0;lx_size],
             },
             None => Level {
                 hash_function: None,
                 objects: vec![],
                 minimum: minimum,
                 maximum: maximum,
-                lx_top: vec![0;level],
+                lx_top: vec![0;lx_size],
             }
         }
     }
