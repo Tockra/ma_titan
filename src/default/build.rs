@@ -81,15 +81,18 @@ impl STreeBuilder {
 
         for &i in &self.root_indexs {
             for _ in &self.root_table[i].keys {
-                result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE, None));
+                result[i].objects.push(L3Ebene::new(LX_ARRAY_SIZE/64, None));
             }
 
             for &key in &self.root_table[i].keys {
                 let len = self.root_table[i].hash_map.get(&key).unwrap().keys.len();
                 Self::build_lx_top(&mut result[i].lx_top, key);
                 let keys = self.root_table[i].hash_map.get(&key).unwrap().keys.as_ref();
-
-                result[i].get(key).hash_function = Some(Mphf::new_parallel(GAMMA,&keys, None));
+                
+                //if keys.len() > 1 {
+                    result[i].get(key).hash_function = Some(Mphf::new_parallel(GAMMA,keys, None));
+               // }
+                
                     
                 for _ in 0..len {
                     for &sub_key in &self.root_table[i].hash_map.get(&key).unwrap().keys {
