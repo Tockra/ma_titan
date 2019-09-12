@@ -1,0 +1,58 @@
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+slope  [783.01 us 806.56 us] R^2            [0.9834597 0.9795947]
+mean   [766.58 us 811.09 us] std. dev.      [14.481 us 54.206 us]
+median [753.81 us 798.03 us] med. abs. dev. [1.1870 us 50.921 us]
+
+"testdata/u40/2^17.data"
+Benchmarking algo=BinarySearch<u40> method=predecessor size=131072
+Benchmarking algo=BinarySearch<u40> method=predecessor size=131072: Warming up for 1.0000 ns
+Benchmarking algo=BinarySearch<u40> method=predecessor size=131072: Collecting 10 samples in estimated 5.1652 s (220 iterations)
+Benchmarking algo=BinarySearch<u40> method=predecessor size=131072: Analyzing
+algo=BinarySearch<u40> method=predecessor size=131072
+                        time:   [1.1240 ms 1.1400 ms 1.1535 ms]
+Found 4 outliers among 10 measurements (40.00%)
+  2 (20.00%) low severe
+  2 (20.00%) high severe
+slope  [1.1240 ms 1.1535 ms] R^2            [0.9917254 0.9927128]
+mean   [1.0998 ms 1.1389 ms] std. dev.      [11.579 us 43.939 us]
+median [1.0936 ms 1.1415 ms] med. abs. dev. [1.2975 us 51.563 us]
+
+Benchmarking algo=BinarySearch<u40> method=successor size=131072
+Benchmarking algo=BinarySearch<u40> method=successor size=131072: Warming up for 1.0000 ns
+Benchmarking algo=BinarySearch<u40> method=successor size=131072: Collecting 10 samples in estimated 5.8132 s (220 iterations)
+Benchmarking algo=BinarySearch<u40> method=successor size=131072: Analyzing
+algo=BinarySearch<u40> method=successor size=131072
+                        time:   [1.4080 ms 1.4115 ms 1.4195 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+slope  [1.4080 ms 1.4195 ms] R^2            [0.9990487 0.9985535]
+mean   [1.4117 ms 1.4338 ms] std. dev.      [6.3652 us 28.378 us]
+median [1.4076 ms 1.4266 ms] med. abs. dev. [1.1570 us 23.179 us]
+
+"testdata/u40/2^6.data"
+Benchmarking algo=BinarySearch<u40> method=predecessor size=64
+Benchmarking algo=BinarySearch<u40> method=predecessor size=64: Warming up for 1.0000 ns
+Benchmarking algo=BinarySearch<u40> method=predecessor size=64: Collecting 10 samples in estimated 5.5224 s (220 iterations)
+Benchmarking algo=BinarySearch<u40> method=predecessor size=64: Analyzing
+algo=BinarySearch<u40> method=predecessor size=64
+                        time:   [384.40 us 390.94 us 393.83 us]
+Found 3 outliers among 10 measurements (30.00%)
+  2 (20.00%) low severe
+  1 (10.00%) high severe
+slope  [384.40 us 393.83 us] R^2            [0.9559221 0.9596536]
+mean   [314.78 us 397.36 us] std. dev.      [1.0310 us 86.975 us]
+median [312.59 us 393.64 us] med. abs. dev. [186.29 ns 117.65 us]
+
+Benchmarking algo=BinarySearch<u40> method=successor size=64
+Benchmarking algo=BinarySearch<u40> method=successor size=64: Warming up for 1.0000 ns
+Benchmarking algo=BinarySearch<u40> method=successor size=64: Collecting 10 samples in estimated 6.4667 s (220 iterations)
+Benchmarking algo=BinarySearch<u40> method=successor size=64: Analyzing
+algo=BinarySearch<u40> method=successor size=64
+                        time:   [299.51 us 302.77 us 307.72 us]
+Found 3 outliers among 10 measurements (30.00%)
+  2 (20.00%) low severe
+  1 (10.00%) high severe
+slope  [299.51 us 307.72 us] R^2            [0.9741879 0.9714729]
+mean   [271.37 us 310.22 us] std. dev.      [2.5485 us 43.564 us]
+median [267.69 us 305.40 us] med. abs. dev. [182.90 ns 52.415 us]
