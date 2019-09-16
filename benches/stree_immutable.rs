@@ -76,8 +76,10 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwne
         while test_values.len() != REPEATS {
             test_values.push(E::from(state.gen_range((values[0]+1u32).into(),(values[values.len()-1]).into())));
         }
+
+        let values_clone = values.clone();
         let data_structure = T::new(values);
-        let data_strucuture_succ:T = data_structure.clone();
+        let data_strucuture_succ:T = T::new(values_clone);
 
         let id = &format!("algo={}<{}> method=predecessor size={}",T::TYPE,E::TYPE, len)[..];
         let cp = test_values.clone();
@@ -93,7 +95,7 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwne
                 }, BatchSize::SmallInput);
             },
             vec![cp]
-        ).sample_size(SAMPLE_SIZE).warm_up_time(Duration::new(0, 1)));
+        ).sample_size(SAMPLE_SIZE));
 
         let id = &format!("algo={}<{}> method=successor size={}",T::TYPE,E::TYPE, len)[..];
         c.bench(id,ParameterizedBenchmark::new(id,move
@@ -108,7 +110,7 @@ fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwne
                 }, BatchSize::SmallInput);
             },
             vec![test_values]
-        ).sample_size(SAMPLE_SIZE).warm_up_time(Duration::new(0, 1)));
+        ).sample_size(SAMPLE_SIZE));
     }
 }
 
