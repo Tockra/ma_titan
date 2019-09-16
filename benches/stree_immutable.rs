@@ -156,8 +156,8 @@ criterion_group!(binary_search_pred_u40, pred_benchmark<u40,BinarySearch>);
 criterion_group!(stree_succ_u40, succ_benchmark<u40,STree<u40>>);
 criterion_group!(binary_search_succ_u40, succ_benchmark<u40,BinarySearch>);
 
-
-criterion_main!(stree_gen_u40, binary_search_gen_u40, stree_pred_u40, binary_search_pred_u40,stree_succ_u40, binary_search_succ_u40, generate_sql_plot_input);
+// Tmp: stree_gen_u40, binary_search_gen_u40, 
+criterion_main!(stree_pred_u40, binary_search_pred_u40,stree_succ_u40, binary_search_succ_u40, generate_sql_plot_input);
 
 /// Diese Methode darf erst am Ende einer Bench-Methode aufgerufen werden, da ansonsten /target/criterion/ nicht existiert
 /// Außerdem muss sichergestellt werden, dass man sich zum Zeitpunkt des Aufrufs im Hauptverzeichnis des Rust-Projects befindet.
