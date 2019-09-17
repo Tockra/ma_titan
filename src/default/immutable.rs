@@ -35,32 +35,20 @@ pub struct STree<T> {
 /// Er stellt sicher das der generische Parameter gewisse Traits implementiert und die New-Methode besitzt.
 /// Zusätzlich wird die Größe des Root-Arrays in Form einer Funktion rückgebar gemacht.
 pub trait Int: PartialOrd + From<u64> + Into<u64> + Copy + Splittable { 
-    fn new(k: u64) -> Self;
-    fn root_array_size() -> usize;
+    fn new(k: u64) -> Self {
+        Self::from(k)
+    }
+    fn root_array_size() -> usize {
+        1 << (std::mem::size_of::<Self>()*8/2)
+    }
 }
 
 impl Int for u40 {
-    fn new(k: u64) -> Self {
-        Self::from(k)
-    }
 
-    /// Gibt den Wert 2^20 zurück, da u40 40 Bit besitzt und die hälfte davon mit 2^20 Werten adressiert werden
-    /// können.
-    fn root_array_size() -> usize {
-        1 << 20
-    }
 }
 
 impl Int for u48 {
-    fn new(k: u64) -> Self {
-        Self::from(k)
-    }
 
-    /// Gibt den Wert 2^20 zurück, da u40 40 Bit besitzt und die hälfte davon mit 2^20 Werten adressiert werden
-    /// können.
-    fn root_array_size() -> usize {
-        1 << 24
-    }
 }
 
 impl<T: Int> PredecessorSetStatic<T> for STree<T> {
