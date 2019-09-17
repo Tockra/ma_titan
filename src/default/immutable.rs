@@ -27,11 +27,6 @@ pub struct STree<T> {
     /// Somit gilt |root_table[i+1]| = |root_table[i]|/64  
     root_top: Box<[Box<[u64]>]>,
 
-    /// Das Root-Top-Sub-Array ist ein Hilfsarray. Dabei werden immer 64-Bit des Root-Top-Arrays (also ein Index) verodert und zu einem 
-    /// Bit in `root_top_sub`. Somit können die nächsten gesetzten Bits in `root_top` gefunden werden, ohne alle Einträge zu überprüfen.
-    /// Die Länge des Arrays beträgt somit [u64;2^20 / 64 / 64].
-   // root_top_sub: Box<[u64]>, 
-
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
     element_list: Box<[T]>,
 }
@@ -119,9 +114,8 @@ impl<T: Int> STree<T> {
     pub fn new(elements: Vec<T>) -> Self {
         let mut builder = STreeBuilder::new(elements.clone());
 
-        let (root_top,root_top_sub) = builder.get_root_tops();
-        let root_top: Box<[Box<[u64]>]> = vec![root_top,root_top_sub].into_boxed_slice();
-        STree{
+        let root_top = builder.get_root_tops();
+        STree {
             root_table: builder.build::<T>(),
             root_top: root_top,
             element_list: elements.into_boxed_slice(),

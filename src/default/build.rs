@@ -26,10 +26,7 @@ pub struct STreeBuilder {
     root_table: Box<[L2EbeneBuilder]>,
 
     /// Root-Top-Array
-    root_top: Box<[u64]>,
-
-    /// Root-Sub-Top-Array zur Leistungsoptimierung (siehe Paper)
-    root_top_sub: Box<[u64]>, 
+    root_top: Box<[Box<[u64]>]>,
 
     /// Eine Liste, die alle belegten Indizes von `root_table` speichert. 
     root_indexs: Vec<usize>,
@@ -44,8 +41,19 @@ impl STreeBuilder {
     pub fn new<T: Int>(elements: Vec<T>) ->  Self{
         let mut root_indexs = vec![];
                 
-        let mut root_top: Vec<u64> = vec![0; T::root_array_size()/64];
-        let mut root_top_sub: Vec<u64> = vec![0; T::root_array_size()/64/64];
+        // root_top_deep verwenden um die richtige Tiefe von root_top zu bestimmen
+        let mut root_top_deep = 0;
+        while T::root_array_size()/(1<<root_top_deep*6) > 256 {
+            root_top_deep +=1;
+        }
+   
+        let mut root_top: Vec<Box<Vec<u64>>> = Vec::with_capacity(root_top_deep);
+
+        for i in 0..root_top.capacity() {
+            root_top.push(Box::new(vec![0;T::root_array_size()/(1<<i*6)]));
+        }
+
+        let mut root_top: Box<[Box<[u64]>]> = root_top.into_iter().map(|x| x.into_boxed_slice()).collect::<Vec<_>>().into_boxed_slice();
 
         // Hier wird ein root_array der Länge T::root_array_size() angelegt, was 2^i entspricht. Dabei entspricht bei einem u40 Integer i=40 .
         let mut root_table: Box<[L2EbeneBuilder]> = vec![L2EbeneBuilder::new(LX_ARRAY_SIZE/64);T::root_array_size()].into_boxed_slice();
@@ -54,7 +62,7 @@ impl STreeBuilder {
             let (i,j,k) = Splittable::split_integer_down(element);
 
             if !root_indexs.contains(&i) {
-                Self::build_root_top(&mut root_top, &mut root_top_sub, &i);
+                Self::build_root_top(&mut root_top, &i);
                 root_indexs.push(i);
             }
 
@@ -79,7 +87,7 @@ impl STreeBuilder {
             l3_level.keys.push(k);
             l3_level.hash_map.insert(k,index);
         }
-        Self {root_table: root_table, root_top: root_top.into_boxed_slice(), root_top_sub: root_top_sub.into_boxed_slice(), root_indexs: root_indexs}
+        Self {root_table: root_table, root_top: root_top, root_indexs: root_indexs}
     }
 
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
@@ -159,20 +167,18 @@ impl STreeBuilder {
 
     /// Baut das Root-Top-Array mit Hilfe der sich in der Datenstruktur befindenden Werte.
     #[inline]
-    fn build_root_top(root_top: &mut Vec<u64>, root_top_sub: &mut Vec<u64>, bit: &usize) {
+    fn build_root_top(root_top: &mut Box<[Box<[u64]>]>, bit: &usize) {
         // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
-        let index = bit/64;
-        let bit_mask: u64  = 1<<(63-(bit%64));
-        root_top[index] = root_top[index] | bit_mask;
-
-        // Berechnung des Indexs (sub_bit) im root_top_sub array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
-        let index_sub = index/64;
-        let bit_mask_sub: u64 = 1<<(63-(index%64));
-        root_top_sub[index_sub] = root_top_sub[index_sub] | bit_mask_sub;
+        for i in 0..root_top.len() {
+            let curr_bit_repr = bit/(1<<(i*6));
+            let index = curr_bit_repr/64;
+            let bit_mask: u64  = 1<<(63-(curr_bit_repr%64));
+            root_top[i][index] = root_top[i][index] | bit_mask;
+        }
     }
 
-    pub fn get_root_tops(&mut self) -> (Box<[u64]>,Box<[u64]>) {
-        (std::mem::replace(&mut self.root_top,Box::new([])), std::mem::replace(&mut self.root_top_sub,Box::new([])))
+    pub fn get_root_tops(&mut self) -> (Box<[Box<[u64]>]>) {
+        (std::mem::replace(&mut self.root_top,Box::new([])))
     }
 }
 
