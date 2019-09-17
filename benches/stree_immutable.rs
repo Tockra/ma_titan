@@ -5,6 +5,7 @@ extern crate serde;
 extern crate rmp_serde as rmps;
 
 use criterion::Criterion;
+use criterion::black_box;
 
 use criterion::Bencher;
 use criterion::BatchSize;
@@ -57,7 +58,7 @@ fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned
 /// Lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und erzeugt mit Hilfe dieser die zu testende Datenstruktur T. 
 /// Anschließend werden 10000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor-Methode 
 /// werden mit Hilfe dieser gemessen
-fn pred_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>(c: &mut Criterion) {
+fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>(c: &mut Criterion) {
     for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
         let dir = dir.unwrap();
         let path = dir.path();
@@ -70,7 +71,9 @@ fn pred_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<
 
         let test_values = get_test_values(values[0]+1u32,values[values_len-1]);
 
-        let data_structure = T::new(values);
+        let data_structure = T::new(values.clone());
+        let data_structure_succ = T::new(values);
+        
 
         let id = &format!("algo={}<{}> method=predecessor size={}",T::TYPE,E::TYPE, values_len)[..];
         let cp = test_values.clone();
@@ -87,26 +90,6 @@ fn pred_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<
             },
             vec![cp]
         ).sample_size(SAMPLE_SIZE));
-    }
-}
-
-/// Lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und erzeugt mit Hilfe dieser die zu testende Datenstruktur T. 
-/// Anschließend werden 10000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Successor-Methode 
-/// werden mit Hilfe dieser gemessen
-fn succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>(c: &mut Criterion) {
-    for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
-        let dir = dir.unwrap();
-        let path = dir.path();
-        println!("{:?}",path);
-
-        let buf = BufReader::new(File::open(path).unwrap());
-        let mut values = Deserializer::new(buf);
-        let values: Vec<E> = Deserialize::deserialize(&mut values).unwrap();
-        let values_len = values.len();
-
-        let test_values = get_test_values(values[0]+1u32,values[values_len-1]);
-
-        let data_structure = T::new(values);
 
         let id = &format!("algo={}<{}> method=successor size={}",T::TYPE,E::TYPE, values_len)[..];
         c.bench(id,ParameterizedBenchmark::new(id,move
@@ -116,7 +99,7 @@ fn succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<
                     ()
                 }, |_| {
                     for elem in elems {
-                        data_structure.successor(*elem);
+                        data_structure_succ.successor(*elem);
                     }
                 }, BatchSize::SmallInput);
             },
@@ -126,7 +109,7 @@ fn succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<
 }
 
 fn get_test_values<E: 'static + Typable + Copy + From<u64> + Into<u64> + Add<u32, Output=E>>(min: E, max: E) -> Vec<E> {
-    let mut state = Mcg128Xsl64::new(SEED);
+    let mut state = Mcg128Xsl64::new(black_box(SEED));
     let mut test_values: Vec<E> = Vec::with_capacity(REPEATS);
 
     while test_values.len() != REPEATS {
@@ -140,7 +123,7 @@ pub fn cache_clear() {
     let mut data = vec![23u64];
 
     for i in 1 .. 3_750_000u64 {
-        data.push(data[i as usize -1] + i);
+        data.push(black_box(data[i as usize -1] + i));
     }
 
     let mut buf = BufWriter::new(File::create("cache").unwrap());
@@ -150,13 +133,11 @@ pub fn cache_clear() {
 
 criterion_group!(stree_gen_u40, static_build_benchmark<u40,STree<u40>>);
 criterion_group!(binary_search_gen_u40, static_build_benchmark<u40,BinarySearch<u40>>);
-criterion_group!(stree_pred_u40, pred_benchmark<u40,STree<u40>>);
-criterion_group!(binary_search_pred_u40, pred_benchmark<u40,BinarySearch<u40>>);
-criterion_group!(stree_succ_u40, succ_benchmark<u40,STree<u40>>);
-criterion_group!(binary_search_succ_u40, succ_benchmark<u40,BinarySearch<u40>>);
+criterion_group!(stree_pred_u40, pred_and_succ_benchmark<u40,STree<u40>>);
+criterion_group!(binary_search_pred_u40, pred_and_succ_benchmark<u40,BinarySearch<u40>>);
 
 // Tmp: stree_gen_u40, binary_search_gen_u40, 
-criterion_main!(stree_pred_u40, binary_search_pred_u40,stree_succ_u40, binary_search_succ_u40, generate_sql_plot_input);
+criterion_main!(stree_pred_u40, binary_search_pred_u40, generate_sql_plot_input);
 
 /// Diese Methode darf erst am Ende einer Bench-Methode aufgerufen werden, da ansonsten /target/criterion/ nicht existiert
 /// Außerdem muss sichergestellt werden, dass man sich zum Zeitpunkt des Aufrufs im Hauptverzeichnis des Rust-Projects befindet.
@@ -179,7 +160,7 @@ fn generate_sql_plot_input() {
                 let line = line.unwrap();
                 let line: Vec<&str> = line.split(",").collect();
 
-                writeln!(result, "RESULT {} time={} unit={} repeats={}",line[0],line[5],line[6], REPEATS).unwrap(); 
+                writeln!(result, "RESULT {} time={} unit={} repeats={}",line[0],line[5].parse::<f64>().unwrap()/line[7].parse::<f64>().unwrap(),line[6], REPEATS).unwrap(); 
             } 
             result.flush().unwrap();
 
