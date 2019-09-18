@@ -30,6 +30,7 @@ use std::fs::OpenOptions;
 
 use ma_titan::internal::PredecessorSetStatic;
 use ma_titan::default::immutable::{STree, BinarySearch};
+use change_ds::VEBTree;
 use uint::u40;
 use uint::Typable;
 const REPEATS: usize = 10_000;
@@ -133,11 +134,13 @@ pub fn cache_clear() {
 
 criterion_group!(stree_gen_u40, static_build_benchmark<u40,STree<u40>>);
 criterion_group!(binary_search_gen_u40, static_build_benchmark<u40,BinarySearch<u40>>);
+criterion_group!(veb_tree_gen_u40, static_build_benchmark<u40,VEBTree>);
 criterion_group!(stree_pred_u40, pred_and_succ_benchmark<u40,STree<u40>>);
 criterion_group!(binary_search_pred_u40, pred_and_succ_benchmark<u40,BinarySearch<u40>>);
+criterion_group!(veb_tree_pred_u40, pred_and_succ_benchmark<u40,VEBTree<u40>>);
 
-// Tmp: stree_gen_u40, binary_search_gen_u40, 
-criterion_main!(stree_pred_u40, binary_search_pred_u40, generate_sql_plot_input);
+
+criterion_main!(stree_gen_u40, binary_search_gen_u40, veb_tree_gen_u40, stree_pred_u40, binary_search_pred_u40, veb_tree_pred_u40, generate_sql_plot_input);
 
 /// Diese Methode darf erst am Ende einer Bench-Methode aufgerufen werden, da ansonsten /target/criterion/ nicht existiert
 /// Außerdem muss sichergestellt werden, dass man sich zum Zeitpunkt des Aufrufs im Hauptverzeichnis des Rust-Projects befindet.
@@ -166,4 +169,48 @@ fn generate_sql_plot_input() {
 
         } 
     }
+}
+
+mod change_ds {
+    use vebtrees::VEBTree as vs;
+    use ma_titan::internal::PredecessorSetStatic;
+    use ma_titan::default::immutable::{Int};
+    struct VEBTree {
+        veb_tree: vs
+    }
+
+    impl<T: Int> PredecessorSetStatic<T> for VEBTree<T> {
+        const TYPE: &'static str = "vEB-Tree";
+
+        fn new(elements: Vec<T>) -> Self {
+            let vtree = vs::new(elements.len());
+            for elem in elements {
+                vtree.insert((elem.into()) as usize);
+            }
+            Self {
+                veb_tree: vtree,
+            }
+        }
+
+        fn predecessor(&self,number: T) -> Option<T> {
+            self.veb_tree.findprev((number.into()) as usize).and_then(|x| Some(T::new(x as u64)))
+        }
+
+        fn successor(&self,number: T) -> Option<T> {
+            self.veb_tree.findnext((number.into()) as usize).and_then(|x| Some(T::new(x as u64)))
+        }
+
+        fn minimum(&self) -> Option<T> {
+            self.veb_tree.minimum().and_then(|x| Some(T::new(x as u64)))
+        }
+
+        fn maximum(&self) -> Option<T> {
+            self.veb_tree.maximum().and_then(|x| Some(T::new(x as u64)))
+        } 
+
+        fn contains(&self, number: T) -> bool {
+            self.veb_tree.contains((number.into()) as usize)
+        }
+    }
+
 }
