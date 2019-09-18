@@ -137,7 +137,7 @@ criterion_group!(binary_search_gen_u40, static_build_benchmark<u40,BinarySearch<
 criterion_group!(veb_tree_gen_u40, static_build_benchmark<u40,VEBTree>);
 criterion_group!(stree_pred_u40, pred_and_succ_benchmark<u40,STree<u40>>);
 criterion_group!(binary_search_pred_u40, pred_and_succ_benchmark<u40,BinarySearch<u40>>);
-criterion_group!(veb_tree_pred_u40, pred_and_succ_benchmark<u40,VEBTree<u40>>);
+criterion_group!(veb_tree_pred_u40, pred_and_succ_benchmark<u40,VEBTree>);
 
 
 criterion_main!(stree_gen_u40, binary_search_gen_u40, veb_tree_gen_u40, stree_pred_u40, binary_search_pred_u40, veb_tree_pred_u40, generate_sql_plot_input);
@@ -175,15 +175,17 @@ mod change_ds {
     use vebtrees::VEBTree as vs;
     use ma_titan::internal::PredecessorSetStatic;
     use ma_titan::default::immutable::{Int};
-    struct VEBTree {
+
+    #[derive(Clone,Debug, PartialEq, Eq)]
+    pub struct VEBTree {
         veb_tree: vs
     }
 
-    impl<T: Int> PredecessorSetStatic<T> for VEBTree<T> {
+    impl<T: Int> PredecessorSetStatic<T> for VEBTree {
         const TYPE: &'static str = "vEB-Tree";
 
         fn new(elements: Vec<T>) -> Self {
-            let vtree = vs::new(elements.len());
+            let mut vtree = vs::new(elements.len());
             for elem in elements {
                 vtree.insert((elem.into()) as usize);
             }
