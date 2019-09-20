@@ -30,6 +30,9 @@ pub struct STreeBuilder {
 
     /// Eine Liste, die alle belegten Indizes von `root_table` speichert. 
     root_indexs: Vec<usize>,
+
+    /// Zählt alle erzeugten mphf-Funktionen
+    count_mphf: usize,
 }
 
 impl STreeBuilder {
@@ -87,7 +90,7 @@ impl STreeBuilder {
             l3_level.keys.push(k);
             l3_level.hash_map.insert(k,index);
         }
-        Self {root_table: root_table, root_top: root_top, root_indexs: root_indexs}
+        Self {root_table: root_table, root_top: root_top, root_indexs: root_indexs, count_mphf: 0}
     }
 
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
@@ -98,6 +101,9 @@ impl STreeBuilder {
         // Die L2Level-Elemente werden angelegt. Hierbei wird direkt in der new()-Funktion die perfekte Hashfunktion berechnet
         for i in 0..tmp.capacity() {
             tmp.push(L2Ebene::new(LX_ARRAY_SIZE/64, Some(&self.root_table[i].keys),self.root_table[i].minimum, self.root_table[i].maximum));
+            if self.root_table[i].minimum != self.root_table[i].maximum {
+                self.count_mphf +=1;
+            }
         }
         let mut result: Box<[L2Ebene]> = tmp.into_boxed_slice();
 
@@ -126,7 +132,7 @@ impl STreeBuilder {
                     // Verhindert das Anlegen einer Hashfunktion, wenn nur ein Element existiert
                     if l3_level.minimum != l3_level.maximum {
                         result[i].get(j).hash_function = Some(Mphf::new_parallel(GAMMA,keys, None));
-
+                        self.count_mphf +=1;
                         // Die leeren usizes, die auf die Element-Liste zeigen werden angelegt
                         result[i].get(j).objects = Vec::with_capacity(l3_level.keys.len());
                         for _ in &l3_level.keys {
@@ -147,6 +153,12 @@ impl STreeBuilder {
 
         }
         result
+    }
+
+    /// Gibt den Wert count_mphf zurück
+    #[inline]
+    pub fn get_mphf_count(&self) -> usize {
+        self.count_mphf
     }
 
     /// Hilfsfunktion zum erzeugen der LX-Top-Arrays. 

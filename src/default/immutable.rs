@@ -1,6 +1,9 @@
 #![allow(dead_code)]  
 use boomphf::Mphf;
 use uint::{u40, u48};
+use std::io::BufWriter;
+use std::io::prelude::*;
+use std::fs::OpenOptions;
 
 use crate::internal::{Splittable, PredecessorSetStatic};
 use crate::default::build::{GAMMA, STreeBuilder};
@@ -101,13 +104,21 @@ impl<T: Int> STree<T> {
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
     pub fn new(elements: Vec<T>) -> Self {
         let mut builder = STreeBuilder::new(elements.clone());
-
+        let mut result = BufWriter::new(OpenOptions::new()
+        .read(true)
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open("output/mphf_count/stats.txt").unwrap());
         let root_top = builder.get_root_tops();
-        STree {
+        let stree = STree {
             root_table: builder.build::<T>(),
             root_top: root_top,
             element_list: elements.into_boxed_slice(),
-        }
+        };
+
+        writeln!(result, "RESULT size={} mphf_count={}",stree.len(), builder.get_mphf_count()).unwrap(); 
+        stree
     }
 
 
