@@ -20,5 +20,29 @@ criterion = "0.3.0"
 criterion = "0.3.0"
 
 [[bench]]
-name = "stree_immutable"
+name = "binary_new"
 harness = false
+
+[[bench]]
+name = "binary_pred"
+harness = false
+
+[[bench]]
+name = "stree_new"
+harness = false
+
+[[bench]]
+name = "stree_pred"
+harness = false
+
+[[bench]]
+name = "vebtree_new"
+harness = false
+
+[[bench]]
+name = "vebtree_pred"
+harness = false
+
+
+
+
