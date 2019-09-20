@@ -43,6 +43,10 @@ harness = false
 name = "vebtree_pred"
 harness = false
 
+[[bench]]
+name = "btree_new"
+harness = false
 
-
-
+[[bench]]
+name = "btree_pred"
+harness = false

@@ -275,3 +275,37 @@ impl<T: Int> BinarySearch<T> {
 
 }
 
+use std::collections::BTreeMap;
+
+impl<T: Int>  PredecessorSetStatic<T> for BTreeMap<T,T> {
+    fn new(elements: Vec<T>) -> Self {
+        let mut n: BTreeMap<T,T> = BTreeMap::new();
+        for i in elements {
+            n.insert(i,i);
+        }
+        n
+    }
+
+    fn predecessor(&self,number: T) -> Option<T> {
+        self.range(T::from(0)..number).rev().next().map(|x| *x.0)
+    }
+
+    fn successor(&self,number: T) -> Option<T>{
+        self.range(number..).next().map(|x| *x.0)
+    }
+    
+    fn minimum(&self) -> Option<T>{
+        self.range(T::from(0)..).next().map(|x| *x.0)
+    }
+
+    fn maximum(&self) -> Option<T>{
+        self.range(T::from(0)..).rev().next().map(|x| *x.0)
+    }
+
+    fn contains(&self, number: T) -> bool {
+        self.contains_key(&number)
+    }
+
+    const TYPE: &'static str = "B-Baum";
+}
+

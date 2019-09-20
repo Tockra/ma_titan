@@ -34,7 +34,7 @@ pub struct STree<T> {
 /// Dieser Trait dient als Platzhalter für u40, u48 und u64. 
 /// Er stellt sicher das der generische Parameter gewisse Traits implementiert und die New-Methode besitzt.
 /// Zusätzlich wird die Größe des Root-Arrays in Form einer Funktion rückgebar gemacht.
-pub trait Int: PartialOrd + From<u64> + Into<u64> + Copy + Splittable { 
+pub trait Int: Ord + PartialOrd + From<u64> + Into<u64> + Copy + Splittable { 
     fn new(k: u64) -> Self {
         Self::from(k)
     }
