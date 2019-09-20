@@ -36,7 +36,7 @@ pub fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeO
         .write(true)
         .truncate(true)
         .create(true)
-        .open(format!("stats_new_{}.txt",T::TYPE)).unwrap());
+        .open(format!("output/new/{}.txt",T::TYPE)).unwrap());
     
     for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
         let dir = dir.unwrap();
@@ -74,7 +74,7 @@ pub fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + Deserialize
         .write(true)
         .truncate(true)
         .create(true)
-        .open(format!("stats_pred_succ_{}.txt",T::TYPE)).unwrap());
+        .open(format!("output/pred/{}.txt",T::TYPE)).unwrap());
     for dir in read_dir(format!("testdata/{}/", E::TYPE)).unwrap() {
         let dir = dir.unwrap();
         let path = dir.path();
