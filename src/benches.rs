@@ -23,7 +23,7 @@ use crate::internal::PredecessorSetStatic;
 
 use criterion::black_box;
 
-const SAMPLE_SIZE: usize = 10;
+const SAMPLE_SIZE: usize = 100;
 const REPEATS: usize = 100_000;
 const SEED: u128 = 0xcafef00dd15ea5e5;
 /// Diese Methode lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
