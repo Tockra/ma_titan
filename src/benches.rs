@@ -5,7 +5,7 @@ extern crate rmp_serde as rmps;
 use std::fs::File;
 use std::io::prelude::*;
 use std::fs::OpenOptions;
-use std::time::{Instant};
+use std::time::{Instant, SystemTime};
 use std::fmt::Debug;
 use std::ops::Add;
 use std::io::{BufWriter, BufReader};
@@ -131,11 +131,17 @@ pub fn cache_clear() {
     let mut data = vec![23u64];
 
     for i in 1 .. 3_750_000u64 {
-        data.push(black_box(data[i as usize -1] + i));
+        let mut sum = 0;
+        for j in 0..(i as usize) {
+            sum += data[j];
+        }
+        data.push(black_box(sum));
     }
 
-    let mut buf = BufWriter::new(File::create("cache").unwrap());
+    let mut buf = BufWriter::new(File::create(format!("cache_{}",SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis())).unwrap());
     buf.write_fmt(format_args!("{}", data[data.len()-1])).unwrap();
+
+    buf.flush();
 }
 
 
