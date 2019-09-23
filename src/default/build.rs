@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
 use boomphf::Mphf;
 
 use crate::internal::{Splittable};
 use crate::default::immutable::{L2Ebene, L3Ebene, Int};
 
+type HashMap<T,K> = std::collections::HashMap<T,K>;
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 /// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
@@ -186,7 +185,7 @@ impl STreeBuilder {
 #[derive(Clone)]
 pub struct BuilderLevel<T> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
-    pub hash_map: std::collections::HashMap<u16,T>,
+    pub hash_map: HashMap<u16,T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
     /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.

@@ -141,7 +141,7 @@ pub fn cache_clear() {
     let mut buf = BufWriter::new(File::create(format!("cache_{}",SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis())).unwrap());
     buf.write_fmt(format_args!("{}", data[data.len()-1])).unwrap();
 
-    buf.flush();
+    buf.flush().unwrap();
 }
 
 
