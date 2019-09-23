@@ -4,6 +4,12 @@ use crate::internal::{Splittable};
 use crate::default::immutable::{L2Ebene, L3Ebene, Int};
 
 type HashMap<T,K> = std::collections::HashMap<T,K>;
+#[derive(Clone)]
+pub enum HashMapEnum<T,K> {
+    None,
+    One((T,K)),
+    Some(HashMap<T,K>)
+}
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 /// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
@@ -70,23 +76,80 @@ impl STreeBuilder {
             l2_level.minimum.get_or_insert(index);
             l2_level.maximum = Some(index);
             
-            if !root_table[i].hash_map.contains_key(&j) {
-                root_table[i].keys.push(j);
+            match &mut root_table[i].hash_map  {
+                // Wenn noch kein Element existiert, wird ein One, anstelle einer hashmap angelegt
+                HashMapEnum::None => {
+                    root_table[i].keys.push(j);
+                    let mut l3_level = L3EbeneBuilder::new(LX_ARRAY_SIZE/64);
+                    Self::insert_l3_level(&mut l3_level,index,k);
+                    root_table[i].hash_map = HashMapEnum::One((j,l3_level));
+                },
+                // Falls bereits genau ein Element ext. wird eine Hashmap angelegt
+                HashMapEnum::One((key,x)) => {
+                    if *key != j {
+                        root_table[i].keys.push(j);
 
-                let l3_level = L3EbeneBuilder::new(LX_ARRAY_SIZE/64);
+                        let mut l3_level = L3EbeneBuilder::new(LX_ARRAY_SIZE/64);
+                        let mut hash_map = HashMap::default();
+                        Self::insert_l3_level(&mut l3_level,index,k);
 
-                root_table[i].hash_map.insert(j,l3_level);
+                        hash_map.insert(j,l3_level);
+                        let key = std::mem::replace(key, 0);
+                        let x = std::mem::replace(x, L3EbeneBuilder::new(0));
+                        
+                        hash_map.insert(key,x);
+                        root_table[i].hash_map = HashMapEnum::Some(hash_map);
+                    } else {
+                        // Fall nur bei Duplikaten
+                        Self::insert_l3_level(x,index,k);
+                    }
+                },
+                HashMapEnum::Some(x) => {
+                    if !root_table[i].keys.contains(&j) {
+                        root_table[i].keys.push(j);
+
+                        let mut l3_level = L3EbeneBuilder::new(LX_ARRAY_SIZE/64);
+                        Self::insert_l3_level(&mut l3_level,index,k);
+
+                        x.insert(j,l3_level);
+                    }
+                    else {
+                        // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen
+                        Self::insert_l3_level(x.get_mut(&j).unwrap(),index,k);
+                    }
+                }
             }
-            let mut l3_level = root_table[i].hash_map.get_mut(&j).unwrap();
-            // Minima- und Maximasetzung auf der zweiten Ebene
-            l3_level.minimum.get_or_insert(index);
-            l3_level.maximum = Some(index);
-
-            // Hier ist keine Prüfung notwendig, da die Elemente einmalig sind.
-            l3_level.keys.push(k);
-            l3_level.hash_map.insert(k,index);
         }
         Self {root_table: root_table, root_top: root_top, root_indexs: root_indexs}
+    }
+    #[inline]
+    fn insert_l3_level(l3_level: &mut L3EbeneBuilder,index: usize, k: u16) {
+        // Minima- und Maximasetzung auf der zweiten Ebene
+        l3_level.minimum.get_or_insert(index);
+        l3_level.maximum = Some(index);
+
+        // Hier ist keine Prüfung notwendig, da die Elemente einmalig sind.
+        // Prüfung wird trotzdem gemacht. Um auch bei falscher Eingabe noch lauffähig zu sein.
+        if !l3_level.keys.contains(&k) {
+            l3_level.keys.push(k);
+            match &mut l3_level.hash_map {
+                HashMapEnum::None => {
+                    l3_level.hash_map = HashMapEnum::One((k,index));
+                },
+                HashMapEnum::One((key,x)) => {
+                    let mut hash_map = HashMap::default();
+                    let key = std::mem::replace(key, 0);
+                    let x = std::mem::replace(x, 0);
+                    hash_map.insert(key,x);
+                    hash_map.insert(k,index);
+
+                    l3_level.hash_map = HashMapEnum::Some(hash_map);
+                },
+                HashMapEnum::Some(x) => {
+                    x.insert(k,index);
+                }
+            }
+        }
     }
 
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
@@ -113,7 +176,18 @@ impl STreeBuilder {
 
                 for &j in &l2_level.keys {
                     // Die L2-Top-Tabellen werden gefüllt und die 
-                    let l3_level = &mut l2_level.hash_map.get_mut(&j).unwrap();
+                    let l3_level = match &mut l2_level.hash_map {
+                        HashMapEnum::One((_,x)) => {
+                            x
+                        },
+                        HashMapEnum::Some(x) => {
+                            x.get_mut(&j).unwrap()
+                        },
+                        _ => {
+                            panic!("Die HashMap des root_arrays im Builder Struct fehlt!");
+                        }
+                    };
+
                     Self::build_lx_top(&mut result[i].lx_top, j);
                     let keys = l3_level.keys.as_ref();
                     
@@ -136,7 +210,17 @@ impl STreeBuilder {
                         for &k in &l3_level.keys {
                             Self::build_lx_top(&mut result[i].get(j).lx_top,k);
                             let result = result[i].get(j).get(k);
-                            *result = l3_level.hash_map.get(&k).map(|x| *x);
+                            *result = match &l3_level.hash_map {
+                                HashMapEnum::One((_,x)) => {
+                                    Some(*x)
+                                },
+                                HashMapEnum::Some(x) => {
+                                    x.get(&k).map(|x| *x)
+                                },
+                                _ => {
+                                    panic!("Die HashMap des root_arrays im Builder Struct fehlt!");
+                                }
+                            };
                         }      
                     }
                        
@@ -185,7 +269,7 @@ impl STreeBuilder {
 #[derive(Clone)]
 pub struct BuilderLevel<T> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
-    pub hash_map: HashMap<u16,T>,
+    pub hash_map: HashMapEnum<u16,T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
     /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.
@@ -212,7 +296,7 @@ impl<T> BuilderLevel<T> {
     #[inline]
     pub fn new(lx_top_size: usize) -> BuilderLevel<T> {
         BuilderLevel {
-            hash_map: (HashMap::<u16,T>::default()),
+            hash_map: (HashMapEnum::None),
             keys: vec![],
             lx_top: vec![0;lx_top_size],
             maximum: None,
