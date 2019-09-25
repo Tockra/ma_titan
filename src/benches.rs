@@ -150,14 +150,14 @@ use crate::default::immutable::Int;
 
 #[derive(Clone,Debug, PartialEq, Eq)]
 pub struct VEBTree {
-    veb_tree: vs
+    veb_tree: vs<usize>
 }
 
 impl<T: Int> PredecessorSetStatic<T> for VEBTree {
     const TYPE: &'static str = "vEB-Tree";
 
     fn new(elements: Vec<T>) -> Self {
-        let mut vtree = vs::new(elements.len());
+        let mut vtree = vs::with_capacity(elements.len());
         for elem in elements {
             vtree.insert((elem.into()) as usize);
         }
