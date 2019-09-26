@@ -243,15 +243,19 @@ impl<T: Int> BinarySearch<T> {
         let mut l = l;
         let mut r = r;
 
-        while r != l {
+        if element >= self.element_list[r] {
+            return None;
+        }
+
+        while r != l && element >= self.element_list[l]  {
             let m = (l+r)/2;
-            if self.element_list[m] > element {
-                r = m;
-            } else {
+            if element >= self.element_list[m] {
                 l = m+1;
+            } else {
+                r = m;
             }
         }
-        if self.element_list[l] >= element {
+        if element < self.element_list[l] {
             Some(self.element_list[l])
         } else {
             None
@@ -262,17 +266,21 @@ impl<T: Int> BinarySearch<T> {
         let mut l = l;
         let mut r = r;
 
-        while l != r {
+        if element <= self.element_list[l] {
+            return None;
+        }
+
+        while l != r && element <= self.element_list[r] {
             let m = (l+r)/2;
-            if self.element_list[m] < element {
-                r = m
+            if self.element_list[m] >= element {
+                r = m-1;
             } else {
-                l = m+1;
+                l = m;
             }
         }
 
-        if element >= self.element_list[l] {
-            Some(self.element_list[l])
+        if element > self.element_list[r] {
+            Some(self.element_list[r])
         } else {
             None
         }
