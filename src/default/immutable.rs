@@ -245,35 +245,45 @@ impl<T: Int> STree<T> {
             return None;
         } 
 
-        // Paper z. 3 
-        if self.root_table[i].minimum.is_none() || element < self.minimum_level(&self.root_table[i]).unwrap() {
-            return self.compute_last_set_bit_deep(T::new(i as u64),0)
-                .map(|x| self.root_table[x].maximum.unwrap());
-        }
+        match self.root_table[i].get() {
+            Pointer::Level(l) => {
+                let second_level = *l;
 
-        // Paper z. 4
-        if self.root_table[i].maximum == self.root_table[i].minimum {
-            return Some(self.root_table[i].minimum.unwrap());
-        }
+                // Paper z. 3 
+                if second_level.minimum.is_none() || element < self.minimum_level(&second_level).unwrap() {
+                    return self.compute_last_set_bit_deep(T::new(i as u64),0)
+                        .map(|x| second_level.maximum.unwrap());
+                }
 
-        // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
-        if self.root_table[i].try_get(j).is_none() || element < self.minimum_level(&self.root_table[i].try_get(j).unwrap()).unwrap() {
-            let new_j = self.root_table[i].compute_last_set_bit(&(j-1u16));
-            return new_j
-                .and_then(|x| self.root_table[i].try_get(x))
-                .map(|x| x.maximum.unwrap());
-        }
+                // Paper z. 4
+               // if self.root_table[i].maximum == self.root_table[i].minimum {
+                //    return Some(self.root_table[i].minimum.unwrap());
+               // }
 
+                // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
+                if second_level.try_get(j).is_none() || element < self.minimum_level(&second_level.try_get(j).unwrap()).unwrap() {
+                    let new_j = self.root_table[i].compute_last_set_bit(&(j-1u16));
+                    return new_j
+                        .and_then(|x| second_level.try_get(x))
+                        .map(|x| x.maximum.unwrap());
+                }
 
-        // Paper z.7
-        if self.root_table[i].try_get(j).unwrap().maximum == self.root_table[i].try_get(j).unwrap().minimum {
-            return Some(self.root_table[i].try_get(j).unwrap().minimum.unwrap());
+                // Paper z.7
+                if self.root_table[i].try_get(j).unwrap().maximum == self.root_table[i].try_get(j).unwrap().minimum {
+                    return Some(self.root_table[i].try_get(j).unwrap().minimum.unwrap());
+                }
+        
+                // Paper z.8
+                let new_k = self.root_table[i].try_get(j).unwrap().compute_last_set_bit(&k);
+                return new_k
+                    .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
+                
+            },
+
+            Pointer::Element(e) => {
+                return Some(*e);
+            }
         }
- 
-        // Paper z.8
-        let new_k = self.root_table[i].try_get(j).unwrap().compute_last_set_bit(&k);
-        return new_k
-            .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
     }
 
     /// Hilfsfunktion, die in der Root-Top-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
