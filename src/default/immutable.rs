@@ -7,11 +7,11 @@ use crate::default::build::{GAMMA, STreeBuilder};
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
-pub type L2Ebene = Level<L3Ebene>;
+pub type L2Ebene = *mut Level<L3Ebene>;
 
 /// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf 
 /// ein Indize der STree.element_list zeigt.
-pub type L3Ebene = Level<Option<usize>>;
+pub type L3Ebene = *mut Level<Option<usize>>;
 
 /// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
@@ -76,7 +76,7 @@ impl<T: Int> PredecessorSetStatic<T> for STree<T> {
 
     fn contains(&self, number: T) -> bool {
         let (i,j,k) = Splittable::split_integer_down(&number);
-        if self.root_table[i].minimum.is_none() {
+        if self.root_table[i].minimum.is_null() {
             return false;
         } else {
             let l3_level = self.root_table[i].try_get(j);
@@ -353,6 +353,7 @@ impl<T: Int> STree<T> {
 
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 #[derive(Clone)]
+#[repr(align(4))]
 pub struct Level<T> {
     /// Perfekte Hashfunktion, die immer (außer zur Inialisierung) gesetzt ist. 
     pub hash_function: Option<Mphf<u16>>,
