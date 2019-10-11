@@ -7,11 +7,65 @@ use crate::default::build::{GAMMA, STreeBuilder};
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
-pub type L2Ebene = *mut Level<L3Ebene>;
+pub type L2Ebene = LevelPointer<L3Ebene>;
 
 /// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf 
 /// ein Indize der STree.element_list zeigt.
-pub type L3Ebene = *mut Level<Option<usize>>;
+pub type L3Ebene = LevelPointer<usize>;
+
+enum Pointer<T> {
+    Level(*mut Level<T>),
+    Element(*mut usize)
+}
+
+/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
+/// oder auf ein Levelobjekt
+#[derive(Clone)]
+struct LevelPointer<T> {
+    pointer: *mut Level<T>
+}
+
+impl<T> Drop for LevelPointer<T> {
+    fn drop(&mut self) {
+        match self.get() {
+            Pointer::Level(l) => {
+                let x = unsafe { Box::from_raw(l) };
+            },
+
+            Pointer::Element(e) => {
+                let x = unsafe { Box::from_raw(e) };
+            }
+        }
+    }
+}
+
+impl<T> LevelPointer<T> {
+    fn get(&self) -> Pointer<T> {
+        if (self.pointer as usize % 4) == 0 {
+            Pointer::Level(self.pointer)
+        } else {
+            assert!((self.pointer as usize % 4) == 1);
+
+            Pointer::Element((self.pointer as usize -1) as *mut usize)
+        }
+    }
+
+    fn from_level(level_box: Box<Level<T>>) -> Self {
+        Self {
+            pointer: Box::into_raw(level_box)
+        }
+    }
+
+    fn from_usize(usize_box: Box<usize>) -> Self {
+        let pointer = Box::into_raw(usize_box);
+        assert!((pointer as usize % 4) == 0);
+
+        let pointer = (pointer as usize + 1) as *mut Level<T>;
+        Self {
+            pointer: pointer
+        }
+    }
+}
 
 /// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
@@ -76,20 +130,38 @@ impl<T: Int> PredecessorSetStatic<T> for STree<T> {
 
     fn contains(&self, number: T) -> bool {
         let (i,j,k) = Splittable::split_integer_down(&number);
-        if self.root_table[i].minimum.is_null() {
-            return false;
-        } else {
-            let l3_level = self.root_table[i].try_get(j);
-            if l3_level.is_none() {
-                return false;
-            } else {
-                let elem = l3_level.unwrap().try_get(k);
-                if elem.is_none() {
-                    return false
-                } 
+        match self.root_table[i].get() {
+            Pointer::Level(l) => {
+                if (*l).minimum.is_none() {
+                    return false;
+                } else {
+                    let l3_level = (*l).try_get(j);
+                    if l3_level.is_none() {
+                        return false;
+                    } else {
+                        let elem_index = match l3_level.unwrap().get() {
+                            Pointer::Level(l) => {
+                                (*l).try_get(k)
+                            },
+                            Pointer::Element(e) => {
+                                Some(&*e)
+                            }
+                        };
+                        
+                         
+                        if elem_index.is_none() {
+                            false
+                        } else {
+                            self.element_list[*elem_index.unwrap()] == number
+                        }
+                    }
+                }
+            },
+
+            Pointer::Element(e) => {
+                self.element_list[*e] == number
             }
         }
-        true
     }
 }
 
@@ -515,7 +587,7 @@ impl<T> Level<T> {
 #[cfg(test)]
 mod tests {
     use uint::u40;
-    use super::STree;
+    use super::{STree, Pointer};
     use crate::internal::Splittable;
 
     /// Größe der LX-Top-Arrays
@@ -541,9 +613,25 @@ mod tests {
         assert_eq!(data_structure.maximum().unwrap(),u40::new(check.len() as u64 - 1));
         for val in check {
             let (i,j,k) = Splittable::split_integer_down(&val);
-            let second_level = data_structure.root_table[i].get(j);
-            let saved_val = second_level.get(k).unwrap();
-            assert_eq!(data_structure.element_list[saved_val],val);
+            match data_structure.root_table[i].get() {
+                Pointer::Level(l) => {
+                    let second_level = (*l).get(j);
+                    let saved_val = match second_level.get() {
+                        Pointer::Level(l) => {
+                            *(*l).get(k)
+                        },
+                        Pointer::Element(e) => {
+                            *e
+                        }
+                    };
+                    assert_eq!(data_structure.element_list[saved_val],val);
+                },
+
+                Pointer::Element(e) => {
+                    assert_eq!(data_structure.element_list[*e],val);
+                }
+            };
+
         }
     }
     
