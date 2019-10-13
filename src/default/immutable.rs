@@ -13,50 +13,72 @@ pub type L2Ebene = LevelPointer<L3Ebene>;
 /// ein Indize der STree.element_list zeigt.
 pub type L3Ebene = LevelPointer<usize>;
 
-enum Pointer<T> {
-    Level(*mut Level<T>),
-    Element(*mut usize)
+pub enum Pointer<T: 'static> {
+    Level(&'static mut Level<T>),
+    Element(&'static mut usize)
 }
 
 /// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
 /// oder auf ein Levelobjekt
 #[derive(Clone)]
-struct LevelPointer<T> {
+pub struct LevelPointer<T> {
     pointer: *mut Level<T>
 }
 
 impl<T> Drop for LevelPointer<T> {
     fn drop(&mut self) {
-        match self.get() {
-            Pointer::Level(l) => {
-                let x = unsafe { Box::from_raw(l) };
-            },
+        if (self.pointer as usize % 4) == 0 {
+            unsafe { Box::from_raw(self.pointer) };
+        } else {
+            assert!((self.pointer as usize % 4) == 1);
 
-            Pointer::Element(e) => {
-                let x = unsafe { Box::from_raw(e) };
-            }
+            unsafe { Box::from_raw((self.pointer as usize -1) as *mut usize) };
         }
     }
 }
 
-impl<T> LevelPointer<T> {
-    fn get(&self) -> Pointer<T> {
+impl<T: 'static> LevelPointer<T> {
+    pub fn get(&self) -> Pointer<T> {
         if (self.pointer as usize % 4) == 0 {
-            Pointer::Level(self.pointer)
+            unsafe {Pointer::Level(&mut (*self.pointer))}
         } else {
             assert!((self.pointer as usize % 4) == 1);
 
-            Pointer::Element((self.pointer as usize -1) as *mut usize)
+            unsafe {Pointer::Element(&mut *((self.pointer as usize -1) as *mut usize))}
         }
     }
 
-    fn from_level(level_box: Box<Level<T>>) -> Self {
+    fn minimum(&self) -> usize {
+        match self.get() {
+            Pointer::Level(l) => {
+                (*l).minimum
+            },
+
+            Pointer::Element(e) => {
+                *e
+            }
+        }
+    }
+
+    fn maximum(&self) -> usize {
+        match self.get() {
+            Pointer::Level(l) => {
+                (*l).maximum
+            },
+
+            Pointer::Element(e) => {
+                *e
+            }
+        }
+    }
+
+    pub fn from_level(level_box: Box<Level<T>>) -> Self {
         Self {
             pointer: Box::into_raw(level_box)
         }
     }
 
-    fn from_usize(usize_box: Box<usize>) -> Self {
+    pub fn from_usize(usize_box: Box<usize>) -> Self {
         let pointer = Box::into_raw(usize_box);
         assert!((pointer as usize % 4) == 0);
 
@@ -64,6 +86,23 @@ impl<T> LevelPointer<T> {
         Self {
             pointer: pointer
         }
+    }
+
+    pub fn change_to_usize(&mut self, usize_box: Box<usize>) {
+        match self.get() {
+            Pointer::Level(l) => {
+                unsafe { Box::from_raw(l); }
+            },
+
+            Pointer::Element(e) => {
+                unsafe { Box::from_raw(e); }
+            }
+        } 
+        let pointer = Box::into_raw(usize_box);
+        assert!((pointer as usize % 4) == 0);
+
+        let pointer = (pointer as usize + 1) as *mut Level<T>;
+        self.pointer = pointer;
     }
 }
 
@@ -73,7 +112,7 @@ impl<T> LevelPointer<T> {
 pub struct STree<T> {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
-    root_table: Box<[L2Ebene]>,
+    root_table: Box<[Option<L2Ebene>]>,
     
     /// Das Root-Top-Array speichert für jeden Eintrag `root_table[i][x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
     /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert.
@@ -117,7 +156,8 @@ impl<T: Int> PredecessorSetStatic<T> for STree<T> {
     }
 
     fn successor(&self,number: T) -> Option<T> {
-        self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
+        //self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
+        unimplemented!();
     }
 
     fn minimum(&self) -> Option<T> {
@@ -130,32 +170,33 @@ impl<T: Int> PredecessorSetStatic<T> for STree<T> {
 
     fn contains(&self, number: T) -> bool {
         let (i,j,k) = Splittable::split_integer_down(&number);
-        match self.root_table[i].get() {
+        if self.root_table[i].is_none()  {
+            return false;
+        }
+
+        match self.root_table[i].as_ref().unwrap().get() {
             Pointer::Level(l) => {
-                if (*l).minimum.is_none() {
+                let l3_level = (*l).try_get(j);
+                if l3_level.is_none() {
                     return false;
                 } else {
-                    let l3_level = (*l).try_get(j);
-                    if l3_level.is_none() {
-                        return false;
-                    } else {
-                        let elem_index = match l3_level.unwrap().get() {
-                            Pointer::Level(l) => {
-                                (*l).try_get(k)
-                            },
-                            Pointer::Element(e) => {
-                                Some(&*e)
-                            }
-                        };
-                        
-                         
-                        if elem_index.is_none() {
-                            false
-                        } else {
-                            self.element_list[*elem_index.unwrap()] == number
+                    let elem_index = match l3_level.unwrap().get() {
+                        Pointer::Level(l) => {
+                            (*l).try_get(k)
+                        },
+                        Pointer::Element(e) => {
+                            Some(&*e)
                         }
+                    };
+                    
+                        
+                    if elem_index.is_none() {
+                        false
+                    } else {
+                        self.element_list[*elem_index.unwrap()] == number
                     }
                 }
+                
             },
 
             Pointer::Element(e) => {
@@ -213,8 +254,8 @@ impl<T: Int> STree<T> {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Maximum zurückgegeben werden soll.
     #[inline]
-    fn maximum_level<E>(&self, lx: &Level<E>) -> Option<T>{
-        lx.maximum.and_then(|x| Some(self.element_list[x]))
+    fn maximum_level<E>(&self, lx: &Level<E>) -> T {
+        self.element_list[lx.maximum]
     }
 
     /// Gibt das Minimum der übergebenen Ebene zurück.
@@ -223,8 +264,8 @@ impl<T: Int> STree<T> {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Minimum zurückgegeben werden soll.
     #[inline]
-    fn minimum_level<E>(&self, lx: &Level<E>) -> Option<T>{
-        lx.minimum.and_then(|x| Some(self.element_list[x]))
+    fn minimum_level<E>(&self, lx: &Level<E>) -> T {
+        self.element_list[lx.minimum]
     }
 
 
@@ -238,45 +279,47 @@ impl<T: Int> STree<T> {
     /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Vorgängers von `element` zurückgegeben.
     #[inline]
     pub fn locate_or_pred(&self, element: T) -> Option<usize> {
-        let (i,j,k) = Splittable::split_integer_down(&element);
-
         // Paper z.1 
-        if self.len() < 1 || element < self.minimum().unwrap() {
+        if element < self.minimum().unwrap() {
             return None;
         } 
 
-        match self.root_table[i].get() {
+        let (i,j,k) = Splittable::split_integer_down(&element);
+
+        // Paper z.3
+        if self.root_table[i].is_none() || element < self.element_list[self.root_table[i].as_ref().unwrap().minimum()] {
+            return self.compute_last_set_bit_deep(T::new(i as u64),0)
+                .map(|x| self.root_table[x].as_ref().unwrap().maximum());
+        }
+
+        // Paper z. 4 (durch die Match-Arme)
+        match self.root_table[i].as_ref().unwrap().get() {
             Pointer::Level(l) => {
-                let second_level = *l;
-
-                // Paper z. 3 
-                if second_level.minimum.is_none() || element < self.minimum_level(&second_level).unwrap() {
-                    return self.compute_last_set_bit_deep(T::new(i as u64),0)
-                        .map(|x| second_level.maximum.unwrap());
-                }
-
-                // Paper z. 4
-               // if self.root_table[i].maximum == self.root_table[i].minimum {
-                //    return Some(self.root_table[i].minimum.unwrap());
-               // }
-
+                let second_level = l;
+                let third_level = second_level.try_get(j);
                 // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
-                if second_level.try_get(j).is_none() || element < self.minimum_level(&second_level.try_get(j).unwrap()).unwrap() {
-                    let new_j = self.root_table[i].compute_last_set_bit(&(j-1u16));
+                if third_level.is_none() || element < self.element_list[third_level.unwrap().minimum()] {
+                    let new_j = second_level.compute_last_set_bit(&(j-1u16));
                     return new_j
                         .and_then(|x| second_level.try_get(x))
-                        .map(|x| x.maximum.unwrap());
+                        .map(|x| x.maximum());
                 }
 
                 // Paper z.7
-                if self.root_table[i].try_get(j).unwrap().maximum == self.root_table[i].try_get(j).unwrap().minimum {
-                    return Some(self.root_table[i].try_get(j).unwrap().minimum.unwrap());
+                match third_level.unwrap().get() {
+                    Pointer::Level(l) => {
+                        // Paper z.8
+                        let new_k = (*l).compute_last_set_bit(&k);
+                        return new_k
+                            .map(|x| *(*l).try_get(x).unwrap());
+                    }
+                    // Paper z.7
+                    Pointer::Element(e) => {
+                        return Some(*e);
+                    }
                 }
         
-                // Paper z.8
-                let new_k = self.root_table[i].try_get(j).unwrap().compute_last_set_bit(&k);
-                return new_k
-                    .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
+                
                 
             },
 
@@ -284,7 +327,9 @@ impl<T: Int> STree<T> {
                 return Some(*e);
             }
         }
-    }
+
+
+}
 
     /// Hilfsfunktion, die in der Root-Top-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
     /// Achtung diese Funktion funktioniert etwas anders als Level::compute_last_set_bit_deep !
@@ -346,43 +391,55 @@ impl<T: Int> STree<T> {
     /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Nachfolgers von element zurückgegeben.
     #[inline]
     pub fn locate_or_succ(&self, element: T) -> Option<usize> {
-        let (i,j,k) = Splittable::split_integer_down(&element);
-
         // Paper z.1 
-        if self.len() < 1 || element > self.maximum().unwrap() {
+        if element > self.maximum().unwrap() {
             return None;
         } 
 
-        // Paper z. 3 
-        if self.root_table[i].maximum.is_none() || self.maximum_level(&self.root_table[i]).unwrap() < element {
+        let (i,j,k) = Splittable::split_integer_down(&element);
+
+        // Paper z.3
+        if self.root_table[i].is_none() || self.element_list[self.root_table[i].as_ref().unwrap().maximum()] < element {
             return self.compute_next_set_bit_deep(T::new(i as u64),0)
-                .map(|x| self.root_table[x].minimum.unwrap());
-        }
-       
-        // Paper z. 4
-        if self.root_table[i].maximum == self.root_table[i].minimum {
-            return Some(self.root_table[i].minimum.unwrap());
+                .map(|x| self.root_table[x].as_ref().unwrap().minimum());
         }
 
-        // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
-        if self.root_table[i].try_get(j).is_none() || self.maximum_level(&self.root_table[i].try_get(j).unwrap()).unwrap() < element {
-            let new_j = self.root_table[i].compute_next_set_bit(&(j+1u16));
-            return new_j
-                .and_then(|x| self.root_table[i].try_get(x))
-                .map(|x| x.minimum.unwrap());
+        // Paper z. 4 (durch die Match-Arme)
+        match self.root_table[i].as_ref().unwrap().get() {
+            Pointer::Level(l) => {
+                let second_level = l;
+                let third_level = second_level.try_get(j);
+                // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
+                if third_level.is_none() || self.element_list[third_level.unwrap().maximum()] < element {
+                    let new_j = second_level.compute_next_set_bit(&(j+1u16));
+                    return new_j
+                        .and_then(|x| second_level.try_get(x))
+                        .map(|x| x.minimum());
+                }
+
+                // Paper z.7
+                match third_level.unwrap().get() {
+                    Pointer::Level(l) => {
+                        // Paper z.8
+                        let new_k = (*l).compute_next_set_bit(&k);
+                        return new_k
+                            .map(|x| *(*l).try_get(x).unwrap());
+                    }
+                    // Paper z.7
+                    Pointer::Element(e) => {
+                        return Some(*e);
+                    }
+                }
+        
+                
+                
+            },
+
+            Pointer::Element(e) => {
+                return Some(*e);
+            }
         }
-    
-
-        // Paper z.7
-        if self.root_table[i].try_get(j).unwrap().maximum == self.root_table[i].try_get(j).unwrap().minimum {
-            return Some(self.root_table[i].try_get(j).unwrap().minimum.unwrap());
-        }
-
-        // Paper z.8
-        let new_k = self.root_table[i].try_get(j).unwrap().compute_next_set_bit(&(k));
-        return new_k
-            .map(|x| self.root_table[i].try_get(j).unwrap().try_get(x).unwrap().unwrap());
-
+        
     }
 
     /// Hilfsfunktion, die in der Root-Top-Tabelle das nächste Bit, dass nach Index `bit` gesetzt ist, zurückgibt. 
@@ -445,10 +502,10 @@ pub struct Level<T> {
     pub objects: Vec<T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
-    pub maximum: Option<usize>,
+    pub maximum: usize,
 
     /// Speichert einen Zeiger auf den Index des Minimums dieses Levels
-    pub minimum: Option<usize>,
+    pub minimum: usize,
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
@@ -464,26 +521,17 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(lx_size: usize, keys: Option<&Vec<u16>>, minimum: Option<usize>, maximum: Option<usize>) -> Level<T> {
+    pub fn new(lx_size: usize, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
         match keys {
             Some(x) => {
-                if minimum != maximum {
-                    Level {
-                        hash_function: Some(Mphf::new_parallel(GAMMA,x,None)),
-                        objects: Vec::with_capacity(x.len()),
-                        minimum: minimum,
-                        maximum: maximum,
-                        lx_top: vec![0;lx_size],
-                    }
-                } else {
-                    Level {
-                        hash_function: None,
-                        objects: Vec::with_capacity(x.len()),
-                        minimum: minimum,
-                        maximum: maximum,
-                        lx_top: vec![0;lx_size],
-                    }
+                Level {
+                    hash_function: Some(Mphf::new_parallel(GAMMA,x,None)),
+                    objects: Vec::with_capacity(x.len()),
+                    minimum: minimum,
+                    maximum: maximum,
+                    lx_top: vec![0;lx_size],
                 }
+    
             },
             None => Level {
                 hash_function: None,
@@ -616,16 +664,16 @@ mod tests {
         }
  
         let check = data.clone();
-        let mut data_structure: STree<u40> = STree::new(data);
+        let data_structure: STree<u40> = STree::new(data);
 
         assert_eq!(data_structure.len(),check.len());
         assert_eq!(data_structure.minimum().unwrap(),u40::new(0));
         assert_eq!(data_structure.maximum().unwrap(),u40::new(check.len() as u64 - 1));
         for val in check {
             let (i,j,k) = Splittable::split_integer_down(&val);
-            match data_structure.root_table[i].get() {
+            match data_structure.root_table[i].as_ref().unwrap().get() {
                 Pointer::Level(l) => {
-                    let second_level = (*l).get(j);
+                    let second_level = l.get(j);
                     let saved_val = match second_level.get() {
                         Pointer::Level(l) => {
                             *(*l).get(k)
@@ -651,7 +699,7 @@ mod tests {
     fn test_top_arrays() {
         let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101_u64)];
         let check = data.clone();
-        let mut data_structure: STree<u40> = STree::new(data);
+        let data_structure: STree<u40> = STree::new(data);
 
         assert_eq!(data_structure.len(),check.len());
         assert_eq!(data_structure.minimum().unwrap(),u40::new(0b00000000000000000000_1010010010_0101010101));
@@ -659,17 +707,31 @@ mod tests {
 
         for val in check {
             let (i,j,k) = Splittable::split_integer_down(&val);
-            if data_structure.root_table[i].minimum != data_structure.root_table[i].maximum {
-                let second_level = &mut data_structure.root_table[i].get(j);
-                if second_level.minimum != second_level.maximum {
-                    let saved_val = second_level.get(k).unwrap();
-                    assert_eq!(data_structure.element_list[saved_val],val);
+            if data_structure.root_table[i].as_ref().unwrap().minimum() != data_structure.root_table[i].as_ref().unwrap().maximum() {
+                let second_level = match data_structure.root_table[i].as_ref().unwrap().get() {
+                        Pointer::Level(l) => {
+                            l.get(j)
+                        },
+                        _ => {
+                            panic!("Das sollte nicht geschehen");
+                        }
+                };
+                if second_level.minimum() != second_level.maximum() {
+                    let saved_val = match second_level.get() {
+                        Pointer::Level(l) => {
+                            l.get(k)
+                        },
+                        _ => {
+                            panic!("Das sollte nicht geschehen");
+                        }
+                    };
+                    assert_eq!(data_structure.element_list[*saved_val],val);
                 } else {
-                    assert_eq!(data_structure.element_list[second_level.minimum.unwrap()],val);
+                    assert_eq!(data_structure.element_list[second_level.minimum()],val);
                 }
 
             } else {
-                assert_eq!(data_structure.element_list[data_structure.root_table[i].minimum.unwrap()],val);
+                assert_eq!(data_structure.element_list[data_structure.root_table[i].as_ref().unwrap().minimum()],val);
             }
 
         }
