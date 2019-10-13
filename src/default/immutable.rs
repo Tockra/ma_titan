@@ -27,6 +27,10 @@ pub struct LevelPointer<T> {
 
 impl<T> Drop for LevelPointer<T> {
     fn drop(&mut self) {
+        if self.pointer.is_null() {
+            return;
+        }
+
         if (self.pointer as usize % 4) == 0 {
             unsafe { Box::from_raw(self.pointer) };
         } else {
@@ -39,6 +43,10 @@ impl<T> Drop for LevelPointer<T> {
 
 impl<T: 'static> LevelPointer<T> {
     pub fn get(&self) -> Pointer<T> {
+        if self.pointer.is_null() {
+            panic!("LevelPointer<T> is null!");
+        }
+
         if (self.pointer as usize % 4) == 0 {
             unsafe {Pointer::Level(&mut (*self.pointer))}
         } else {
@@ -78,6 +86,16 @@ impl<T: 'static> LevelPointer<T> {
         }
     }
 
+    pub fn from_null() -> Self {
+        Self {
+            pointer: std::ptr::null_mut()
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.pointer.is_null()
+    }
+
     pub fn from_usize(usize_box: Box<usize>) -> Self {
         let pointer = Box::into_raw(usize_box);
         assert!((pointer as usize % 4) == 0);
@@ -89,6 +107,10 @@ impl<T: 'static> LevelPointer<T> {
     }
 
     pub fn change_to_usize(&mut self, usize_box: Box<usize>) {
+        if self.pointer.is_null() {
+            panic!("change_to_usize Aufruf auf LevelPointer<T>, der Null ist.");
+        }
+
         match self.get() {
             Pointer::Level(l) => {
                 unsafe { Box::from_raw(l); }
@@ -156,8 +178,7 @@ impl<T: Int> PredecessorSetStatic<T> for STree<T> {
     }
 
     fn successor(&self,number: T) -> Option<T> {
-        //self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
-        unimplemented!();
+        self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
     }
 
     fn minimum(&self) -> Option<T> {
@@ -509,7 +530,7 @@ pub struct Level<T> {
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
-    pub lx_top: Vec<u64>,
+    pub lx_top: Box<[u64]>,
 }
 
 impl<T> Level<T> {
@@ -529,7 +550,7 @@ impl<T> Level<T> {
                     objects: Vec::with_capacity(x.len()),
                     minimum: minimum,
                     maximum: maximum,
-                    lx_top: vec![0;lx_size],
+                    lx_top: vec![0;lx_size].into_boxed_slice(),
                 }
     
             },
@@ -538,7 +559,7 @@ impl<T> Level<T> {
                 objects: vec![],
                 minimum: minimum,
                 maximum: maximum,
-                lx_top: vec![0;lx_size],
+                lx_top: vec![0;lx_size].into_boxed_slice(),
             }
         }
     }

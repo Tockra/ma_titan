@@ -302,7 +302,7 @@ impl<T: Int>  PredecessorSetStatic<T> for BTreeMap<T,T> {
     }
 
     fn predecessor(&self,number: T) -> Option<T> {
-        self.range(T::from(0)..number).rev().next().map(|x| *x.0)
+        self.range(T::from(0)..number).last().map(|x| *x.0)
     }
 
     fn successor(&self,number: T) -> Option<T>{
