@@ -31,6 +31,8 @@ const SEED: u128 = 0xcafef00dd15ea5e5;
 pub fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned, T: PredecessorSetStatic<E>>() {
     println!("Starte Evaluierung der Datenstrukturerzeugung");
     let bench_start = Instant::now();
+    std::fs::create_dir_all("./output/new/").unwrap();
+
     let mut result = BufWriter::new(OpenOptions::new()
         .read(true)
         .write(true)
@@ -70,6 +72,7 @@ pub fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeO
 pub fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>() {
     println!("Starte Evaluierung der Predecessor- und Successor Methoden.");
     let bench_start = Instant::now();
+    std::fs::create_dir_all("./output/pred/{}.txt").unwrap();
     let mut result = BufWriter::new(OpenOptions::new()
         .read(true)
         .write(true)
@@ -302,7 +305,7 @@ impl<T: Int>  PredecessorSetStatic<T> for BTreeMap<T,T> {
     }
 
     fn predecessor(&self,number: T) -> Option<T> {
-        self.range(T::from(0)..number).rev().next().map(|x| *x.0)
+        self.range(T::from(0)..number).last().map(|x| *x.0)
     }
 
     fn successor(&self,number: T) -> Option<T>{
