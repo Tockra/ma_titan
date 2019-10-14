@@ -1,6 +1,4 @@
 extern crate criterion;
-extern crate serde;
-extern crate rmp_serde as rmps;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -8,16 +6,12 @@ use std::fs::OpenOptions;
 use std::time::{Instant, SystemTime};
 use std::fmt::Debug;
 use std::ops::Add;
-use std::io::{BufWriter, BufReader};
+use std::io::{BufWriter};
 use std::fs::read_dir;
 use rand_pcg::Mcg128Xsl64;
 use rand::Rng;
 
 use uint::Typable;
-
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
-use rmps::Deserializer;
 
 use crate::internal::PredecessorSetStatic;
 
@@ -28,7 +22,7 @@ const REPEATS: usize = 100_000;
 const SEED: u128 = 0xcafef00dd15ea5e5;
 /// Diese Methode lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und konstruiert mit Hilfe dieser eine
 /// Datenstruktur T. Dabei wird die Laufzeit gemessen.
-pub fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned, T: PredecessorSetStatic<E>>() {
+pub fn static_build_benchmark<E: 'static + Typable + From<u64> + Copy + Debug, T: PredecessorSetStatic<E>>() {
     println!("Starte Evaluierung der Datenstrukturerzeugung");
     let bench_start = Instant::now();
     std::fs::create_dir_all("./output/new/").unwrap();
@@ -44,12 +38,9 @@ pub fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeO
         let dir = dir.unwrap();
         let path = dir.path();
         println!("{:?}",path);
-
-        let buf = BufReader::new(File::open(path).unwrap());
         
-       
-        let mut values = Deserializer::new(buf);
-        let values: Vec<E> = Deserialize::deserialize(&mut values).unwrap();
+        let values = read_from_file::<E>(path.to_str().unwrap().to_string()).unwrap();
+      
 
         for _ in 0..SAMPLE_SIZE {
             let values_cloned = values.clone();
@@ -57,8 +48,8 @@ pub fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeO
             let now = Instant::now();
             let result_ds = T::new(values_cloned);
             let elapsed_time = now.elapsed().as_nanos();
-            println!("{:?}",result_ds.maximum());
             writeln!(result, "RESULT algo={} method=new size={} time={} unit=ns repeats={}",T::TYPE, len, elapsed_time, SAMPLE_SIZE).unwrap(); 
+            ::std::mem::size_of_val(&result_ds);
         }
         result.flush().unwrap();
         
@@ -66,10 +57,29 @@ pub fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeO
     println!("Laufzeitmessung der Datenstrukturerzeugung beendet. Dauer {} Sekunden", bench_start.elapsed().as_secs())
 }
 
+pub fn create_output() {
+    std::fs::create_dir_all("input/pred/uniform/u40/").unwrap();
+   
+    for dir in read_dir(format!("testdata/uniform/u40/")).unwrap() {
+        let dir = dir.unwrap();
+        let path = dir.path();
+        println!("{:?}",path);
+        
+        let values = read_from_file::<uint::u40>(path.to_str().unwrap().to_string()).unwrap();
+      
+
+        let values_len = values.len();
+
+        let test_values = get_test_values(values[0]+1u32,values[values_len-1]);
+
+        write_to_file(format!("input/pred/uniform/u40/min{}_max{}.data",u64::from(values[0]),u64::from(values[values_len-1])).to_string(), &test_values).unwrap();
+    }
+}
+
 /// Lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und erzeugt mit Hilfe dieser die zu testende Datenstruktur T. 
 /// Anschließend werden 10000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor-Methode 
 /// werden mit Hilfe dieser gemessen
-pub fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + DeserializeOwned + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>() {
+pub fn pred_and_succ_benchmark<E: 'static + Typable + From<u64> + Copy + Debug + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>() {
     println!("Starte Evaluierung der Predecessor- und Successor Methoden.");
     let bench_start = Instant::now();
     std::fs::create_dir_all("./output/pred/{}.txt").unwrap();
@@ -84,9 +94,7 @@ pub fn pred_and_succ_benchmark<E: 'static + Typable + Copy + Debug + Deserialize
         let path = dir.path();
         println!("{:?}",path);
 
-        let buf = BufReader::new(File::open(path).unwrap());
-        let mut values = Deserializer::new(buf);
-        let values: Vec<E> = Deserialize::deserialize(&mut values).unwrap();
+        let values: Vec<E> = read_from_file::<E>(path.to_str().unwrap().to_string()).unwrap();
         let values_len = values.len();
 
         let test_values = get_test_values(values[0]+1u32,values[values_len-1]);
@@ -327,3 +335,40 @@ impl<T: Int>  PredecessorSetStatic<T> for BTreeMap<T,T> {
     const TYPE: &'static str = "B-Baum";
 }
 
+pub fn read_from_file<T: Typable + From<u64> + Copy>(name: String) -> std::io::Result<Vec<T>> {
+    let mut input = File::open(name.clone())?;
+    let mut lenv = Vec::new();
+    std::io::Read::by_ref(&mut input).take(std::mem::size_of::<usize>() as u64).read_to_end(&mut lenv)?;
+    let mut len: [u8; std::mem::size_of::<usize>()] = [0; std::mem::size_of::<usize>()];
+    for (i,b) in lenv.iter().enumerate() {
+        len[i] = *b;
+    }
+    let len: usize = usize::from_le_bytes(len);
+
+    assert!(len == (std::fs::metadata(name)?.len() as usize - std::mem::size_of::<usize>())/ std::mem::size_of::<T>());
+
+    let mut values: Vec<T> = Vec::with_capacity(len);
+    while values.len() != len {
+        let mut buffer = Vec::with_capacity(std::mem::size_of::<T>());
+        std::io::Read::by_ref(&mut input).take(std::mem::size_of::<T>() as u64).read_to_end(&mut buffer)?;
+        let mut next_value: u64 = 0;
+        for i in 0..buffer.len() {
+            next_value |= (buffer[i] as u64) << (8*i);
+        }
+
+        values.push(T::from(next_value));
+    }
+    Ok(values)
+}
+
+/// Serializiert den übergebenen Vector und schreibt diesen in eine Datei namens `name`.
+fn write_to_file<T: Typable + Copy + Into<u64>>(name: String, val: &[T]) -> std::io::Result<()>{
+    let mut buf = BufWriter::new(File::create(name).unwrap());
+    buf.write_all(&val.len().to_le_bytes())?;
+    for &v in val {
+        let v: u64 = v.into();
+        buf.write_all(&v.to_le_bytes()[..std::mem::size_of::<T>()])?;
+    }
+    buf.flush()?;
+    Ok(())
+}
