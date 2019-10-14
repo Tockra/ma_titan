@@ -57,8 +57,8 @@ pub fn static_build_benchmark<E: 'static + Typable + Copy + Debug + DeserializeO
             let now = Instant::now();
             let result_ds = T::new(values_cloned);
             let elapsed_time = now.elapsed().as_nanos();
-            println!("{:?}",result_ds.maximum());
             writeln!(result, "RESULT algo={} method=new size={} time={} unit=ns repeats={}",T::TYPE, len, elapsed_time, SAMPLE_SIZE).unwrap(); 
+            ::std::mem::size_of_val(&result_ds);
         }
         result.flush().unwrap();
         
