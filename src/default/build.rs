@@ -117,7 +117,7 @@ impl STreeBuilder {
         Self {root_table: root_table, root_top: root_top, root_indexs: root_indexs}
     }
     #[inline]
-    fn insert_l3_level<T: Int>(l3_level: &mut L3EbeneBuilder,index: usize, k: u16, elements: &[T]) {
+    fn insert_l3_level<T: Int + Into<u64>>(l3_level: &mut L3EbeneBuilder,index: usize, k: u16, elements: &[T]) {
         if l3_level.is_null() {
             *l3_level = LevelPointerBuilder::from_usize(Box::new(index));
         } else {
@@ -140,6 +140,10 @@ impl STreeBuilder {
                     let mut l3_level_n = BuilderLevel::new(LX_ARRAY_SIZE/64);
                     l3_level_n.keys.push(k);
                     l3_level_n.keys.push(k2);
+
+                    if k==k2 {
+                        println!("element: {}, neuer wert: {}", elements[*e].into(), elements[index].into());
+                    }
                     assert!(k2!=k);
 
                      // Minima- und Maximasetzung auf der zweiten Ebene
