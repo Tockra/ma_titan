@@ -102,9 +102,9 @@ impl STreeBuilder {
 
                             second_level.keys.push(j2);
                             second_level.hash_map.insert(j2,l3_level);
-                        } 
-                        
-                        Self::insert_l3_level(&mut l3_level,*e,k2,&elements);
+                        } else {
+                            Self::insert_l3_level(&mut l3_level,*e,k2,&elements);
+                        }
                         Self::insert_l3_level(&mut l3_level,index,k,&elements);
                         second_level.hash_map.insert(j,l3_level);
 
@@ -136,15 +136,11 @@ impl STreeBuilder {
                 },
 
                 PointerBuilder::Element(e) => {
-                    let (_,j2,k2) = Splittable::split_integer_down(&elements[*e]);
-                    let (i,j,k) = Splittable::split_integer_down(&elements[index]);
+                    let (_,_,k2) = Splittable::split_integer_down(&elements[*e]);
                     let mut l3_level_n = BuilderLevel::new(LX_ARRAY_SIZE/64);
                     l3_level_n.keys.push(k);
                     l3_level_n.keys.push(k2);
 
-                    if k==k2 {
-                        println!("element: {}, neuer wert: {}, j {}, j_new {}", elements[*e].into(), elements[index].into(), j, j2);
-                    }
                     assert!(k2!=k);
 
                      // Minima- und Maximasetzung auf der zweiten Ebene
