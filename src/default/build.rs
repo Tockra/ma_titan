@@ -185,7 +185,7 @@ impl STreeBuilder {
                 match &mut result[i].get() {
                     Pointer::Level(l) => {
                         // Hier muss l2_level aufgrund der symmetrischen Befüllung auch == Ptr::Level sein.LevelPointerBuilder
-                        match self.root_table[i].get() {
+                        match std::mem::replace(&mut self.root_table[i],L2EbeneBuilder::from_null()).get() {
                             PointerBuilder::Level(l2) => {
                                 let l2_level = l2;
 
