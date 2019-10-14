@@ -134,7 +134,7 @@ impl<T: 'static> LevelPointer<T> {
 pub struct STree<T> {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
-    root_table: Box<[Option<L2Ebene>]>,
+    root_table: Box<[L2Ebene]>,
     
     /// Das Root-Top-Array speichert für jeden Eintrag `root_table[i][x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
     /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert.
@@ -191,11 +191,11 @@ impl<T: Int> PredecessorSetStatic<T> for STree<T> {
 
     fn contains(&self, number: T) -> bool {
         let (i,j,k) = Splittable::split_integer_down(&number);
-        if self.root_table[i].is_none()  {
+        if self.root_table[i].is_null()  {
             return false;
         }
 
-        match self.root_table[i].as_ref().unwrap().get() {
+        match self.root_table[i].get() {
             Pointer::Level(l) => {
                 let l3_level = (*l).try_get(j);
                 if l3_level.is_none() {
@@ -308,13 +308,13 @@ impl<T: Int> STree<T> {
         let (i,j,k) = Splittable::split_integer_down(&element);
 
         // Paper z.3
-        if self.root_table[i].is_none() || element < self.element_list[self.root_table[i].as_ref().unwrap().minimum()] {
+        if self.root_table[i].is_null() || element < self.element_list[self.root_table[i].minimum()] {
             return self.compute_last_set_bit_deep(T::new(i as u64),0)
-                .map(|x| self.root_table[x].as_ref().unwrap().maximum());
+                .map(|x| self.root_table[x].maximum());
         }
 
         // Paper z. 4 (durch die Match-Arme)
-        match self.root_table[i].as_ref().unwrap().get() {
+        match self.root_table[i].get() {
             Pointer::Level(l) => {
                 let second_level = l;
                 let third_level = second_level.try_get(j);
@@ -420,13 +420,13 @@ impl<T: Int> STree<T> {
         let (i,j,k) = Splittable::split_integer_down(&element);
 
         // Paper z.3
-        if self.root_table[i].is_none() || self.element_list[self.root_table[i].as_ref().unwrap().maximum()] < element {
+        if self.root_table[i].is_null() || self.element_list[self.root_table[i].maximum()] < element {
             return self.compute_next_set_bit_deep(T::new(i as u64),0)
-                .map(|x| self.root_table[x].as_ref().unwrap().minimum());
+                .map(|x| self.root_table[x].minimum());
         }
 
         // Paper z. 4 (durch die Match-Arme)
-        match self.root_table[i].as_ref().unwrap().get() {
+        match self.root_table[i].get() {
             Pointer::Level(l) => {
                 let second_level = l;
                 let third_level = second_level.try_get(j);
@@ -520,7 +520,7 @@ pub struct Level<T> {
 
     /// Array, das mit Hilfe der perfekten Hashfunktion `hash_function` auf Objekte zeigt. 
     /// In objects sind alle Objekte gespeichert, auf die die Hashfunktion zeigen kann. Diese Objekte sind vom Typ T.
-    pub objects: Vec<T>,
+    pub objects: Box<[T]>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -542,12 +542,12 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(lx_size: usize, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
+    pub fn new(lx_size: usize, objects: Option<Box<[T]>>, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
         match keys {
             Some(x) => {
                 Level {
                     hash_function: Some(Mphf::new_parallel(GAMMA,x,None)),
-                    objects: Vec::with_capacity(x.len()),
+                    objects: objects.unwrap(),
                     minimum: minimum,
                     maximum: maximum,
                     lx_top: vec![0;lx_size].into_boxed_slice(),
@@ -556,7 +556,7 @@ impl<T> Level<T> {
             },
             None => Level {
                 hash_function: None,
-                objects: vec![],
+                objects: vec![].into_boxed_slice(),
                 minimum: minimum,
                 maximum: maximum,
                 lx_top: vec![0;lx_size].into_boxed_slice(),
@@ -692,7 +692,7 @@ mod tests {
         assert_eq!(data_structure.maximum().unwrap(),u40::new(check.len() as u64 - 1));
         for val in check {
             let (i,j,k) = Splittable::split_integer_down(&val);
-            match data_structure.root_table[i].as_ref().unwrap().get() {
+            match data_structure.root_table[i].get() {
                 Pointer::Level(l) => {
                     let second_level = l.get(j);
                     let saved_val = match second_level.get() {
@@ -728,8 +728,8 @@ mod tests {
 
         for val in check {
             let (i,j,k) = Splittable::split_integer_down(&val);
-            if data_structure.root_table[i].as_ref().unwrap().minimum() != data_structure.root_table[i].as_ref().unwrap().maximum() {
-                let second_level = match data_structure.root_table[i].as_ref().unwrap().get() {
+            if data_structure.root_table[i].minimum() != data_structure.root_table[i].maximum() {
+                let second_level = match data_structure.root_table[i].get() {
                         Pointer::Level(l) => {
                             l.get(j)
                         },
@@ -752,7 +752,7 @@ mod tests {
                 }
 
             } else {
-                assert_eq!(data_structure.element_list[data_structure.root_table[i].as_ref().unwrap().minimum()],val);
+                assert_eq!(data_structure.element_list[data_structure.root_table[i].minimum()],val);
             }
 
         }

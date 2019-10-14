@@ -1,15 +1,7 @@
-use boomphf::Mphf;
-
 use crate::internal::{Splittable};
 use crate::default::immutable::{Level, L2Ebene, Int, LevelPointer, Pointer};
 
 type HashMap<T,K> = std::collections::HashMap<T,K>;
-#[derive(Clone)]
-pub enum HashMapEnum<T,K> {
-    None,
-    One((T,K)),
-    Some(HashMap<T,K>)
-}
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 /// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
@@ -19,10 +11,10 @@ pub const GAMMA: f64 = 2.0;
 const LX_ARRAY_SIZE: usize = 1 << 10;
 
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L2-Ebene hat.AsMut
-type L2EbeneBuilder = BuilderLevel<L3EbeneBuilder>;
+type L2EbeneBuilder = LevelPointerBuilder<L3EbeneBuilder>;
 
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L3-Ebene hat.AsMut
-type L3EbeneBuilder = BuilderLevel<usize>;
+type L3EbeneBuilder = LevelPointerBuilder<usize>;
 
 /// Hilfsdatenstruktur zum Bauen eines STrees (nötig wegen der perfekten Hashfunktionen, die zum Erzeugungszeitpunkt alle Schlüssel kennen müssen).
 pub struct STreeBuilder {
@@ -61,7 +53,7 @@ impl STreeBuilder {
         let mut root_top: Box<[Box<[u64]>]> = root_top.into_iter().map(|x| x.into_boxed_slice()).collect::<Vec<_>>().into_boxed_slice();
 
         // Hier wird ein root_array der Länge T::root_array_size() angelegt, was 2^i entspricht. Dabei entspricht bei einem u40 Integer i=40 .
-        let mut root_table: Box<[L2EbeneBuilder]> = vec![L2EbeneBuilder::new(LX_ARRAY_SIZE/64);T::root_array_size()].into_boxed_slice();
+        let mut root_table: Box<[L2EbeneBuilder]> = vec![LevelPointerBuilder::from_null(); T::root_array_size()].into_boxed_slice();
     
         for (index,element) in elements.iter().enumerate() {
             let (i,j,k) = Splittable::split_integer_down(element);
@@ -70,54 +62,54 @@ impl STreeBuilder {
                 Self::build_root_top(&mut root_top, &i);
                 root_indexs.push(i);
             }
-
-            let l2_level = &mut root_table[i];
-            // Minima- und Maximasetzung auf der ersten Ebene
-            if l2_level.minimum > l2_level.maximum {
-                l2_level.minimum = index;
-            }
-            l2_level.maximum = index;
             
-            match &mut root_table[i].hash_map  {
-                // Wenn noch kein Element existiert, wird ein One, anstelle einer hashmap angelegt
-                HashMapEnum::None => {
-                    root_table[i].keys.push(j);
-                    let mut l3_level = L3EbeneBuilder::new(LX_ARRAY_SIZE/64);
-                    Self::insert_l3_level(&mut l3_level,index,k);
-                    root_table[i].hash_map = HashMapEnum::One((j,l3_level));
-                },
-                // Falls bereits genau ein Element ext. wird eine Hashmap angelegt
-                HashMapEnum::One((key,x)) => {
-                    if *key != j {
-                        root_table[i].keys.push(j);
+            if root_table[i].is_null() {
+                root_table[i] = LevelPointerBuilder::from_usize(Box::new(index));
+            } else {
+                match root_table[i].get() {
+                    PointerBuilder::Level(l) => {
+                        let second_level = l;
+                        second_level.maximum = index;
 
-                        let mut l3_level = L3EbeneBuilder::new(LX_ARRAY_SIZE/64);
-                        let mut hash_map = HashMap::default();
-                        Self::insert_l3_level(&mut l3_level,index,k);
+                        if !second_level.keys.contains(&j) {
+                            second_level.keys.push(j);
 
-                        hash_map.insert(j,l3_level);
-                        let key = std::mem::replace(key, 0);
-                        let x = std::mem::replace(x, L3EbeneBuilder::new(0));
+                            let mut l3_level = LevelPointerBuilder::from_null();
+                            Self::insert_l3_level(&mut l3_level,index,k,&elements);
+
+                            second_level.hash_map.insert(j,l3_level);
+                        }
+                        else {
+                            // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
+                            Self::insert_l3_level(second_level.hash_map.get_mut(&j).unwrap(),index,k,&elements);
+                        }
+                    },
+
+                    PointerBuilder::Element(e) => {
+                        let (_,j2,k2) = Splittable::split_integer_down(&elements[*e]);
+                        let mut second_level = BuilderLevel::new(LX_ARRAY_SIZE/64);
+                        second_level.keys.push(j);
+
+                        // Minima- und Maximasetzung auf der ersten Ebene
+                        second_level.minimum = *e;
+                        second_level.maximum = index;
+
+                        let mut l3_level = LevelPointerBuilder::from_null();
+
+                        if j2 != j {
+                            let mut l3_level = LevelPointerBuilder::from_null();
+                            Self::insert_l3_level(&mut l3_level,*e,k2,&elements);
+
+                            second_level.keys.push(j2);
+                            second_level.hash_map.insert(j2,l3_level);
+                        } 
                         
-                        hash_map.insert(key,x);
-                        root_table[i].hash_map = HashMapEnum::Some(hash_map);
-                    } else {
-                        // Fall nur bei Duplikaten
-                        Self::insert_l3_level(x,index,k);
-                    }
-                },
-                HashMapEnum::Some(x) => {
-                    if !root_table[i].keys.contains(&j) {
-                        root_table[i].keys.push(j);
+                        Self::insert_l3_level(&mut l3_level,*e,k2,&elements);
+                        Self::insert_l3_level(&mut l3_level,index,k,&elements);
+                        second_level.hash_map.insert(j,l3_level);
 
-                        let mut l3_level = L3EbeneBuilder::new(LX_ARRAY_SIZE/64);
-                        Self::insert_l3_level(&mut l3_level,index,k);
+                        root_table[i] = LevelPointerBuilder::from_level(Box::new(second_level));
 
-                        x.insert(j,l3_level);
-                    }
-                    else {
-                        // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen
-                        Self::insert_l3_level(x.get_mut(&j).unwrap(),index,k);
                     }
                 }
             }
@@ -125,32 +117,38 @@ impl STreeBuilder {
         Self {root_table: root_table, root_top: root_top, root_indexs: root_indexs}
     }
     #[inline]
-    fn insert_l3_level(l3_level: &mut L3EbeneBuilder,index: usize, k: u16) {
-        // Minima- und Maximasetzung auf der zweiten Ebene
-        if l3_level.minimum > l3_level.maximum {
-            l3_level.minimum = index;
-        }
-        l3_level.maximum = index;
+    fn insert_l3_level<T: Int>(l3_level: &mut L3EbeneBuilder,index: usize, k: u16, elements: &[T]) {
+        if l3_level.is_null() {
+            *l3_level = LevelPointerBuilder::from_usize(Box::new(index));
+        } else {
+            match l3_level.get() {
+                PointerBuilder::Level(l) => {
+                    let l3_level = l;
 
-        // Hier ist keine Prüfung notwendig, da die Elemente einmalig sind.
-        // Prüfung wird trotzdem gemacht. Um auch bei falscher Eingabe noch lauffähig zu sein.
-        if !l3_level.keys.contains(&k) {
-            l3_level.keys.push(k);
-            match &mut l3_level.hash_map {
-                HashMapEnum::None => {
-                    l3_level.hash_map = HashMapEnum::One((k,index));
-                },
-                HashMapEnum::One((key,x)) => {
-                    let mut hash_map = HashMap::default();
-                    let key = std::mem::replace(key, 0);
-                    let x = std::mem::replace(x, 0);
-                    hash_map.insert(key,x);
-                    hash_map.insert(k,index);
+                    assert!(!l3_level.keys.contains(&k));
 
-                    l3_level.hash_map = HashMapEnum::Some(hash_map);
+                    l3_level.keys.push(k);
+                
+                    //Maximasetzung auf der zweiten Ebene
+                    l3_level.maximum = index;
+
+                    l3_level.hash_map.insert(k, index);
                 },
-                HashMapEnum::Some(x) => {
-                    x.insert(k,index);
+
+                PointerBuilder::Element(e) => {
+                    let (_,_,k2) = Splittable::split_integer_down(&elements[*e]);
+                    let mut l3_level_n = BuilderLevel::new(LX_ARRAY_SIZE/64);
+                    l3_level_n.keys.push(k);
+                    l3_level_n.keys.push(k2);
+                    assert!(k2!=k);
+
+                     // Minima- und Maximasetzung auf der zweiten Ebene
+                    l3_level_n.minimum = *e;
+                    l3_level_n.maximum = index;
+
+                    l3_level_n.hash_map.insert(k, index);
+                    l3_level_n.hash_map.insert(k2, *e);
+                    *l3_level = LevelPointerBuilder::from_level(Box::new(l3_level_n));
                 }
             }
         }
@@ -159,108 +157,71 @@ impl STreeBuilder {
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
     /// angelegt und miteinander verbunden. Nachdem die Struktur mit normalen Hashfunktionen gebaut wurde können nun perfekte Hashfunktionen berechnet 
     /// werden!
-    pub fn build<T: Int>(&mut self) -> Box<[Option<L2Ebene>]> {
-        let mut tmp: Vec<Option<L2Ebene>> = Vec::with_capacity(T::root_array_size());
+    pub fn build<T: Int>(&mut self) -> Box<[L2Ebene]> {
+        let mut tmp: Vec<L2Ebene> = Vec::with_capacity(T::root_array_size());
         // Die L2Level-Elemente werden angelegt. Hierbei wird direkt in der new()-Funktion die perfekte Hashfunktion berechnet
         for i in 0..tmp.capacity() {
-            if self.root_table[i].minimum == self.root_table[i].maximum {
-                tmp.push(Some(LevelPointer::from_usize(Box::new(self.root_table[i].minimum))));
-            } else if self.root_table[i].maximum < self.root_table[i].minimum {
-                tmp.push(None);
+            if self.root_table[i].is_null() {
+                tmp.push(LevelPointer::from_null());
             } else {
-                let val = Box::new(Level::new(LX_ARRAY_SIZE/64, Some(&self.root_table[i].keys),self.root_table[i].minimum, self.root_table[i].maximum));
-                tmp.push(Some(LevelPointer::from_level(val)));
+                match self.root_table[i].get() {
+                    PointerBuilder::Level(l) => {
+                        let second_level = l;
+                        let val = Box::new(Level::new(LX_ARRAY_SIZE/64,Some(vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice()), Some(&second_level.keys),second_level.minimum, second_level.maximum));
+                        tmp.push(LevelPointer::from_level(val));
+                    },
+
+                    PointerBuilder::Element(e) => {
+                        tmp.push(LevelPointer::from_usize(Box::new(*e)));
+                    }
+                }
             }
         }
-        let result: Box<[Option<L2Ebene>]> = tmp.into_boxed_slice();
+        let result: Box<[L2Ebene]> = tmp.into_boxed_slice();
 
         for &i in &self.root_indexs {
             // L3-Level werden nur angelegt, falls mehr als 1 Wert in der DS existiert.
-            if !result[i].is_none() {
-                match result[i].as_ref().unwrap().get() {
+            if !result[i].is_null() {
+                match &mut result[i].get() {
                     Pointer::Level(l) => {
-                        let l2_level = &mut self.root_table[i];
+                        // Hier muss l2_level aufgrund der symmetrischen Befüllung auch == Ptr::Level sein.LevelPointerBuilder
+                        match self.root_table[i].get() {
+                            PointerBuilder::Level(l2) => {
+                                let l2_level = l2;
 
-                        // Die leeren L3Level-Elemente auf die L2 später zeigt werden angelegt
-                        (*l).objects = Vec::with_capacity(l2_level.keys.len());
-                        for _ in &l2_level.keys {
-                            (*l).objects.push(LevelPointer::from_null());
-                        }
-
-                        for &j in &l2_level.keys {
-                            // Die L2-Top-Tabellen werden gefüllt und die 
-                            let l3_level = match &mut l2_level.hash_map {
-                                HashMapEnum::One((_,x)) => {
-                                    x
-                                },
-                                HashMapEnum::Some(x) => {
-                                    x.get_mut(&j).unwrap()
-                                },
-                                _ => {
-                                    panic!("Die HashMap des root_arrays im Builder Struct fehlt!");
-                                }
-                            };
-                            if (*l).get(j).is_null() {
-                                let hash = (*l).hash_function.as_ref().unwrap().try_hash(&j).unwrap() as usize;
-                                (*l).objects[hash] =  if l3_level.minimum == l3_level.maximum {
-                                    LevelPointer::from_usize(Box::new(l3_level.minimum))
-                                } else {
-                                    LevelPointer::from_level(Box::new(Level::new(LX_ARRAY_SIZE/64,None,1,0)))
-                                };
-                                
-                            }
-                            Self::build_lx_top(&mut (*l).lx_top, j);
-                            let keys = l3_level.keys.as_ref();
-                            
-                            
-                            // Die L3-Elemente bekommen die Symantik aus dem L3BuilderStruct und die perfekte Hashfunktion wird berechnet
-                            match (*l).get(j).get() {
-                                Pointer::Level(l2) => {
-                                    (*l2).minimum = l3_level.minimum;
-                                    (*l2).maximum = l3_level.maximum
-                                },
-
-                                _ => {
-                                   
-                                }
-                            }
-
-                            match (*l).get(j).get() {
-                                Pointer::Level(l2) => {
-                                    let third_level = l2;
-                                    third_level.hash_function = Some(Mphf::new_parallel(GAMMA,keys, None));
-
-                                    // Die leeren usizes, die auf die Element-Liste zeigen werden angelegt
-                                    third_level.objects = Vec::with_capacity(l3_level.keys.len());
-
+                                for &j in &l2_level.keys {
+                                    Self::build_lx_top(&mut (*l).lx_top, j);
                                     
-                                    for _ in &l3_level.keys {
-                                        third_level.objects.push(0);
-                                    }
-                                    // Die usizes werden sinnvoll belegt + die L3-Top-Tabellen werden gefüllt
-                                    for &k in &l3_level.keys {
-                                        Self::build_lx_top(&mut third_level.lx_top,k);
-                                        let result = third_level.get(k);
-                                        *result = match &l3_level.hash_map {
-                                            HashMapEnum::One((_,x)) => {
-                                                *x
+                                    // Die L2-Top-Tabellen werden gefüllt und die 
+                                    let l3_level = l2_level.hash_map.get_mut(&j).unwrap();
+                                    // TODO 
+                                    if (*l).get(j).is_null() {
+                                        let hash = (*l).hash_function.as_ref().unwrap().try_hash(&j).unwrap() as usize;
+                                        (*l).objects[hash] =  match l3_level.get() {
+                                            PointerBuilder::Level(l2) => {
+                                                let l3_level = l2;
+                                                let mut level = Level::new(LX_ARRAY_SIZE/64, Some(vec![0; l3_level.keys.len()].into_boxed_slice()), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
+                                                for k in &l3_level.keys {
+                                                    Self::build_lx_top(&mut level.lx_top, *k);
+                                                    let result = level.get(*k);
+                                                    *result = *l3_level.hash_map.get(k).unwrap();
+                                                }
+                                                
+                                                LevelPointer::from_level(Box::new(level))
                                             },
-                                            HashMapEnum::Some(x) => {
-                                                *x.get(&k).unwrap()
-                                            },
-                                            _ => {
-                                                panic!("Die HashMap des root_arrays im Builder Struct fehlt!");
+                                            PointerBuilder::Element(e) => {
+                                                LevelPointer::from_usize(Box::new(*e))
                                             }
                                         };
-                                    }   
-
-                                },
-
-                                _ => {
-                                    // Es passiert nichts, wenn die nächste Ebene nicht ext. da nur ein Element ext.
+                                    }
                                 }
+
+                            }
+                            _ => {
+
                             }
                         }
+            
                     },
 
                     _ => {
@@ -310,7 +271,7 @@ impl STreeBuilder {
 #[derive(Clone)]
 pub struct BuilderLevel<T> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
-    pub hash_map: HashMapEnum<u16,T>,
+    pub hash_map: HashMap<u16,T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
     /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.
@@ -337,7 +298,7 @@ impl<T> BuilderLevel<T> {
     #[inline]
     pub fn new(lx_top_size: usize) -> BuilderLevel<T> {
         BuilderLevel {
-            hash_map: (HashMapEnum::None),
+            hash_map: HashMap::new(),
             keys: vec![],
             lx_top: vec![0;lx_top_size].into_boxed_slice(),
             maximum: 0,
@@ -346,3 +307,72 @@ impl<T> BuilderLevel<T> {
     }
 }
 
+pub enum PointerBuilder<T: 'static> {
+    Level(&'static mut BuilderLevel<T>),
+    Element(&'static mut usize)
+}
+
+/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
+/// oder auf ein Levelobjekt
+#[derive(Clone)]
+pub struct LevelPointerBuilder<T> {
+    pointer: *mut BuilderLevel<T>
+}
+
+impl<T> Drop for LevelPointerBuilder<T> {
+    fn drop(&mut self) {
+        if self.pointer.is_null() {
+            return;
+        }
+
+        if (self.pointer as usize % 4) == 0 {
+            unsafe { Box::from_raw(self.pointer) };
+        } else {
+            assert!((self.pointer as usize % 4) == 1);
+
+            unsafe { Box::from_raw((self.pointer as usize -1) as *mut usize) };
+        }
+    }
+}
+
+impl<T: 'static> LevelPointerBuilder<T> {
+    pub fn get(&self) -> PointerBuilder<T> {
+        if self.pointer.is_null() {
+            panic!("LevelPointer<T> is null!");
+        }
+
+        if (self.pointer as usize % 4) == 0 {
+            unsafe {PointerBuilder::Level(&mut (*self.pointer))}
+        } else {
+            assert!((self.pointer as usize % 4) == 1);
+
+            unsafe {PointerBuilder::Element(&mut *((self.pointer as usize -1) as *mut usize))}
+        }
+    }
+
+    pub fn from_level(level_box: Box<BuilderLevel<T>>) -> Self {
+        Self {
+            pointer: Box::into_raw(level_box)
+        }
+    }
+
+    pub fn from_null() -> Self {
+        Self {
+            pointer: std::ptr::null_mut()
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.pointer.is_null()
+    }
+
+    pub fn from_usize(usize_box: Box<usize>) -> Self {
+        let pointer = Box::into_raw(usize_box);
+        assert!((pointer as usize % 4) == 0);
+
+        let pointer = (pointer as usize + 1) as *mut BuilderLevel<T>;
+        Self {
+            pointer: pointer
+        }
+    }
+}
