@@ -60,7 +60,7 @@ pub fn static_build_benchmark<E: 'static + Typable + From<u64> + Copy + Debug, T
 pub fn create_output() {
     std::fs::create_dir_all("input/pred/uniform/u40/").unwrap();
    
-    for dir in read_dir(format!("testdata/uniform/u40/")).unwrap() {
+    for dir in read_dir(format!("testdata/normal/bereich_komplett/u40/")).unwrap() {
         let dir = dir.unwrap();
         let path = dir.path();
         println!("{:?}",path);
@@ -72,14 +72,14 @@ pub fn create_output() {
 
         let test_values = get_test_values(values[0]+1u32,values[values_len-1]);
 
-        write_to_file(format!("input/pred/uniform/u40/min{}_max{}.data",u64::from(values[0]),u64::from(values[values_len-1])).to_string(), &test_values).unwrap();
+        write_to_file(format!("input/pred/normal/bereich_komplett/u40/min{}_max{}.data",u64::from(values[0]),u64::from(values[values_len-1])).to_string(), &test_values).unwrap();
     }
 }
 
 /// Lädt die Testdaten aus ./testdata/{u40,u48,u64}/ und erzeugt mit Hilfe dieser die zu testende Datenstruktur T. 
 /// Anschließend werden 10000 gültige Vor- bzw. Nachfolger erzeugt und die Laufzeiten der Predecessor-Methode 
 /// werden mit Hilfe dieser gemessen
-pub fn pred_and_succ_benchmark<E: 'static + Typable + From<u64> + Copy + Debug + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>() {
+pub fn pred_and_succ_benchmark<E: 'static + Typable + Into<u64> + Copy + Debug + From<u64> + Into<u64> + Add<u32, Output=E>, T: 'static + Clone + PredecessorSetStatic<E>>() {
     println!("Starte Evaluierung der Predecessor- und Successor Methoden.");
     let bench_start = Instant::now();
     std::fs::create_dir_all("./output/pred/{}.txt").unwrap();
@@ -97,7 +97,7 @@ pub fn pred_and_succ_benchmark<E: 'static + Typable + From<u64> + Copy + Debug +
         let values: Vec<E> = read_from_file::<E>(path.to_str().unwrap().to_string()).unwrap();
         let values_len = values.len();
 
-        let test_values = get_test_values(values[0]+1u32,values[values_len-1]);
+        let test_values = read_from_file::<E>(format!("input/pred/uniform/u40/min{}_max{}.data",values[0].into(),values[values_len-1].into()).to_string()).unwrap();
 
         let len = values.len();
         let data_structure = T::new(values.clone());
