@@ -35,7 +35,7 @@ impl STreeBuilder {
     /// # Arguments
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new<T: Int>(elements: Vec<T>) ->  Self{
+    pub fn new<T: Int>(elements: Box<[T]>) ->  Self{
         let mut root_indexs = vec![];
                 
         // root_top_deep verwenden um die richtige Tiefe von root_top zu bestimmen

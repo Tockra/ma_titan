@@ -39,7 +39,7 @@ pub fn static_build_benchmark<E: 'static + Typable + From<u64> + Copy + Debug, T
         let path = dir.path();
         println!("{:?}",path);
         
-        let values = read_from_file::<E>(path.to_str().unwrap().to_string()).unwrap();
+        let values = read_from_file::<E>(path.to_str().unwrap()).unwrap();
       
 
         for _ in 0..SAMPLE_SIZE {
@@ -65,7 +65,7 @@ pub fn create_output() {
         let path = dir.path();
         println!("{:?}",path);
         
-        let values = read_from_file::<uint::u40>(path.to_str().unwrap().to_string()).unwrap();
+        let values = read_from_file::<uint::u40>(path.to_str().unwrap()).unwrap();
       
 
         let values_len = values.len();
@@ -94,10 +94,10 @@ pub fn pred_and_succ_benchmark<E: 'static + Typable + Into<u64> + Copy + Debug +
         let path = dir.path();
         println!("{:?}",path);
 
-        let values: Vec<E> = read_from_file::<E>(path.to_str().unwrap().to_string()).unwrap();
+        let values = read_from_file::<E>(path.to_str().unwrap()).unwrap();
         let values_len = values.len();
 
-        let test_values = read_from_file::<E>(format!("input/pred/uniform/u40/min{}_max{}.data",values[0].into(),values[values_len-1].into()).to_string()).unwrap();
+        let test_values = read_from_file::<E>(&format!("input/pred/uniform/u40/min{}_max{}.data",values[0].into(),values[values_len-1].into())).unwrap();
 
         let len = values.len();
         let data_structure = T::new(values.clone());
@@ -140,6 +140,8 @@ fn get_test_values<E: 'static + Typable + Copy + From<u64> + Into<u64> + Add<u32
 
 // Diese Methode löscht (hoffentlich) 12 Mbyte des Caches. 
 pub fn cache_clear() {
+    std::fs::create_dir_all("./cache").unwrap();
+
     let mut data = vec![23u64];
 
     for i in 1 .. 3_750_000u64 {
@@ -150,7 +152,7 @@ pub fn cache_clear() {
         data.push(black_box(sum));
     }
 
-    let mut buf = BufWriter::new(File::create(format!("cache_{}",SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis())).unwrap());
+    let mut buf = BufWriter::new(File::create(format!("cache/cache_{}",SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis())).unwrap());
     buf.write_fmt(format_args!("{}", data[data.len()-1])).unwrap();
 
     buf.flush().unwrap();
@@ -168,9 +170,9 @@ pub struct VEBTree {
 impl<T: Int> PredecessorSetStatic<T> for VEBTree {
     const TYPE: &'static str = "vEB-Tree";
 
-    fn new(elements: Vec<T>) -> Self {
+    fn new(elements: Box<[T]>) -> Self {
         let mut vtree = vs::with_capacity(elements.len());
-        for elem in elements {
+        for &elem in elements.iter() {
             vtree.insert((elem.into()) as usize);
         }
         Self {
@@ -205,9 +207,9 @@ pub struct BinarySearch<T> {
 }
 
 impl<T: Int>  PredecessorSetStatic<T> for BinarySearch<T> {
-    fn new(elements: Vec<T>) -> Self {
+    fn new(elements: Box<[T]>) -> Self {
         Self {
-            element_list: elements.into_boxed_slice(),
+            element_list: elements,
         }
     }
 
@@ -304,10 +306,10 @@ impl<T: Int> BinarySearch<T> {
 use std::collections::BTreeMap;
 
 impl<T: Int>  PredecessorSetStatic<T> for BTreeMap<T,T> {
-    fn new(elements: Vec<T>) -> Self {
+    fn new(elements: Box<[T]>) -> Self {
         let mut n: BTreeMap<T,T> = BTreeMap::new();
-        for i in elements {
-            n.insert(i,i);
+        for i in elements.iter() {
+            n.insert(*i,*i);
         }
         n
     }
@@ -335,8 +337,8 @@ impl<T: Int>  PredecessorSetStatic<T> for BTreeMap<T,T> {
     const TYPE: &'static str = "B-Baum";
 }
 
-pub fn read_from_file<T: Typable + From<u64> + Copy>(name: String) -> std::io::Result<Vec<T>> {
-    let mut input = File::open(name.clone())?;
+pub fn read_from_file<T: Typable + From<u64> + Copy>(name: &str) -> std::io::Result<Box<[T]>> {
+    let mut input = File::open(name)?;
     let mut lenv = Vec::new();
     std::io::Read::by_ref(&mut input).take(std::mem::size_of::<usize>() as u64).read_to_end(&mut lenv)?;
     let mut len: [u8; std::mem::size_of::<usize>()] = [0; std::mem::size_of::<usize>()];
@@ -358,7 +360,7 @@ pub fn read_from_file<T: Typable + From<u64> + Copy>(name: String) -> std::io::R
 
         values.push(T::from(next_value));
     }
-    Ok(values)
+    Ok(values.into_boxed_slice())
 }
 
 /// Serializiert den übergebenen Vector und schreibt diesen in eine Datei namens `name`.
