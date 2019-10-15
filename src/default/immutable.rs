@@ -166,6 +166,10 @@ impl Int for u48 {
 
 }
 
+impl Int for u64 {
+
+}
+
 impl<T: Int> PredecessorSetStatic<T> for STree<T> {
     const TYPE: &'static str = "STree";
 
