@@ -58,7 +58,7 @@ pub fn static_build_benchmark<E: 'static + Typable + From<u64> + Copy + Debug, T
 }
 
 pub fn create_output() {
-    std::fs::create_dir_all("input/pred/uniform/u40/").unwrap();
+    std::fs::create_dir_all("input/pred/normal/bereich_komplett/u40/").unwrap();
    
     for dir in read_dir(format!("testdata/normal/bereich_komplett/u40/")).unwrap() {
         let dir = dir.unwrap();
