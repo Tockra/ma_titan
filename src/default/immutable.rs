@@ -1,8 +1,8 @@
-#![allow(dead_code)]  
 use boomphf::Mphf;
 use uint::{u40, u48};
 
 use crate::default::build::{GAMMA, STreeBuilder};
+use crate::internal::Splittable;
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
@@ -217,7 +217,7 @@ impl<T: Int> STree<T> {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Maximum zurückgegeben werden soll.
     #[inline]
-    fn maximum_level<E>(&self, lx: &Level<E>) -> T {
+    pub fn maximum_level<E>(&self, lx: &Level<E>) -> T {
         self.element_list[lx.maximum]
     }
 
@@ -227,7 +227,7 @@ impl<T: Int> STree<T> {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Minimum zurückgegeben werden soll.
     #[inline]
-    fn minimum_level<E>(&self, lx: &Level<E>) -> T {
+    pub fn minimum_level<E>(&self, lx: &Level<E>) -> T {
         self.element_list[lx.minimum]
     }
 
