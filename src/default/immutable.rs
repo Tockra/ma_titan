@@ -169,7 +169,7 @@ impl Int for u48 {
 impl<T: Int> PredecessorSetStatic<T> for STree<T> {
     const TYPE: &'static str = "STree";
 
-    fn new(elements: Vec<T>) -> Self {
+    fn new(elements: Box<[T]>) -> Self {
          STree::<T>::new(elements)
     }
 
@@ -233,14 +233,14 @@ impl<T: Int> STree<T> {
     /// # Arguments
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new(elements: Vec<T>) -> Self {
+    pub fn new(elements: Box<[T]>) -> Self {
         let mut builder = STreeBuilder::new(elements.clone());
 
         let root_top = builder.get_root_tops();
         STree {
             root_table: builder.build::<T>(),
             root_top: root_top,
-            element_list: elements.into_boxed_slice(),
+            element_list: elements,
         }
     }
 
@@ -685,7 +685,7 @@ mod tests {
         }
  
         let check = data.clone();
-        let data_structure: STree<u40> = STree::new(data);
+        let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
 
         assert_eq!(data_structure.len(),check.len());
         assert_eq!(data_structure.minimum().unwrap(),u40::new(0));
@@ -720,7 +720,7 @@ mod tests {
     fn test_top_arrays() {
         let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101_u64)];
         let check = data.clone();
-        let data_structure: STree<u40> = STree::new(data);
+        let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
 
         assert_eq!(data_structure.len(),check.len());
         assert_eq!(data_structure.minimum().unwrap(),u40::new(0b00000000000000000000_1010010010_0101010101));
@@ -783,7 +783,7 @@ mod tests {
             data.push(u40::new(*val));
         }
         
-        let data_structure: STree<u40> = STree::new(data);
+        let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
         for (index,_) in data_v1.iter().enumerate() {
             if index < data_v1.len()-1 {
                 for i in data_v1[index]+1..data_v1[index+1]+1 {
@@ -841,7 +841,7 @@ mod tests {
         for val in data_raw.iter() {
             data.push(u40::new(*val));
         }
-        let data_structure: STree<u40> = STree::new(data.clone());
+        let data_structure: STree<u40> = STree::new(data.clone().into_boxed_slice());
         assert_eq!(data_structure.locate_or_succ(u40::new(0b11111111111111111111_1111111111_1111111111_u64)), None);
         
         for (i,&elem) in data.iter().enumerate() {
@@ -871,7 +871,7 @@ mod tests {
             data.push(u40::new(*val));
         }
         
-        let data_structure: STree<u40> = STree::new(data);
+        let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
         assert_eq!(u40::new(1065983), data_structure.element_list[data_structure.locate_or_pred(u40::new(1065983)).unwrap()]);
         for (index,_) in data_v1.iter().enumerate().rev() {
             if index > 0 {
@@ -930,7 +930,7 @@ mod tests {
         for val in data_raw.iter() {
             data.push(u40::new(*val));
         }
-        let data_structure: STree<u40> = STree::new(data.clone());
+        let data_structure: STree<u40> = STree::new(data.clone().into_boxed_slice());
         assert_eq!(data_structure.locate_or_pred(u40::new(0)), None);
 
         for (i,&elem) in data.iter().enumerate().rev() {

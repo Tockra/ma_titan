@@ -21,7 +21,7 @@ pub trait PredecessorSet<T> {
 }
 
 pub trait PredecessorSetStatic<T> {
-    fn new(elements: Vec<T>) -> Self;
+    fn new(elements: Box<[T]>) -> Self;
     fn predecessor(&self,number: T) -> Option<T>;
     fn successor(&self,number: T) -> Option<T>; // Optional
     fn minimum(&self) -> Option<T>;
