@@ -238,7 +238,7 @@ impl Splittable for u48 {
     }
 }
 
-impl Splittable for i32 {
+impl Splittable for u32 {
     #[inline]
     fn split_integer_down(&self) -> (usize,u16,u16) {
         let i: usize = (*self >> 16) as usize;
@@ -251,6 +251,21 @@ impl Splittable for i32 {
         (i,j,k)
     }
 }
+
+impl Splittable for u64 {
+    #[inline]
+    fn split_integer_down(&self) -> (usize,u16,u16) {
+        let i: usize = (*self >> 32) as usize;
+        // Die niedrigwertigsten 32 Bits element[32..63]
+        let low = *self & 0xFFFFFFFF;
+        // Bits 16 bis 32
+        let j: u16 = (low >> 16) as u16;
+        // Die niedrigwertigsten 16 Bits element[0..15]
+        let k: u16 = (*self & 0xFFFF) as u16;
+        (i,j,k)
+    }
+} 
+
 
 #[cfg(test)]
 mod tests {
