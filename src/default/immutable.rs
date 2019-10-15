@@ -133,13 +133,13 @@ impl<T: 'static> LevelPointer<T> {
 pub struct STree<T> {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
-    root_table: Box<[L2Ebene]>,
+    pub root_table: Box<[L2Ebene]>,
     
     /// Das Root-Top-Array speichert für jeden Eintrag `root_table[i][x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
     /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert.
     /// i steht dabei für die Ebene der root_tabelle. Ebene i+1 beinhaltet an Index [x] immer 64 Veroderungen aus Ebene i. 
     /// Somit gilt |root_table[i+1]| = |root_table[i]|/64  
-    root_top: Box<[Box<[u64]>]>,
+    pub root_top: Box<[Box<[u64]>]>,
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
     pub element_list: Box<[T]>,
