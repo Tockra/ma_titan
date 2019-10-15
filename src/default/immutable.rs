@@ -2,7 +2,6 @@
 use boomphf::Mphf;
 use uint::{u40, u48};
 
-use crate::internal::{Splittable, PredecessorSetStatic};
 use crate::default::build::{GAMMA, STreeBuilder};
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
@@ -168,67 +167,6 @@ impl Int for u48 {
 
 impl Int for u64 {
 
-}
-
-impl<T: Int> PredecessorSetStatic<T> for STree<T> {
-    const TYPE: &'static str = "STree";
-
-    fn new(elements: Box<[T]>) -> Self {
-         STree::<T>::new(elements)
-    }
-
-    fn predecessor(&self,number: T) -> Option<T> {
-        self.locate_or_pred(number).and_then(|x| Some(self.element_list[x]))
-    }
-
-    fn successor(&self,number: T) -> Option<T> {
-        self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
-    }
-
-    fn minimum(&self) -> Option<T> {
-        self.minimum()
-    }
-
-    fn maximum(&self) -> Option<T> {
-        self.maximum()
-    } 
-
-    fn contains(&self, number: T) -> bool {
-        let (i,j,k) = Splittable::split_integer_down(&number);
-        if self.root_table[i].is_null()  {
-            return false;
-        }
-
-        match self.root_table[i].get() {
-            Pointer::Level(l) => {
-                let l3_level = (*l).try_get(j);
-                if l3_level.is_none() {
-                    return false;
-                } else {
-                    let elem_index = match l3_level.unwrap().get() {
-                        Pointer::Level(l) => {
-                            (*l).try_get(k)
-                        },
-                        Pointer::Element(e) => {
-                            Some(&*e)
-                        }
-                    };
-                    
-                        
-                    if elem_index.is_none() {
-                        false
-                    } else {
-                        self.element_list[*elem_index.unwrap()] == number
-                    }
-                }
-                
-            },
-
-            Pointer::Element(e) => {
-                self.element_list[*e] == number
-            }
-        }
-    }
 }
 
 impl<T: Int> STree<T> {

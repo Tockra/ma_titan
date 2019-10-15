@@ -20,17 +20,6 @@ pub trait PredecessorSet<T> {
     fn contains(&self, number: T) -> bool;
 }
 
-pub trait PredecessorSetStatic<T> {
-    fn new(elements: Box<[T]>) -> Self;
-    fn predecessor(&self,number: T) -> Option<T>;
-    fn successor(&self,number: T) -> Option<T>; // Optional
-    fn minimum(&self) -> Option<T>;
-    fn maximum(&self) -> Option<T>; 
-    fn contains(&self, number: T) -> bool;
-
-    const TYPE: &'static str;
-}
-
 pub struct Element<T> {
     pub next: Option<Box<Element<T>>>,
     pub prev: *mut Element<T>,
