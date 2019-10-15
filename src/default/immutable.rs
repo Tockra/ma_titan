@@ -1,9 +1,8 @@
-#![allow(dead_code)]  
 use boomphf::Mphf;
 use uint::{u40, u48};
 
-use crate::internal::{Splittable, PredecessorSetStatic};
 use crate::default::build::{GAMMA, STreeBuilder};
+use crate::internal::Splittable;
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
@@ -134,16 +133,16 @@ impl<T: 'static> LevelPointer<T> {
 pub struct STree<T> {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
-    root_table: Box<[L2Ebene]>,
+    pub root_table: Box<[L2Ebene]>,
     
     /// Das Root-Top-Array speichert für jeden Eintrag `root_table[i][x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
     /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert.
     /// i steht dabei für die Ebene der root_tabelle. Ebene i+1 beinhaltet an Index [x] immer 64 Veroderungen aus Ebene i. 
     /// Somit gilt |root_table[i+1]| = |root_table[i]|/64  
-    root_top: Box<[Box<[u64]>]>,
+    pub root_top: Box<[Box<[u64]>]>,
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
-    element_list: Box<[T]>,
+    pub element_list: Box<[T]>,
 }
 
 /// Dieser Trait dient als Platzhalter für u40, u48 und u64. 
@@ -168,67 +167,6 @@ impl Int for u48 {
 
 impl Int for u64 {
 
-}
-
-impl<T: Int> PredecessorSetStatic<T> for STree<T> {
-    const TYPE: &'static str = "STree";
-
-    fn new(elements: Box<[T]>) -> Self {
-         STree::<T>::new(elements)
-    }
-
-    fn predecessor(&self,number: T) -> Option<T> {
-        self.locate_or_pred(number).and_then(|x| Some(self.element_list[x]))
-    }
-
-    fn successor(&self,number: T) -> Option<T> {
-        self.locate_or_succ(number).and_then(|x| Some(self.element_list[x]))
-    }
-
-    fn minimum(&self) -> Option<T> {
-        self.minimum()
-    }
-
-    fn maximum(&self) -> Option<T> {
-        self.maximum()
-    } 
-
-    fn contains(&self, number: T) -> bool {
-        let (i,j,k) = Splittable::split_integer_down(&number);
-        if self.root_table[i].is_null()  {
-            return false;
-        }
-
-        match self.root_table[i].get() {
-            Pointer::Level(l) => {
-                let l3_level = (*l).try_get(j);
-                if l3_level.is_none() {
-                    return false;
-                } else {
-                    let elem_index = match l3_level.unwrap().get() {
-                        Pointer::Level(l) => {
-                            (*l).try_get(k)
-                        },
-                        Pointer::Element(e) => {
-                            Some(&*e)
-                        }
-                    };
-                    
-                        
-                    if elem_index.is_none() {
-                        false
-                    } else {
-                        self.element_list[*elem_index.unwrap()] == number
-                    }
-                }
-                
-            },
-
-            Pointer::Element(e) => {
-                self.element_list[*e] == number
-            }
-        }
-    }
 }
 
 impl<T: Int> STree<T> {
@@ -279,7 +217,7 @@ impl<T: Int> STree<T> {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Maximum zurückgegeben werden soll.
     #[inline]
-    fn maximum_level<E>(&self, lx: &Level<E>) -> T {
+    pub fn maximum_level<E>(&self, lx: &Level<E>) -> T {
         self.element_list[lx.maximum]
     }
 
@@ -289,7 +227,7 @@ impl<T: Int> STree<T> {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Minimum zurückgegeben werden soll.
     #[inline]
-    fn minimum_level<E>(&self, lx: &Level<E>) -> T {
+    pub fn minimum_level<E>(&self, lx: &Level<E>) -> T {
         self.element_list[lx.minimum]
     }
 
