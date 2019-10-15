@@ -142,7 +142,7 @@ pub struct STree<T> {
     root_top: Box<[Box<[u64]>]>,
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
-    element_list: Box<[T]>,
+    pub element_list: Box<[T]>,
 }
 
 /// Dieser Trait dient als Platzhalter für u40, u48 und u64. 
