@@ -5,8 +5,6 @@ authors = ["Tim <tim.tannert@tu-dortmund.de>"]
 edition = "2018"
 
 [dependencies]
-rand = "0.7.0"
-rand_pcg = "0.2.0"
 fnv = "1.0.6"
 boomphf = {git = "https://github.com/10XGenomics/rust-boomphf.git"}
 uint = { git = "https://github.com/Tockra/uint.git" }
