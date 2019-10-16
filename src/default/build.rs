@@ -1,7 +1,161 @@
 use crate::internal::{Splittable};
 use crate::default::immutable::{Level, L2Ebene, Int, LevelPointer, Pointer};
 
-type HashMap<T,K> = std::collections::HashMap<T,K>;
+type HashMap<K,T> = std::collections::HashMap<K,T>;
+
+
+// ------------------------- Pointer Magie, zum Verhindern der Nutzung von HashMaps für kleine Datenmengen ----------------------------------
+enum PointerHm<K: 'static,T: 'static> {
+    Build(&'static mut Vec<(K,T)>),
+    Many(&'static mut HashMap<K,T>)
+}
+
+pub struct BuildHM<K,T> {
+    pointer: *mut HashMap<K,T>,
+}
+
+impl<K:'static + Clone,T:'static + Clone> Clone for BuildHM<K,T> {
+    fn clone(&self) -> Self {
+        match self.get_enum() {
+            PointerHm::Build(x) => {
+                Self {
+                    pointer: (Box::into_raw(Box::new((*x).clone())) as usize + 1) as *mut HashMap<K,T>,
+                }
+            },
+            PointerHm::Many(x) => {
+                Self {
+                    pointer: (Box::into_raw(Box::new(x.clone()))),
+                }
+            },
+            
+        }
+    }
+}
+
+impl<K,T> Drop for BuildHM<K,T> {
+    fn drop(&mut self) {
+        if self.pointer.is_null() {
+            return;
+        }
+
+        if (self.pointer as usize % 4) == 0 {
+            unsafe { Box::from_raw(self.pointer) };
+        } else {
+            assert!((self.pointer as usize % 4) == 1);
+
+            unsafe { Box::from_raw((self.pointer as usize -1) as *mut Vec<(K,T)>) };
+        }
+    }   
+}
+
+impl<K,T> BuildHM<K,T> {
+    fn get_enum(&self) -> PointerHm<K,T> {
+        if self.pointer.is_null() {
+            panic!("LevelPointer<T> is null!");
+        }
+
+        if (self.pointer as usize % 4) == 0 {
+            unsafe {PointerHm::Many(&mut (*self.pointer))}
+        } else {
+            assert!((self.pointer as usize % 4) == 1);
+
+            unsafe {PointerHm::Build(&mut *((self.pointer as usize -1) as *mut Vec<(K,T)>))}
+        }
+    }
+}
+
+impl<K:'static + Eq + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
+    fn new() -> Self{
+        Self {
+            pointer: (Box::into_raw(Box::new(Vec::<(K,T)>::new())) as usize + 1) as *mut HashMap<K,T>,
+        }
+    }
+
+    /// Die eigentliche Updatemechanik der HashMaps, wird hier ignoriert, da keine Werte geupdatet werden müssen!
+    fn insert(&mut self, key: K, val: T) {
+        match self.get_enum() {
+            PointerHm::Build(x) => {
+                if x.len() <= 1023 {
+                    x.push((key,val));
+                } else {
+                    assert!((self.pointer as usize % 4) == 1);
+                    let mut hm = HashMap::<K,T>::with_capacity(1025);
+                    unsafe { Box::from_raw((self.pointer as usize -1) as *mut Vec<(K,T)>) };
+
+                    let x = std::mem::replace(x, vec![]);
+                    for val in x.into_iter() {
+                        hm.insert(val.0, val.1);
+                    }
+                    hm.insert(key, val);
+                    self.pointer = Box::into_raw(Box::new(hm));
+                }
+            },
+            PointerHm::Many(x) => {
+                x.insert(key, val);
+            },
+        }
+    }
+
+    fn get_mut(&mut self, k: &K) -> Option<&mut T> {
+        match self.get_enum() {
+            PointerHm::Build(x) => {
+                let mut l = 0;
+                let mut r = x.len()-1;
+
+                while l != r && x[l].0 != *k && x[r].0 != *k{
+                    let m = (l+r)/2;
+                    if *k == x[m].0 {
+                        return Some(&mut x[m].1);
+                    } else if *k > x[m].0 {
+                        l = m+1;
+                    } else {
+                        r = m-1;
+                    }
+                }
+
+                if x[l].0 == *k  {
+                    Some(&mut x[l].1)
+                } else {
+                    Some(&mut x[r].1)
+                }
+            },
+            PointerHm::Many(x) => {
+                x.get_mut(k)
+            },
+        }
+    }
+
+    fn get(&mut self, k: &K) -> Option<&T> {
+        match self.get_enum() {
+            PointerHm::Build(x) => {
+                let mut l = 0;
+                let mut r = x.len()-1;
+
+                while l != r && x[l].0 != *k && x[r].0 != *k{
+                    let m = (l+r)/2;
+                    if *k == x[m].0 {
+                        return Some(&x[m].1);
+                    } else if *k > x[m].0 {
+                        l = m+1;
+                    } else {
+                        r = m-1;
+                    }
+                }
+
+                if x[l].0 == *k  {
+                    Some(&x[l].1)
+                } else {
+                    Some(&x[r].1)
+                }
+            },
+            PointerHm::Many(x) => {
+                x.get(k)
+            },
+        }
+    }
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 /// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
@@ -270,9 +424,9 @@ impl STreeBuilder {
 
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 #[derive(Clone)]
-pub struct BuilderLevel<T> {
+pub struct BuilderLevel<T: 'static> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
-    pub hash_map: HashMap<u16,T>,
+    pub hash_map: BuildHM<u16,T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
     /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.
@@ -299,7 +453,7 @@ impl<T> BuilderLevel<T> {
     #[inline]
     pub fn new(lx_top_size: usize) -> BuilderLevel<T> {
         BuilderLevel {
-            hash_map: HashMap::new(),
+            hash_map: BuildHM::new(),
             keys: vec![],
             lx_top: vec![0;lx_top_size].into_boxed_slice(),
             maximum: 0,
@@ -316,7 +470,7 @@ pub enum PointerBuilder<T: 'static> {
 /// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
 /// oder auf ein Levelobjekt
 #[derive(Clone)]
-pub struct LevelPointerBuilder<T> {
+pub struct LevelPointerBuilder<T: 'static> {
     pointer: *mut BuilderLevel<T>
 }
 
