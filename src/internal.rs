@@ -405,3 +405,86 @@ mod tests {
 }
 
 }
+
+
+pub enum PointerEnum<T: 'static, E: 'static> {
+    First(&'static mut T),
+    Second(&'static mut E)
+}
+
+/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein T oder ein E Objekt zeigt. Wichtig ist hierbei, dass T mit einem Vielfachen von 4 alligned werden muss!
+pub struct Pointer<T,E> {
+    pointer: *mut T,
+    phantom: std::marker::PhantomData<E>,
+}
+
+impl<T:'static + Clone,E:'static + Clone> Clone for Pointer<T,E> {
+    fn clone(&self) -> Self {
+        match self.get() {
+            PointerEnum::First(x) => Self::from_first(Box::new(x.clone())),
+            PointerEnum::Second(x) => Self::from_second(Box::new(x.clone())),
+        }
+    }
+}
+
+impl<T,E> Drop for Pointer<T,E> {
+    fn drop(&mut self) {
+        if self.pointer.is_null() {
+            return;
+        }
+
+        if (self.pointer as usize % 4) == 0 {
+            unsafe { Box::from_raw(self.pointer) };
+        } else {
+            assert!((self.pointer as usize % 4) == 1);
+
+            unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
+        }
+    }
+}
+
+impl<T,E> Pointer<T,E> {
+    pub fn from_first(b: Box<T>) -> Self {
+        Self {
+            pointer: Box::into_raw(b),
+            phantom: std::marker::PhantomData
+        }
+    }
+
+    pub fn from_second(b: Box<E>) -> Self {
+        let pointer = Box::into_raw(b);
+        assert!((pointer as usize % 4) == 0);
+
+        let pointer = (pointer as usize + 1) as *mut T;
+        Self {
+            pointer: pointer,
+            phantom: std::marker::PhantomData
+        }
+    }
+
+
+    pub fn get(&self) -> PointerEnum<T,E> {
+        if self.pointer.is_null() {
+            panic!("LevelPointer<T> is null!");
+        }
+
+        if (self.pointer as usize % 4) == 0 {
+            unsafe {PointerEnum::First(&mut (*self.pointer))}
+        } else {
+            assert!((self.pointer as usize % 4) == 1);
+
+            unsafe {PointerEnum::Second(&mut *((self.pointer as usize -1) as *mut E))}
+        }
+    }
+
+    pub fn null() -> Self {
+        Self {
+            pointer: std::ptr::null_mut(),
+            phantom: std::marker::PhantomData
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.pointer.is_null()
+    }
+}
