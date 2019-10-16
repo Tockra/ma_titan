@@ -17,63 +17,35 @@ pub enum Pointer<T: 'static> {
     Element(&'static mut usize)
 }
 
+use crate::internal::{self, PointerEnum};
+
 /// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
 /// oder auf ein Levelobjekt
 #[derive(Clone)]
-pub struct LevelPointer<T> {
-    pointer: *mut Level<T>
-}
-
-impl<T> Drop for LevelPointer<T> {
-    fn drop(&mut self) {
-        if self.pointer.is_null() {
-            return;
-        }
-
-        if (self.pointer as usize % 4) == 0 {
-            unsafe { Box::from_raw(self.pointer) };
-        } else {
-            assert!((self.pointer as usize % 4) == 1);
-
-            unsafe { Box::from_raw((self.pointer as usize -1) as *mut usize) };
-        }
-    }
+pub struct LevelPointer<T: 'static> {
+    pointer: internal::Pointer<Level<T>,usize>
 }
 
 impl<T: 'static> LevelPointer<T> {
-    pub fn get(&self) -> Pointer<T> {
-        if self.pointer.is_null() {
-            panic!("LevelPointer<T> is null!");
-        }
-
-        if (self.pointer as usize % 4) == 0 {
-            unsafe {Pointer::Level(&mut (*self.pointer))}
-        } else {
-            assert!((self.pointer as usize % 4) == 1);
-
-            unsafe {Pointer::Element(&mut *((self.pointer as usize -1) as *mut usize))}
-        }
-    }
-
     fn minimum(&self) -> usize {
-        match self.get() {
-            Pointer::Level(l) => {
+        match self.pointer.get() {
+            PointerEnum::First(l) => {
                 (*l).minimum
             },
 
-            Pointer::Element(e) => {
+            PointerEnum::Second(e) => {
                 *e
             }
         }
     }
 
     fn maximum(&self) -> usize {
-        match self.get() {
-            Pointer::Level(l) => {
+        match self.pointer.get() {
+            PointerEnum::First(l) => {
                 (*l).maximum
             },
 
-            Pointer::Element(e) => {
+            PointerEnum::Second(e) => {
                 *e
             }
         }
@@ -81,49 +53,32 @@ impl<T: 'static> LevelPointer<T> {
 
     pub fn from_level(level_box: Box<Level<T>>) -> Self {
         Self {
-            pointer: Box::into_raw(level_box)
+            pointer: internal::Pointer::from_first(level_box)
         }
     }
 
-    pub fn from_null() -> Self {
-        Self {
-            pointer: std::ptr::null_mut()
-        }
+    pub fn get(&self) -> PointerEnum<Level<T>, usize> {
+        self.pointer.get()
     }
 
     pub fn is_null(&self) -> bool {
         self.pointer.is_null()
     }
 
-    pub fn from_usize(usize_box: Box<usize>) -> Self {
-        let pointer = Box::into_raw(usize_box);
-        assert!((pointer as usize % 4) == 0);
-
-        let pointer = (pointer as usize + 1) as *mut Level<T>;
+    pub fn from_null() -> Self {
         Self {
-            pointer: pointer
+            pointer: internal::Pointer::null()
+        }
+    }
+
+    pub fn from_usize(usize_box: Box<usize>) -> Self {
+        Self {
+            pointer: internal::Pointer::from_second(usize_box)
         }
     }
 
     pub fn change_to_usize(&mut self, usize_box: Box<usize>) {
-        if self.pointer.is_null() {
-            panic!("change_to_usize Aufruf auf LevelPointer<T>, der Null ist.");
-        }
-
-        match self.get() {
-            Pointer::Level(l) => {
-                unsafe { Box::from_raw(l); }
-            },
-
-            Pointer::Element(e) => {
-                unsafe { Box::from_raw(e); }
-            }
-        } 
-        let pointer = Box::into_raw(usize_box);
-        assert!((pointer as usize % 4) == 0);
-
-        let pointer = (pointer as usize + 1) as *mut Level<T>;
-        self.pointer = pointer;
+        self.pointer = internal::Pointer::from_second(usize_box);
     }
 }
 
@@ -257,7 +212,7 @@ impl<T: Int> STree<T> {
 
         // Paper z. 4 (durch die Match-Arme)
         match self.root_table[i].get() {
-            Pointer::Level(l) => {
+            PointerEnum::First(l) => {
                 let second_level = l;
                 let third_level = second_level.try_get(j);
                 // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
@@ -270,14 +225,14 @@ impl<T: Int> STree<T> {
 
                 // Paper z.7
                 match third_level.unwrap().get() {
-                    Pointer::Level(l) => {
+                    PointerEnum::First(l) => {
                         // Paper z.8
                         let new_k = (*l).compute_last_set_bit(&k);
                         return new_k
                             .map(|x| *(*l).try_get(x).unwrap());
                     }
                     // Paper z.7
-                    Pointer::Element(e) => {
+                    PointerEnum::Second(e) => {
                         return Some(*e);
                     }
                 }
@@ -286,7 +241,7 @@ impl<T: Int> STree<T> {
                 
             },
 
-            Pointer::Element(e) => {
+            PointerEnum::Second(e) => {
                 return Some(*e);
             }
         }
@@ -369,7 +324,7 @@ impl<T: Int> STree<T> {
 
         // Paper z. 4 (durch die Match-Arme)
         match self.root_table[i].get() {
-            Pointer::Level(l) => {
+            PointerEnum::First(l) => {
                 let second_level = l;
                 let third_level = second_level.try_get(j);
                 // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
@@ -382,14 +337,14 @@ impl<T: Int> STree<T> {
 
                 // Paper z.7
                 match third_level.unwrap().get() {
-                    Pointer::Level(l) => {
+                    PointerEnum::First(l) => {
                         // Paper z.8
                         let new_k = (*l).compute_next_set_bit(&k);
                         return new_k
                             .map(|x| *(*l).try_get(x).unwrap());
                     }
                     // Paper z.7
-                    Pointer::Element(e) => {
+                    PointerEnum::Second(e) => {
                         return Some(*e);
                     }
                 }
@@ -398,7 +353,7 @@ impl<T: Int> STree<T> {
                 
             },
 
-            Pointer::Element(e) => {
+            PointerEnum::Second(e) => {
                 return Some(*e);
             }
         }
@@ -608,9 +563,11 @@ impl<T> Level<T> {
 #[cfg(test)]
 mod tests {
     use uint::u40;
-    use super::{STree, Pointer};
+    use super::STree;
     use crate::internal::Splittable;
 
+    use crate::internal::{PointerEnum};
+    
     /// Größe der LX-Top-Arrays
     const LX_ARRAY_SIZE: usize = 1 << 10;
 
@@ -635,20 +592,20 @@ mod tests {
         for val in check {
             let (i,j,k) = Splittable::split_integer_down(&val);
             match data_structure.root_table[i].get() {
-                Pointer::Level(l) => {
+                PointerEnum::First(l) => {
                     let second_level = l.get(j);
                     let saved_val = match second_level.get() {
-                        Pointer::Level(l) => {
+                        PointerEnum::First(l) => {
                             *(*l).get(k)
                         },
-                        Pointer::Element(e) => {
+                        PointerEnum::Second(e) => {
                             *e
                         }
                     };
                     assert_eq!(data_structure.element_list[saved_val],val);
                 },
 
-                Pointer::Element(e) => {
+                PointerEnum::Second(e) => {
                     assert_eq!(data_structure.element_list[*e],val);
                 }
             };
@@ -672,7 +629,7 @@ mod tests {
             let (i,j,k) = Splittable::split_integer_down(&val);
             if data_structure.root_table[i].minimum() != data_structure.root_table[i].maximum() {
                 let second_level = match data_structure.root_table[i].get() {
-                        Pointer::Level(l) => {
+                        PointerEnum::First(l) => {
                             l.get(j)
                         },
                         _ => {
@@ -681,7 +638,7 @@ mod tests {
                 };
                 if second_level.minimum() != second_level.maximum() {
                     let saved_val = match second_level.get() {
-                        Pointer::Level(l) => {
+                        PointerEnum::First(l) => {
                             l.get(k)
                         },
                         _ => {

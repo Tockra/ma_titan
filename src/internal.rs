@@ -420,9 +420,13 @@ pub struct Pointer<T,E> {
 
 impl<T:'static + Clone,E:'static + Clone> Clone for Pointer<T,E> {
     fn clone(&self) -> Self {
-        match self.get() {
-            PointerEnum::First(x) => Self::from_first(Box::new(x.clone())),
-            PointerEnum::Second(x) => Self::from_second(Box::new(x.clone())),
+        if self.pointer.is_null() {
+            Self::null()
+        } else {
+            match self.get() {
+                PointerEnum::First(x) => Self::from_first(Box::new(x.clone())),
+                PointerEnum::Second(x) => Self::from_second(Box::new(x.clone())),
+            }
         }
     }
 }
@@ -465,7 +469,7 @@ impl<T,E> Pointer<T,E> {
 
     pub fn get(&self) -> PointerEnum<T,E> {
         if self.pointer.is_null() {
-            panic!("LevelPointer<T> is null!");
+            panic!("Pointer<T> is null!");
         }
 
         if (self.pointer as usize % 4) == 0 {

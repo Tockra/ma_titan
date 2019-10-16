@@ -1,5 +1,5 @@
 use crate::internal::{Splittable};
-use crate::default::immutable::{Level, L2Ebene, Int, LevelPointer, Pointer};
+use crate::default::immutable::{Level, L2Ebene, Int, LevelPointer};
 
 type HashMap<K,T> = std::collections::HashMap<K,T>;
 
@@ -184,7 +184,7 @@ impl STreeBuilder {
             // L3-Level werden nur angelegt, falls mehr als 1 Wert in der DS existiert.
             if !result[i].is_null() {
                 match &mut result[i].get() {
-                    Pointer::Level(l) => {
+                    PointerEnum::First(l) => {
                         // Hier muss l2_level aufgrund der symmetrischen Befüllung auch == Ptr::Level sein.LevelPointerBuilder
                         match std::mem::replace(&mut self.root_table[i],L2EbeneBuilder::from_null()).get() {
                             PointerBuilder::Level(l2) => {
