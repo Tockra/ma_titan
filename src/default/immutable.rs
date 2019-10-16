@@ -1,8 +1,7 @@
-use boomphf::Mphf;
 use uint::{u40, u48};
 
-use crate::default::build::{GAMMA, STreeBuilder};
-use crate::internal::Splittable;
+use crate::default::build::STreeBuilder;
+use crate::internal::{Splittable, MphfHashMap};
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
@@ -412,12 +411,8 @@ impl<T: Int> STree<T> {
 #[derive(Clone)]
 #[repr(align(4))]
 pub struct Level<T> {
-    /// Perfekte Hashfunktion, die immer (außer zur Inialisierung) gesetzt ist. 
-    pub hash_function: Option<Mphf<u16>>,
-
-    /// Array, das mit Hilfe der perfekten Hashfunktion `hash_function` auf Objekte zeigt. 
-    /// In objects sind alle Objekte gespeichert, auf die die Hashfunktion zeigen kann. Diese Objekte sind vom Typ T.
-    pub objects: Box<[T]>,
+    /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist. 
+    pub hash_map: Option<MphfHashMap<u16,T>>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -439,12 +434,11 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(lx_size: usize, objects: Option<Box<[T]>>, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
+    pub fn new(lx_size: usize, objects: Box<[T]>, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
         match keys {
             Some(x) => {
                 Level {
-                    hash_function: Some(Mphf::new_parallel(GAMMA,x,None)),
-                    objects: objects.unwrap(),
+                    hash_map: Some(MphfHashMap::new(x, objects)),
                     minimum: minimum,
                     maximum: maximum,
                     lx_top: vec![0;lx_size].into_boxed_slice(),
@@ -452,8 +446,7 @@ impl<T> Level<T> {
     
             },
             None => Level {
-                hash_function: None,
-                objects: vec![].into_boxed_slice(),
+                hash_map: None,
                 minimum: minimum,
                 maximum: maximum,
                 lx_top: vec![0;lx_size].into_boxed_slice(),
@@ -469,17 +462,7 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn try_get(&self, key: u16) -> Option<&T> {
-        let k = u16::from(key);
-        let index = (k/64) as usize;
-        let in_index_mask = 1<<(63-(k % 64));
-
-        // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
-        if (self.lx_top[index] & in_index_mask) != 0 {
-            let hash = self.hash_function.as_ref()?.try_hash(&key)? as usize;
-            self.objects.get(hash)
-        } else {
-            None
-        }
+        self.hash_map.as_ref().map_or(None,|x| x.try_get(key,&self.lx_top))
     }
 
     /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
@@ -490,8 +473,7 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&mut self, key: u16) -> &mut T {
-        let hash = self.hash_function.as_ref().unwrap().try_hash(&key).unwrap() as usize;
-        self.objects.get_mut(hash).unwrap()
+        self.hash_map.as_mut().unwrap().get(&key)
     }
 
     

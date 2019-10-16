@@ -168,7 +168,7 @@ impl STreeBuilder {
                 match self.root_table[i].get() {
                     PointerBuilder::Level(l) => {
                         let second_level = l;
-                        let val = Box::new(Level::new(LX_ARRAY_SIZE/64,Some(vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice()), Some(&second_level.keys),second_level.minimum, second_level.maximum));
+                        let val = Box::new(Level::new(LX_ARRAY_SIZE/64,vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), Some(&second_level.keys),second_level.minimum, second_level.maximum));
                         tmp.push(LevelPointer::from_level(val));
                     },
 
@@ -197,11 +197,12 @@ impl STreeBuilder {
                                     let l3_level = l2_level.hash_map.get_mut(&j).unwrap();
                                     // TODO 
                                     if (*l).get(j).is_null() {
-                                        let hash = (*l).hash_function.as_ref().unwrap().try_hash(&j).unwrap() as usize;
-                                        (*l).objects[hash] =  match l3_level.get() {
+                                        let pointered_data = (*l).get(j);
+
+                                        *pointered_data =  match l3_level.get() {
                                             PointerBuilder::Level(l2) => {
                                                 let l3_level = l2;
-                                                let mut level = Level::new(LX_ARRAY_SIZE/64, Some(vec![0; l3_level.keys.len()].into_boxed_slice()), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
+                                                let mut level = Level::new(LX_ARRAY_SIZE/64, vec![0; l3_level.keys.len()].into_boxed_slice(), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
                                                 for k in &l3_level.keys {
                                                     Self::build_lx_top(&mut level.lx_top, *k);
                                                     let result = level.get(*k);

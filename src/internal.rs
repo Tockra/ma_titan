@@ -412,7 +412,7 @@ pub enum PointerEnum<T: 'static, E: 'static> {
     Second(&'static mut E)
 }
 
-/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein T oder ein E Objekt zeigt. Wichtig ist hierbei, dass T mit einem Vielfachen von 4 alligned werden muss!
+/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein T oder ein E Objekt zeigt. Wichtig ist hierbei, dass T mit einem Vielfachen von 2 alligned werden muss!
 pub struct Pointer<T,E> {
     pointer: *mut T,
     phantom: std::marker::PhantomData<E>,
@@ -437,10 +437,10 @@ impl<T,E> Drop for Pointer<T,E> {
             return;
         }
 
-        if (self.pointer as usize % 4) == 0 {
+        if (self.pointer as usize % 2) == 0 {
             unsafe { Box::from_raw(self.pointer) };
         } else {
-            assert!((self.pointer as usize % 4) == 1);
+            assert!((self.pointer as usize % 2) == 1);
 
             unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
         }
@@ -449,15 +449,20 @@ impl<T,E> Drop for Pointer<T,E> {
 
 impl<T,E> Pointer<T,E> {
     pub fn from_first(b: Box<T>) -> Self {
+        let pointer = Box::into_raw(b);
+        assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        assert!((pointer as usize % 2) == 0);
+
         Self {
-            pointer: Box::into_raw(b),
+            pointer: pointer,
             phantom: std::marker::PhantomData
         }
     }
 
     pub fn from_second(b: Box<E>) -> Self {
         let pointer = Box::into_raw(b);
-        assert!((pointer as usize % 4) == 0);
+        assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        assert!((pointer as usize % 2) == 0);
 
         let pointer = (pointer as usize + 1) as *mut T;
         Self {
@@ -472,10 +477,10 @@ impl<T,E> Pointer<T,E> {
             panic!("Pointer<T> is null!");
         }
 
-        if (self.pointer as usize % 4) == 0 {
+        if (self.pointer as usize % 2) == 0 {
             unsafe {PointerEnum::First(&mut (*self.pointer))}
         } else {
-            assert!((self.pointer as usize % 4) == 1);
+            assert!((self.pointer as usize % 2) == 1);
 
             unsafe {PointerEnum::Second(&mut *((self.pointer as usize -1) as *mut E))}
         }
@@ -490,5 +495,58 @@ impl<T,E> Pointer<T,E> {
 
     pub fn is_null(&self) -> bool {
         self.pointer.is_null()
+    }
+}
+
+/// Dies ist ein Wrapper um die Mphf-Hashfunktion. Es wird nicht die interne Implementierung verwendet, da 
+/// bei dieser das Gamma nicht beeinflusst werden kann. 
+use crate::default::build::GAMMA;
+use boomphf::Mphf;
+
+#[derive(Clone)]
+pub struct MphfHashMap<K,V> {
+    hash_function: Mphf<K>,
+    objects: Box<[V]>,
+}
+
+impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Clone,V> MphfHashMap<K,V> {
+    pub fn new(keys: &Vec<K>, objects: Box<[V]>) -> Self {
+        Self {
+            hash_function: Mphf::new_parallel(GAMMA,keys,None),
+            objects: objects
+        }
+    }
+
+       /// Mit Hilfe dieser Funktion kann die perfekte Hashfunktion verwendet werden. 
+    /// Es muss beachtet werden, dass sichergestellt werden muss, dass der verwendete Key auch existiert!
+    /// 
+    /// # Arguments
+    ///
+    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    #[inline]
+    pub fn try_get(&self, key: K, lx_top: &[u64]) -> Option<&V> {
+        let k: u16 = key.clone().into();
+        let index = (k/64) as usize;
+        let in_index_mask = 1<<(63-(k % 64));
+
+        // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
+        if (lx_top[index] & in_index_mask) != 0 {
+            let hash = self.hash_function.try_hash(&key)? as usize;
+            self.objects.get(hash)
+        } else {
+            None
+        }
+    }
+
+    /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
+    /// das zu `key` ein Schlüssel gehört. Anderenfalls sollte `try_hash` verwendet werden
+    /// 
+    /// # Arguments
+    ///
+    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    #[inline]
+    pub fn get(&mut self, key: &K) -> &mut V {
+        let hash = self.hash_function.try_hash(key).unwrap() as usize;
+        self.objects.get_mut(hash).unwrap()
     }
 }
