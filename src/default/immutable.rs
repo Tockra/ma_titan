@@ -1,7 +1,7 @@
 use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
-use crate::internal::{Splittable, MphfHashMap};
+use crate::internal::{Splittable, MphfHashMap, MphfHashMapThres};
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
@@ -410,9 +410,9 @@ impl<T: Int> STree<T> {
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 #[derive(Clone)]
 #[repr(align(4))]
-pub struct Level<T> {
+pub struct Level<T: 'static> {
     /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist. 
-    pub hash_map: Option<MphfHashMap<u16,T>>,
+    pub hash_map: Option<MphfHashMapThres<u16,T>>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -438,7 +438,7 @@ impl<T> Level<T> {
         match keys {
             Some(x) => {
                 Level {
-                    hash_map: Some(MphfHashMap::new(x, objects)),
+                    hash_map: Some(MphfHashMapThres::new(x, objects)),
                     minimum: minimum,
                     maximum: maximum,
                     lx_top: vec![0;lx_size].into_boxed_slice(),

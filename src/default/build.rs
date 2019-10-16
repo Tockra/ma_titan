@@ -11,10 +11,10 @@ pub const GAMMA: f64 = 2.0;
 const LX_ARRAY_SIZE: usize = 1 << 10;
 
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L2-Ebene hat.AsMut
-type L2EbeneBuilder = LevelPointerBuilder<L3EbeneBuilder>;
+type L2EbeneBuilder = internal::Pointer<BuilderLevel<L3EbeneBuilder>,usize>;
 
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L3-Ebene hat.AsMut
-type L3EbeneBuilder = LevelPointerBuilder<usize>;
+type L3EbeneBuilder = internal::Pointer<BuilderLevel<usize>,usize>;
 
 /// Hilfsdatenstruktur zum Bauen eines STrees (nötig wegen der perfekten Hashfunktionen, die zum Erzeugungszeitpunkt alle Schlüssel kennen müssen).
 pub struct STreeBuilder {
@@ -53,7 +53,7 @@ impl STreeBuilder {
         let mut root_top: Box<[Box<[u64]>]> = root_top.into_iter().map(|x| x.into_boxed_slice()).collect::<Vec<_>>().into_boxed_slice();
 
         // Hier wird ein root_array der Länge T::root_array_size() angelegt, was 2^i entspricht. Dabei entspricht bei einem u40 Integer i=40 .
-        let mut root_table: Box<[L2EbeneBuilder]> = vec![LevelPointerBuilder::from_null(); T::root_array_size()].into_boxed_slice();
+        let mut root_table: Box<[L2EbeneBuilder]> = vec![internal::Pointer::null(); T::root_array_size()].into_boxed_slice();
     
         for (index,element) in elements.iter().enumerate() {
             let (i,j,k) = Splittable::split_integer_down(element);
@@ -64,17 +64,17 @@ impl STreeBuilder {
             }
             
             if root_table[i].is_null() {
-                root_table[i] = LevelPointerBuilder::from_usize(Box::new(index));
+                root_table[i] = internal::Pointer::from_second(Box::new(index));
             } else {
                 match root_table[i].get() {
-                    PointerBuilder::Level(l) => {
+                    PointerEnum::First(l) => {
                         let second_level = l;
                         second_level.maximum = index;
 
                         if !second_level.keys.contains(&j) {
                             second_level.keys.push(j);
 
-                            let mut l3_level = LevelPointerBuilder::from_null();
+                            let mut l3_level = internal::Pointer::null();
                             Self::insert_l3_level(&mut l3_level,index,k,&elements);
 
                             second_level.hash_map.insert(j,l3_level);
@@ -85,7 +85,7 @@ impl STreeBuilder {
                         }
                     },
 
-                    PointerBuilder::Element(e) => {
+                    PointerEnum::Second(e) => {
                         let (_,j2,k2) = Splittable::split_integer_down(&elements[*e]);
                         let mut second_level = BuilderLevel::new(LX_ARRAY_SIZE/64);
                         second_level.keys.push(j);
@@ -94,10 +94,10 @@ impl STreeBuilder {
                         second_level.minimum = *e;
                         second_level.maximum = index;
 
-                        let mut l3_level = LevelPointerBuilder::from_null();
+                        let mut l3_level = internal::Pointer::null();
 
                         if j2 != j {
-                            let mut l3_level = LevelPointerBuilder::from_null();
+                            let mut l3_level = internal::Pointer::null();
                             Self::insert_l3_level(&mut l3_level,*e,k2,&elements);
 
                             second_level.keys.push(j2);
@@ -108,7 +108,7 @@ impl STreeBuilder {
                         Self::insert_l3_level(&mut l3_level,index,k,&elements);
                         second_level.hash_map.insert(j,l3_level);
 
-                        root_table[i] = LevelPointerBuilder::from_level(Box::new(second_level));
+                        root_table[i] = internal::Pointer::from_first(Box::new(second_level));
 
                     }
                 }
@@ -119,13 +119,13 @@ impl STreeBuilder {
     #[inline]
     fn insert_l3_level<T: Int + Into<u64>>(l3_level: &mut L3EbeneBuilder,index: usize, k: u16, elements: &[T]) {
         if l3_level.is_null() {
-            *l3_level = LevelPointerBuilder::from_usize(Box::new(index));
+            *l3_level = internal::Pointer::from_second(Box::new(index));
         } else {
             match l3_level.get() {
-                PointerBuilder::Level(l) => {
+                PointerEnum::First(l) => {
                     let l3_level = l;
 
-                    assert!(!l3_level.keys.contains(&k));
+                    debug_assert!(!l3_level.keys.contains(&k));
 
                     l3_level.keys.push(k);
                 
@@ -135,13 +135,13 @@ impl STreeBuilder {
                     l3_level.hash_map.insert(k, index);
                 },
 
-                PointerBuilder::Element(e) => {
+                PointerEnum::Second(e) => {
                     let (_,_,k2) = Splittable::split_integer_down(&elements[*e]);
                     let mut l3_level_n = BuilderLevel::new(LX_ARRAY_SIZE/64);
                     l3_level_n.keys.push(k);
                     l3_level_n.keys.push(k2);
 
-                    assert!(k2!=k);
+                    debug_assert!(k2!=k);
 
                      // Minima- und Maximasetzung auf der zweiten Ebene
                     l3_level_n.minimum = *e;
@@ -149,7 +149,7 @@ impl STreeBuilder {
 
                     l3_level_n.hash_map.insert(k, index);
                     l3_level_n.hash_map.insert(k2, *e);
-                    *l3_level = LevelPointerBuilder::from_level(Box::new(l3_level_n));
+                    *l3_level = internal::Pointer::from_first(Box::new(l3_level_n));
                 }
             }
         }
@@ -166,13 +166,13 @@ impl STreeBuilder {
                 tmp.push(LevelPointer::from_null());
             } else {
                 match self.root_table[i].get() {
-                    PointerBuilder::Level(l) => {
+                    PointerEnum::First(l) => {
                         let second_level = l;
                         let val = Box::new(Level::new(LX_ARRAY_SIZE/64,vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), Some(&second_level.keys),second_level.minimum, second_level.maximum));
                         tmp.push(LevelPointer::from_level(val));
                     },
 
-                    PointerBuilder::Element(e) => {
+                    PointerEnum::Second(e) => {
                         tmp.push(LevelPointer::from_usize(Box::new(*e)));
                     }
                 }
@@ -186,8 +186,8 @@ impl STreeBuilder {
                 match &mut result[i].get() {
                     PointerEnum::First(l) => {
                         // Hier muss l2_level aufgrund der symmetrischen Befüllung auch == Ptr::Level sein.LevelPointerBuilder
-                        match std::mem::replace(&mut self.root_table[i],L2EbeneBuilder::from_null()).get() {
-                            PointerBuilder::Level(l2) => {
+                        match std::mem::replace(&mut self.root_table[i],L2EbeneBuilder::null()).get() {
+                            PointerEnum::First(l2) => {
                                 let l2_level = l2;
 
                                 for &j in &l2_level.keys {
@@ -200,7 +200,7 @@ impl STreeBuilder {
                                         let pointered_data = (*l).get(j);
 
                                         *pointered_data =  match l3_level.get() {
-                                            PointerBuilder::Level(l2) => {
+                                            PointerEnum::First(l2) => {
                                                 let l3_level = l2;
                                                 let mut level = Level::new(LX_ARRAY_SIZE/64, vec![0; l3_level.keys.len()].into_boxed_slice(), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
                                                 for k in &l3_level.keys {
@@ -211,7 +211,7 @@ impl STreeBuilder {
                                                 
                                                 LevelPointer::from_level(Box::new(level))
                                             },
-                                            PointerBuilder::Element(e) => {
+                                            PointerEnum::Second(e) => {
                                                 LevelPointer::from_usize(Box::new(*e))
                                             }
                                         };
@@ -308,78 +308,6 @@ impl<T> BuilderLevel<T> {
         }
     }
 }
-
-pub enum PointerBuilder<T: 'static> {
-    Level(&'static mut BuilderLevel<T>),
-    Element(&'static mut usize)
-}
-
-/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
-/// oder auf ein Levelobjekt
-#[derive(Clone)]
-pub struct LevelPointerBuilder<T: 'static> {
-    pointer: *mut BuilderLevel<T>
-}
-
-impl<T> Drop for LevelPointerBuilder<T> {
-    fn drop(&mut self) {
-        if self.pointer.is_null() {
-            return;
-        }
-
-        if (self.pointer as usize % 4) == 0 {
-            unsafe { Box::from_raw(self.pointer) };
-        } else {
-            assert!((self.pointer as usize % 4) == 1);
-
-            unsafe { Box::from_raw((self.pointer as usize -1) as *mut usize) };
-        }
-    }
-}
-
-impl<T: 'static> LevelPointerBuilder<T> {
-    pub fn get(&self) -> PointerBuilder<T> {
-        if self.pointer.is_null() {
-            panic!("LevelPointer<T> is null!");
-        }
-
-        if (self.pointer as usize % 4) == 0 {
-            unsafe {PointerBuilder::Level(&mut (*self.pointer))}
-        } else {
-            assert!((self.pointer as usize % 4) == 1);
-
-            unsafe {PointerBuilder::Element(&mut *((self.pointer as usize -1) as *mut usize))}
-        }
-    }
-
-    pub fn from_level(level_box: Box<BuilderLevel<T>>) -> Self {
-        Self {
-            pointer: Box::into_raw(level_box)
-        }
-    }
-
-    pub fn from_null() -> Self {
-        Self {
-            pointer: std::ptr::null_mut()
-        }
-    }
-
-    pub fn is_null(&self) -> bool {
-        self.pointer.is_null()
-    }
-
-    pub fn from_usize(usize_box: Box<usize>) -> Self {
-        let pointer = Box::into_raw(usize_box);
-        assert!((pointer as usize % 4) == 0);
-
-        let pointer = (pointer as usize + 1) as *mut BuilderLevel<T>;
-        Self {
-            pointer: pointer
-        }
-    }
-}
-
-
 
 // ------------------------- Pointer Magie, zum Verhindern der Nutzung von HashMaps für kleine Datenmengen ----------------------------------
 

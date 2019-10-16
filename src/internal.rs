@@ -440,7 +440,7 @@ impl<T,E> Drop for Pointer<T,E> {
         if (self.pointer as usize % 2) == 0 {
             unsafe { Box::from_raw(self.pointer) };
         } else {
-            assert!((self.pointer as usize % 2) == 1);
+            debug_assert!((self.pointer as usize % 2) == 1);
 
             unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
         }
@@ -450,8 +450,8 @@ impl<T,E> Drop for Pointer<T,E> {
 impl<T,E> Pointer<T,E> {
     pub fn from_first(b: Box<T>) -> Self {
         let pointer = Box::into_raw(b);
-        assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
-        assert!((pointer as usize % 2) == 0);
+        debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        debug_assert!((pointer as usize % 2) == 0);
 
         Self {
             pointer: pointer,
@@ -461,8 +461,8 @@ impl<T,E> Pointer<T,E> {
 
     pub fn from_second(b: Box<E>) -> Self {
         let pointer = Box::into_raw(b);
-        assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
-        assert!((pointer as usize % 2) == 0);
+        debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        debug_assert!((pointer as usize % 2) == 0);
 
         let pointer = (pointer as usize + 1) as *mut T;
         Self {
@@ -480,7 +480,7 @@ impl<T,E> Pointer<T,E> {
         if (self.pointer as usize % 2) == 0 {
             unsafe {PointerEnum::First(&mut (*self.pointer))}
         } else {
-            assert!((self.pointer as usize % 2) == 1);
+            debug_assert!((self.pointer as usize % 2) == 1);
 
             unsafe {PointerEnum::Second(&mut *((self.pointer as usize -1) as *mut E))}
         }
@@ -548,5 +548,108 @@ impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + st
     pub fn get(&mut self, key: &K) -> &mut V {
         let hash = self.hash_function.try_hash(key).unwrap() as usize;
         self.objects.get_mut(hash).unwrap()
+    }
+
+}
+
+type HashMap<K,T> = MphfHashMapThres<K,T>;
+
+pub struct MphfHashMapThres<K,T> {
+    pointer: Pointer<HashMap<K,T>,Vec<(K,T)>>,
+}
+
+impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
+    fn clone(&self) -> Self {
+        Self {
+            pointer: self.pointer.clone()
+        }
+    }
+}
+
+impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
+    pub fn new(keys: &Vec<K>, objects: Box<[T]>) -> Self {
+        if keys.len() <= 1024 {
+            let mut values = Vec::with_capacity(keys.len());
+            
+            let objects = objects.into_vec();
+            for (i,elem) in objects.into_iter().enumerate() {
+                values.push((keys[i],elem));
+            }
+            Self {
+                pointer: Pointer::from_second(Box::new(values)),
+            }
+        } else {
+            Self {
+                pointer: Pointer::from_first(Box::new(HashMap::new(keys, objects))),
+            }
+        }
+
+    }
+
+    pub fn get(&mut self, k: &K) -> &mut T {
+        match self.pointer.get() {
+            PointerEnum::Second(x) => {
+                let mut l = 0;
+                let mut r = x.len()-1;
+
+                while l != r && x[l].0 != *k && x[r].0 != *k{
+                    let m = (l+r)/2;
+                    if *k == x[m].0 {
+                        return &mut x[m].1;
+                    } else if *k > x[m].0 {
+                        l = m+1;
+                    } else {
+                        r = m-1;
+                    }
+                }
+
+                if x[l].0 == *k  {
+                    &mut x[l].1
+                } else {
+                    &mut x[r].1
+                }
+            },
+            PointerEnum::First(x) => {
+                x.get(k)
+            },
+        }
+    }
+
+    pub fn try_get(&self, key: K, lx_top: &[u64]) -> Option<&T> {
+        let k: u16 = key.clone().into();
+        let index = (k/64) as usize;
+        let in_index_mask = 1<<(63-(k % 64));
+
+        // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
+        if (lx_top[index] & in_index_mask) != 0 {
+             match self.pointer.get() {
+                PointerEnum::Second(x) => {
+                    let mut l = 0;
+                    let mut r = x.len()-1;
+
+                    while l != r && x[l].0 != key && x[r].0 != key{
+                        let m = (l+r)/2;
+                        if key == x[m].0 {
+                            return Some(&x[m].1);
+                        } else if key > x[m].0 {
+                            l = m+1;
+                        } else {
+                            r = m-1;
+                        }
+                    }
+
+                    if x[l].0 == key  {
+                        Some(&x[l].1)
+                    } else {
+                        Some(&x[r].1)
+                    }
+                },
+                PointerEnum::First(x) => {
+                    x.try_get(key,lx_top)
+                },
+             }
+        } else {
+            None
+        }
     }
 }
