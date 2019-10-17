@@ -8,6 +8,7 @@ edition = "2018"
 rand = "0.7.0"
 rand_pcg = "0.2.0"
 fnv = "1.0.6"
+rustc-hash = "1.0.1"
 boomphf = {git = "https://github.com/10XGenomics/rust-boomphf.git"}
 uint = { git = "https://github.com/Tockra/uint.git" }
 vebtrees = {git = "https://github.com/Tockra/rust-vebtrees.git"}
