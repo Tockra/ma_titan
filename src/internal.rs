@@ -512,7 +512,7 @@ pub struct MphfHashMap<K,V> {
 impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Clone,V> MphfHashMap<K,V> {
     pub fn new(keys: &Vec<K>, objects: Box<[V]>) -> Self {
         Self {
-            hash_function: Mphf::new_parallel(GAMMA,keys,None),
+            hash_function: Mphf::new(GAMMA,keys),
             objects: objects
         }
     }
