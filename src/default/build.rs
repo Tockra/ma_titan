@@ -1,7 +1,7 @@
 use crate::internal::{Splittable};
 use crate::default::immutable::{Level, L2Ebene, Int, LevelPointer};
 
-type HashMap<K,T> = std::collections::HashMap<K,T>;
+type HashMap<K,T> = hashbrown::HashMap<K,T>;
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 /// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
