@@ -616,7 +616,7 @@ mod tests {
 
     /// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
     #[test]
-    fn test_new_hashfunctions() {
+    fn test_u40_new_hashfunctions() {
 
         // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
         // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
@@ -659,7 +659,7 @@ mod tests {
     /// Die Top-Arrays werden geprüft. Dabei wird nur grob überprüft, ob sinnvolle Werte gesetzt wurden.
     /// Dieser Test ist ein Kandidat zum Entfernen oder Erweitern.
     #[test]
-    fn test_top_arrays() {
+    fn test_u40_top_arrays() {
         let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101_u64)];
         let check = data.clone();
         let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
@@ -718,7 +718,7 @@ mod tests {
     /// Die locate_or_succ-Funktion wird getestet. Dabei werden beliebige Werte in ein STree gegeben und anschließend wird
     /// `locate_or_succ(x) mit allen x zwischen STree.min() und STree.max() getestet.
     #[test]
-    fn test_locate_or_succ_bruteforce() {
+    fn test_u40_locate_or_succ_bruteforce() {
         let data_v1: Vec<u64> = vec![0,1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 1065983];
         let mut data: Vec<u40> = vec![];
         for val in data_v1.iter() {
@@ -739,7 +739,7 @@ mod tests {
     /// # Äquivalenzklassentest mit Bruteforce
     /// `locate_or_succ` wird getestet. Dabei werden in jeder Ebene die gesuchten Elemente einmal im Minimum, im Maximum und irgendwo dazwischen liegen.
     #[test]
-    fn test_locate_or_succ_eqc_bruteforce_test() {
+    fn test_u40_locate_or_succ_eqc_bruteforce_test() {
         let data_raw: Vec<u64> = vec![
             0b00000000000000000000_0000000000_0000000001,
             0b00000000000000000000_0000000000_0000111000,
@@ -806,7 +806,7 @@ mod tests {
     /// Die locate_or_pred-Funktion wird getestet. Dabei werden beliebige (fest gewählte) Werte in ein STree gegeben und anschließend wird
     /// `locate_or_pred(x) mit allen x zwischen STree.min() und STree.max() getestet.
     #[test]
-    fn test_locate_or_pred_bruteforce() {
+    fn test_u40_locate_or_pred_bruteforce() {
         let data_v1: Vec<u64> = vec![0,1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 1065983];
         let mut data: Vec<u40> = vec![];
         for val in data_v1.iter() {
@@ -828,7 +828,7 @@ mod tests {
      /// # Äquivalenzklassentest mit Bruteforce
     /// `locate_or_pred` wird getestet. Dabei werden in jeder Ebene die gesuchten Elemente einmal im Minimum, im Maximum und irgendwo dazwischen liegen.
     #[test]
-    fn test_locate_or_pred_eqc_bruteforce_test() {
+    fn test_u40_locate_or_pred_eqc_bruteforce_test() {
         let data_raw: Vec<u64> = vec![
             0b00000000000000000000_0000000000_0000000001,
             0b00000000000000000000_0000000000_0000111000,
