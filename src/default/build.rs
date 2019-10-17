@@ -7,9 +7,6 @@ type HashMap<T,K> = std::collections::HashMap<T,K>;
 /// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
 pub const GAMMA: f64 = 2.0;
 
-/// Die Länge der L2- und L3-Top-Arrays, des STrees (basierend auf 40-Bit /2/2.).
-const LX_ARRAY_SIZE: usize = 1 << 10;
-
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L2-Ebene hat.AsMut
 type L2EbeneBuilder = LevelPointerBuilder<L3EbeneBuilder>;
 
@@ -35,7 +32,7 @@ impl STreeBuilder {
     /// # Arguments
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new<T: Int>(elements: Box<[T]>) ->  Self{
+    pub fn new<T: Int>(elements: Box<[T]>) -> Self {
         let mut root_indexs = vec![];
                 
         // root_top_deep verwenden um die richtige Tiefe von root_top zu bestimmen
@@ -87,7 +84,8 @@ impl STreeBuilder {
 
                     PointerBuilder::Element(e) => {
                         let (_,j2,k2) = Splittable::split_integer_down(&elements[*e]);
-                        let mut second_level = BuilderLevel::new(LX_ARRAY_SIZE/64);
+                        let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
+                        let mut second_level = BuilderLevel::new(lx_array_size/64);
                         second_level.keys.push(j);
 
                         // Minima- und Maximasetzung auf der ersten Ebene
@@ -137,7 +135,8 @@ impl STreeBuilder {
 
                 PointerBuilder::Element(e) => {
                     let (_,_,k2) = Splittable::split_integer_down(&elements[*e]);
-                    let mut l3_level_n = BuilderLevel::new(LX_ARRAY_SIZE/64);
+                    let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
+                    let mut l3_level_n = BuilderLevel::new(lx_array_size/64);
                     l3_level_n.keys.push(k);
                     l3_level_n.keys.push(k2);
 
@@ -168,7 +167,8 @@ impl STreeBuilder {
                 match self.root_table[i].get() {
                     PointerBuilder::Level(l) => {
                         let second_level = l;
-                        let val = Box::new(Level::new(LX_ARRAY_SIZE/64,Some(vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice()), Some(&second_level.keys),second_level.minimum, second_level.maximum));
+                        let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
+                        let val = Box::new(Level::new(lx_array_size/64,Some(vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice()), Some(&second_level.keys),second_level.minimum, second_level.maximum));
                         tmp.push(LevelPointer::from_level(val));
                     },
 
@@ -201,7 +201,8 @@ impl STreeBuilder {
                                         (*l).objects[hash] =  match l3_level.get() {
                                             PointerBuilder::Level(l2) => {
                                                 let l3_level = l2;
-                                                let mut level = Level::new(LX_ARRAY_SIZE/64, Some(vec![0; l3_level.keys.len()].into_boxed_slice()), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
+                                                let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
+                                                let mut level = Level::new(lx_array_size/64, Some(vec![0; l3_level.keys.len()].into_boxed_slice()), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
                                                 for k in &l3_level.keys {
                                                     Self::build_lx_top(&mut level.lx_top, *k);
                                                     let result = level.get(*k);
