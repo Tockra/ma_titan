@@ -1,7 +1,7 @@
 use crate::internal::{Splittable};
 use crate::default::immutable::{Level, L2Ebene, Int, LevelPointer, Pointer};
 
-type HashMap<T,K> = std::collections::HashMap<T,K>;
+type HashMap<T,K> = fnv::FnvHashMap<T,K>;
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 /// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
@@ -299,7 +299,7 @@ impl<T> BuilderLevel<T> {
     #[inline]
     pub fn new(lx_top_size: usize) -> BuilderLevel<T> {
         BuilderLevel {
-            hash_map: HashMap::new(),
+            hash_map: HashMap::default(),
             keys: vec![],
             lx_top: vec![0;lx_top_size].into_boxed_slice(),
             maximum: 0,
