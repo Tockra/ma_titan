@@ -484,7 +484,7 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(lx_size: usize, objects: Option<Box<[T]>>, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
+    pub fn new(lx_top: Box<[u64]>, objects: Option<Box<[T]>>, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
         match keys {
             Some(x) => {
                 Level {
@@ -492,7 +492,7 @@ impl<T> Level<T> {
                     objects: objects.unwrap(),
                     minimum: minimum,
                     maximum: maximum,
-                    lx_top: vec![0;lx_size].into_boxed_slice(),
+                    lx_top: lx_top,
                 }
     
             },
@@ -501,7 +501,7 @@ impl<T> Level<T> {
                 objects: vec![].into_boxed_slice(),
                 minimum: minimum,
                 maximum: maximum,
-                lx_top: vec![0;lx_size].into_boxed_slice(),
+                lx_top: lx_top,
             }
         }
     }

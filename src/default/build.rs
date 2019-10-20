@@ -34,7 +34,7 @@ impl STreeBuilder {
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
     pub fn new<T: Int>(elements: Box<[T]>) -> Self {
         let mut root_indexs = vec![];
-                
+        let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
         // root_top_deep verwenden um die richtige Tiefe von root_top zu bestimmen
         let mut root_top_deep = 0;
         while T::root_array_size()/(1<<root_top_deep*6) > 256 {
@@ -55,7 +55,7 @@ impl STreeBuilder {
         for (index,element) in elements.iter().enumerate() {
             let (i,j,k) = Splittable::split_integer_down(element);
 
-            if !root_indexs.contains(&i) {
+            if !root_indexs_contains(&root_top, i) {
                 Self::build_root_top(&mut root_top, &i);
                 root_indexs.push(i);
             }
@@ -68,13 +68,14 @@ impl STreeBuilder {
                         let second_level = l;
                         second_level.maximum = index;
 
-                        if !second_level.keys.contains(&j) {
+                        if !second_level.contains(j) {
                             second_level.keys.push(j);
 
                             let mut l3_level = LevelPointerBuilder::from_null();
                             Self::insert_l3_level(&mut l3_level,index,k,&elements);
 
                             second_level.hash_map.insert(j,l3_level);
+                            Self::build_lx_top(&mut second_level.lx_top, j);
                         }
                         else {
                             // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
@@ -84,13 +85,13 @@ impl STreeBuilder {
 
                     PointerBuilder::Element(e) => {
                         let (_,j2,k2) = Splittable::split_integer_down(&elements[*e]);
-                        let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
                         let mut second_level = BuilderLevel::new(lx_array_size/64);
                         second_level.keys.push(j);
 
                         // Minima- und Maximasetzung auf der ersten Ebene
                         second_level.minimum = *e;
                         second_level.maximum = index;
+                        Self::build_lx_top(&mut second_level.lx_top, j);
 
                         let mut l3_level = LevelPointerBuilder::from_null();
 
@@ -100,6 +101,7 @@ impl STreeBuilder {
 
                             second_level.keys.push(j2);
                             second_level.hash_map.insert(j2,l3_level);
+                            Self::build_lx_top(&mut second_level.lx_top, j2);
                         } else {
                             Self::insert_l3_level(&mut l3_level,*e,k2,&elements);
                         }
@@ -123,8 +125,9 @@ impl STreeBuilder {
                 PointerBuilder::Level(l) => {
                     let l3_level = l;
 
-                    assert!(!l3_level.keys.contains(&k));
+                    debug_assert!(!l3_level.keys.contains(&k));
 
+                    Self::build_lx_top(&mut l3_level.lx_top, k);
                     l3_level.keys.push(k);
                 
                     //Maximasetzung auf der zweiten Ebene
@@ -140,7 +143,7 @@ impl STreeBuilder {
                     l3_level_n.keys.push(k);
                     l3_level_n.keys.push(k2);
 
-                    assert!(k2!=k);
+                    debug_assert!(k2!=k);
 
                      // Minima- und Maximasetzung auf der zweiten Ebene
                     l3_level_n.minimum = *e;
@@ -148,6 +151,9 @@ impl STreeBuilder {
 
                     l3_level_n.hash_map.insert(k, index);
                     l3_level_n.hash_map.insert(k2, *e);
+                    Self::build_lx_top(&mut l3_level_n.lx_top, k);
+                    Self::build_lx_top(&mut l3_level_n.lx_top, k2);
+
                     *l3_level = LevelPointerBuilder::from_level(Box::new(l3_level_n));
                 }
             }
@@ -167,8 +173,7 @@ impl STreeBuilder {
                 match self.root_table[i].get() {
                     PointerBuilder::Level(l) => {
                         let second_level = l;
-                        let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
-                        let val = Box::new(Level::new(lx_array_size/64,Some(vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice()), Some(&second_level.keys),second_level.minimum, second_level.maximum));
+                        let val = Box::new(Level::new(std::mem::replace(&mut second_level.lx_top,Box::new([])),Some(vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice()), Some(&second_level.keys),second_level.minimum, second_level.maximum));
                         tmp.push(LevelPointer::from_level(val));
                     },
 
@@ -201,8 +206,7 @@ impl STreeBuilder {
                                         (*l).objects[hash] =  match l3_level.get() {
                                             PointerBuilder::Level(l2) => {
                                                 let l3_level = l2;
-                                                let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
-                                                let mut level = Level::new(lx_array_size/64, Some(vec![0; l3_level.keys.len()].into_boxed_slice()), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
+                                                let mut level = Level::new(std::mem::replace(&mut l3_level.lx_top, Box::new([])), Some(vec![0; l3_level.keys.len()].into_boxed_slice()), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
                                                 for k in &l3_level.keys {
                                                     Self::build_lx_top(&mut level.lx_top, *k);
                                                     let result = level.get(*k);
@@ -307,6 +311,14 @@ impl<T> BuilderLevel<T> {
             minimum: 1
         }
     }
+
+    
+    pub fn contains(&self, key: u16) -> bool {
+        let index = (key/64) as usize;
+        let in_index_mask = 1<<(63-(key % 64));
+
+        (self.lx_top[index] & in_index_mask) != 0
+    }
 }
 
 pub enum PointerBuilder<T: 'static> {
@@ -330,7 +342,7 @@ impl<T> Drop for LevelPointerBuilder<T> {
         if (self.pointer as usize % 4) == 0 {
             unsafe { Box::from_raw(self.pointer) };
         } else {
-            assert!((self.pointer as usize % 4) == 1);
+            debug_assert!((self.pointer as usize % 4) == 1);
 
             unsafe { Box::from_raw((self.pointer as usize -1) as *mut usize) };
         }
@@ -346,7 +358,7 @@ impl<T: 'static> LevelPointerBuilder<T> {
         if (self.pointer as usize % 4) == 0 {
             unsafe {PointerBuilder::Level(&mut (*self.pointer))}
         } else {
-            assert!((self.pointer as usize % 4) == 1);
+            debug_assert!((self.pointer as usize % 4) == 1);
 
             unsafe {PointerBuilder::Element(&mut *((self.pointer as usize -1) as *mut usize))}
         }
@@ -370,11 +382,23 @@ impl<T: 'static> LevelPointerBuilder<T> {
 
     pub fn from_usize(usize_box: Box<usize>) -> Self {
         let pointer = Box::into_raw(usize_box);
-        assert!((pointer as usize % 4) == 0);
+        debug_assert!((pointer as usize % 4) == 0);
 
         let pointer = (pointer as usize + 1) as *mut BuilderLevel<T>;
         Self {
             pointer: pointer
         }
     }
+}
+
+
+fn root_indexs_contains(root_top: &Box<[Box<[u64]>]>, bit: usize) -> bool {
+    let curr_bit_repr = bit/(1<<(0*6));
+    let index = curr_bit_repr/64;
+    let bit_mask: u64  = 1<<(63-(curr_bit_repr%64));
+    if root_top[0][index] & bit_mask == 0 {
+        return false;
+    }
+
+    true
 }
