@@ -1,7 +1,7 @@
 use uint::{u40, u48};
 
-use crate::default::build::STreeBuilder;
-use crate::internal::{Splittable, MphfHashMap, MphfHashMapThres};
+use crate::default::build::{build_lx_top,build_root_top, create_root_top};
+use crate::internal::{Splittable, MphfHashMapThres};
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
@@ -130,11 +130,98 @@ impl<T: Int> STree<T> {
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
     pub fn new(elements: Box<[T]>) -> Self {
-        let mut builder = STreeBuilder::new(elements.clone());
+        if elements.len() == 0 {
+            panic!("Ein statischer STree muss mindestens 1 Element beinhalten.");
+        }
+        let mut root_table: Box<[L2Ebene]> = vec![LevelPointer::from_null(); T::root_array_size()].into_boxed_slice();
+        let mut root_top = create_root_top::<T>();
 
-        let root_top = builder.get_root_tops();
+        for (index,elem) in elements.iter().enumerate() {
+            let (i,j,k) = Splittable::split_integer_down(elem);
+            build_root_top(&mut root_top, &i);
+ 
+            if root_table[i].is_null() {
+                root_table[i] = LevelPointer::from_usize(Box::new(index));
+            } else {
+                match root_table[i].get() {
+                    PointerEnum::First(l2_object) => {
+                        l2_object.maximum = index;
+                        if l2_object.contains(j) {
+                            match l2_object.hash_map.get(&j).get() {
+                                PointerEnum::First(l3_object) => {
+                                    l3_object.maximum = index;
+                                    build_lx_top(&mut l3_object.lx_top, k);
+                                    l3_object.hash_map.insert(k, index);
+                                    
+                                },
+                                PointerEnum::Second(elem_index) => {
+                                    let mut l3_object = Level::new(1_usize<<(((std::mem::size_of::<T>()*8)/2)/2));
+                                    let (_,_,k2) = Splittable::split_integer_down(&elements[*elem_index]);
+                                    l3_object.minimum = *elem_index;
+                                    l3_object.maximum = index;
+
+
+                                    debug_assert!(k!=k2);
+                                    // da alle Elemente unterschiedlich sind: 
+
+                                    build_lx_top(&mut l3_object.lx_top, k);
+                                    build_lx_top(&mut l3_object.lx_top, k2);
+
+                                    
+                                    l3_object.hash_map.insert(k2, *elem_index);
+                                    l3_object.hash_map.insert(k, index);
+
+                                    l2_object.hash_map.insert(j,L3Ebene::from_level(Box::new(l3_object)));
+                                }
+                            }
+                        } else {
+                            build_lx_top(&mut l2_object.lx_top, j);
+                            l2_object.hash_map.insert(j,L3Ebene::from_usize(Box::new(index)));
+                        }
+      
+                    },
+                    PointerEnum::Second(elem_index) => {
+                        let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
+                        let mut l2_object = Level::new(lx_array_size);
+                        let elem2 = elements[*elem_index];
+                        let (_,j2,k2) = Splittable::split_integer_down(&elem2);
+                        
+                        // Da die Elemente sortiert sind
+                        l2_object.minimum = *elem_index;
+                        l2_object.maximum = index;
+
+                        build_lx_top(&mut l2_object.lx_top, j);
+
+                        if j2 != j {
+                            let l3_ptr = L3Ebene::from_usize(Box::new(index));
+                            let l3_ptr2 = L3Ebene::from_usize(Box::new(*elem_index));
+                            l2_object.hash_map.insert(j,l3_ptr);
+                            l2_object.hash_map.insert(j2,l3_ptr2);
+
+                            build_lx_top(&mut l2_object.lx_top, j2);
+                        } else {
+                            let mut l3_object = Level::new(lx_array_size);
+                            l3_object.minimum = l2_object.minimum;
+                            l3_object.maximum = l2_object.maximum;
+
+                            debug_assert!(k!=k2);
+
+                            build_lx_top(&mut l3_object.lx_top, k);
+                            build_lx_top(&mut l3_object.lx_top, k2);
+          
+                            l3_object.hash_map.insert(k,index);
+                            l3_object.hash_map.insert(k2,*elem_index);
+
+                            l2_object.hash_map.insert(j,L3Ebene::from_level(Box::new(l3_object)));
+                        }
+ 
+                        root_table[i] = LevelPointer::from_level(Box::new(l2_object));
+                    },
+                }
+            }
+        }
         STree {
-            root_table: builder.build::<T>(),
+            root_table: root_table,
             root_top: root_top,
             element_list: elements,
         }
@@ -162,6 +249,7 @@ impl<T: Int> STree<T> {
         if self.len() == 0 {
             return None;
         }
+        
         Some(self.element_list[self.len() - 1])
     }
 
@@ -309,23 +397,28 @@ impl<T: Int> STree<T> {
     #[inline]
     pub fn locate_or_succ(&self, element: T) -> Option<usize> {
         // Paper z.1 
+
         if element > self.maximum().unwrap() {
             return None;
         } 
+    
 
         let (i,j,k) = Splittable::split_integer_down(&element);
-
+        
         // Paper z.3
+        
         if self.root_table[i].is_null() || self.element_list[self.root_table[i].maximum()] < element {
             return self.compute_next_set_bit_deep(T::new(i as u64),0)
                 .map(|x| self.root_table[x].minimum());
         }
 
+       
         // Paper z. 4 (durch die Match-Arme)
         match self.root_table[i].get() {
             PointerEnum::First(l) => {
                 let second_level = l;
                 let third_level = second_level.try_get(j);
+                
                 // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
                 if third_level.is_none() || self.element_list[third_level.unwrap().maximum()] < element {
                     let new_j = second_level.compute_next_set_bit(&(j+1u16));
@@ -333,7 +426,7 @@ impl<T: Int> STree<T> {
                         .and_then(|x| second_level.try_get(x))
                         .map(|x| x.minimum());
                 }
-
+               
                 // Paper z.7
                 match third_level.unwrap().get() {
                     PointerEnum::First(l) => {
@@ -399,6 +492,7 @@ impl<T: Int> STree<T> {
                     }
                 } 
             }
+            
             None
         }
         /*else {
@@ -412,7 +506,7 @@ impl<T: Int> STree<T> {
 #[repr(align(4))]
 pub struct Level<T: 'static> {
     /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist. 
-    pub hash_map: Option<MphfHashMapThres<u16,T>>,
+    pub hash_map: MphfHashMapThres<u16,T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -434,23 +528,12 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(lx_size: usize, objects: Box<[T]>, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
-        match keys {
-            Some(x) => {
-                Level {
-                    hash_map: Some(MphfHashMapThres::new(x, objects)),
-                    minimum: minimum,
-                    maximum: maximum,
-                    lx_top: vec![0;lx_size].into_boxed_slice(),
-                }
-    
-            },
-            None => Level {
-                hash_map: None,
-                minimum: minimum,
-                maximum: maximum,
-                lx_top: vec![0;lx_size].into_boxed_slice(),
-            }
+    pub fn new(lx_size: usize) -> Level<T> {
+        Level {
+            hash_map: MphfHashMapThres::new(),
+            minimum: 0,
+            maximum: 0,
+            lx_top: vec![0;lx_size].into_boxed_slice(),
         }
     }
 
@@ -462,7 +545,14 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn try_get(&self, key: u16) -> Option<&T> {
-        self.hash_map.as_ref().map_or(None,|x| x.try_get(key,&self.lx_top))
+        self.hash_map.try_get(key,&self.lx_top)
+    }
+
+    pub fn contains(&self, key: u16) -> bool {
+        let index = (key/64) as usize;
+        let in_index_mask = 1<<(63-(key % 64));
+
+        (self.lx_top[index] & in_index_mask) != 0
     }
 
     /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
@@ -473,7 +563,7 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&mut self, key: u16) -> &mut T {
-        self.hash_map.as_mut().unwrap().get(&key)
+        self.hash_map.get(&key)
     }
 
     
@@ -507,6 +597,7 @@ impl<T> Level<T> {
                 return Some(i as u16 *64 + num_zeroes as u16);
             }
         }
+
         None
     }
 
