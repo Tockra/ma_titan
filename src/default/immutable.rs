@@ -2,7 +2,7 @@ use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
 use crate::internal::{Splittable, MphfHashMapThres, LEVEL_COUNT, HASH_FUNCTION_COUNT};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene = LevelPointer<L3Ebene>;
@@ -132,8 +132,8 @@ impl<T: Int> STree<T> {
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
     pub fn new(elements: Box<[T]>) -> Self {
-        HASH_FUNCTION_COUNT = AtomicUsize::new(0);
-        LEVEL_COUNT = AtomicUsize::new(0);
+        HASH_FUNCTION_COUNT.store(0, Ordering::SeqCst);
+        LEVEL_COUNT.store(0, Ordering::SeqCst);
         let mut builder = STreeBuilder::new(elements.clone());
 
         let root_top = builder.get_root_tops();
