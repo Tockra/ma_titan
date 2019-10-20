@@ -544,6 +544,10 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
                 }
             },
             PointerEnum::First(x) => {
+                if x.get_mut(k).is_none() {
+                    println!("Mayday Mayday!!!");
+                }
+                
                 x.get_mut(k).unwrap()
             },
         }
