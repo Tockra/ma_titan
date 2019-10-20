@@ -514,7 +514,6 @@ pub struct MphfHashMap<K,V> {
 
 impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Clone,V> MphfHashMap<K,V> {
     pub fn new(keys: &Vec<K>, objects: Box<[V]>) -> Self {
-        unsafe {HASH_FUNCTION_COUNT += 1;}
         Self {
             hash_function: Mphf::new_parallel(GAMMA,keys,None),
             objects: objects
@@ -584,6 +583,7 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
                 pointer: Pointer::from_second(Box::new(values)),
             }
         } else {
+            unsafe {HASH_FUNCTION_COUNT += 1;}
             Self {
                 pointer: Pointer::from_first(Box::new(HashMap::new(keys, objects))),
             }
