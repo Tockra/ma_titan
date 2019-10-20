@@ -513,6 +513,8 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
 }
 
 impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
+
+    #[inline]
     pub fn new() -> Self {  
         let hm = HashMap::default();
         Self {
@@ -530,7 +532,7 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
         self.pointer.insert(key,val);
     }
 
-
+    #[inline]
     pub fn try_get(&self, key: K, lx_top: &[u64]) -> Option<&T> {
         let k: u16 = key.clone().into();
         let index = (k/64) as usize;
