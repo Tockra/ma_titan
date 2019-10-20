@@ -5,7 +5,7 @@ authors = ["Tim <tim.tannert@tu-dortmund.de>"]
 edition = "2018"
 
 [dependencies]
-fnv = "1.0.6"
+hashbrown = "0.6.1"
 boomphf = {git = "https://github.com/10XGenomics/rust-boomphf.git"}
 uint = { git = "https://github.com/Tockra/uint.git" }
 vebtrees = {git = "https://github.com/Tockra/rust-vebtrees.git"}
