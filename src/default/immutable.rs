@@ -171,7 +171,7 @@ impl<T: Int> STree<T> {
                                     l3_object.hash_map.insert(k2, *elem_index);
                                     l3_object.hash_map.insert(k, index);
 
-                                    l2_object.hash_map.insert(j,L3Ebene::from_level(Box::new(l3_object)));
+                                    *l2_object.hash_map.get(&j) = L3Ebene::from_level(Box::new(l3_object));
                                 }
                             }
                         } else {
