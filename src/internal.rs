@@ -450,8 +450,8 @@ impl<T,E> Drop for Pointer<T,E> {
 impl<T,E> Pointer<T,E> {
     pub fn from_first(b: Box<T>) -> Self {
         let pointer = Box::into_raw(b);
-        debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
-        debug_assert!((pointer as usize % 2) == 0);
+        assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        assert!((pointer as usize % 2) == 0);
 
         Self {
             pointer: pointer,
@@ -461,8 +461,8 @@ impl<T,E> Pointer<T,E> {
 
     pub fn from_second(b: Box<E>) -> Self {
         let pointer = Box::into_raw(b);
-        debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
-        debug_assert!((pointer as usize % 2) == 0);
+        assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        assert!((pointer as usize % 2) == 0);
 
         let pointer = (pointer as usize + 1) as *mut T;
         Self {
@@ -547,7 +547,7 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
                 if x.get_mut(k).is_none() {
                     println!("Mayday Mayday!!!");
                 }
-                
+
                 x.get_mut(k).unwrap()
             },
         }
