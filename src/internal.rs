@@ -558,7 +558,7 @@ impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + st
 type HashMap<K,T> = MphfHashMapThres<K,T>;
 
 pub struct MphfHashMapThres<K,T> {
-    pointer: Pointer<HashMap<K,T>,Vec<(K,T)>>,
+    pointer: Pointer<HashMap<K,T>,Box<[(K,T)]>>,
 }
 
 impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
@@ -580,7 +580,7 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
                 values.push((keys[i],elem));
             }
             Self {
-                pointer: Pointer::from_second(Box::new(values)),
+                pointer: Pointer::from_second(Box::new(values.into_boxed_slice())),
             }
         } else {
             unsafe {HASH_FUNCTION_COUNT += 1;}
