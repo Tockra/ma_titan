@@ -514,9 +514,8 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
 
 impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
     pub fn new() -> Self {  
-        let values = Vec::new();
         Self {
-            pointer: Pointer::from_second(Box::new(values)),
+            pointer: Pointer::null(),
         }
     }
 
@@ -550,10 +549,15 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
     }
 
     pub fn insert(&mut self, key: K, val: T) {
+        if self.pointer.is_null() {
+            self.pointer = Pointer::from_second(Box::new(Vec::new()));
+        }
+
         match self.pointer.get() {
             PointerEnum::Second(x) => {
                 if x.len() < 1024 {
                     x.push((key,val));
+                    x.reserve_exact(0);
                 }
                 else {
                     let fnv = std::hash::BuildHasherDefault::<fnv::FnvHasher>::default();
