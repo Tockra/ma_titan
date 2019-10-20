@@ -195,8 +195,8 @@ impl<T: Int> STree<T> {
                         if j2 != j {
                             let l3_ptr = L3Ebene::from_usize(Box::new(index));
                             let l3_ptr2 = L3Ebene::from_usize(Box::new(*elem_index));
-                            l2_object.hash_map.insert(j,l3_ptr);
                             l2_object.hash_map.insert(j2,l3_ptr2);
+                            l2_object.hash_map.insert(j,l3_ptr);
 
                             build_lx_top(&mut l2_object.lx_top, j2);
                         } else {
@@ -209,8 +209,8 @@ impl<T: Int> STree<T> {
                             build_lx_top(&mut l3_object.lx_top, k);
                             build_lx_top(&mut l3_object.lx_top, k2);
           
-                            l3_object.hash_map.insert(k,index);
                             l3_object.hash_map.insert(k2,*elem_index);
+                            l3_object.hash_map.insert(k,index);
 
                             l2_object.hash_map.insert(j,L3Ebene::from_level(Box::new(l3_object)));
                         }
