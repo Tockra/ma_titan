@@ -1,11 +1,13 @@
 use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
-use crate::internal::{Splittable, MphfHashMap, MphfHashMapThres};
+use crate::internal::{Splittable, MphfHashMap, MphfHashMapThres, LEVEL_COUNT, HASH_FUNCTION_COUNT};
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene = LevelPointer<L3Ebene>;
+
+
 
 /// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf 
 /// ein Indize der STree.element_list zeigt.
@@ -133,11 +135,13 @@ impl<T: Int> STree<T> {
         let mut builder = STreeBuilder::new(elements.clone());
 
         let root_top = builder.get_root_tops();
-        STree {
+        let st = STree {
             root_table: builder.build::<T>(),
             root_top: root_top,
             element_list: elements,
-        }
+        };
+        unsafe {println!("STree ({}) angelegt. Anzahl der Level: {}, Anzahl der echten Hashfunktionen: {}",st.len(),LEVEL_COUNT,HASH_FUNCTION_COUNT);}
+        st
     }
 
 

@@ -498,6 +498,9 @@ impl<T,E> Pointer<T,E> {
     }
 }
 
+pub static mut LEVEL_COUNT: u64 = 0;
+pub static mut HASH_FUNCTION_COUNT: u64 = 0;
+
 /// Dies ist ein Wrapper um die Mphf-Hashfunktion. Es wird nicht die interne Implementierung verwendet, da 
 /// bei dieser das Gamma nicht beeinflusst werden kann. 
 use crate::default::build::GAMMA;
@@ -511,6 +514,7 @@ pub struct MphfHashMap<K,V> {
 
 impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Clone,V> MphfHashMap<K,V> {
     pub fn new(keys: &Vec<K>, objects: Box<[V]>) -> Self {
+        unsafe {HASH_FUNCTION_COUNT += 1;}
         Self {
             hash_function: Mphf::new_parallel(GAMMA,keys,None),
             objects: objects
@@ -568,6 +572,7 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
 
 impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
     pub fn new(keys: &Vec<K>, objects: Box<[T]>) -> Self {
+        unsafe {LEVEL_COUNT += 1;}
         if keys.len() <= 1024 {
             let mut values = Vec::with_capacity(keys.len());
             
