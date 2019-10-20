@@ -438,14 +438,14 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(lx_size: usize, objects: Box<[T]>, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
+    pub fn new(lx_top: Box<[u64]>, objects: Box<[T]>, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
         match keys {
             Some(x) => {
                 Level {
                     hash_map: Some(MphfHashMapThres::new(x, objects)),
                     minimum: minimum,
                     maximum: maximum,
-                    lx_top: vec![0;lx_size].into_boxed_slice(),
+                    lx_top: lx_top,
                 }
     
             },
@@ -453,7 +453,7 @@ impl<T> Level<T> {
                 hash_map: None,
                 minimum: minimum,
                 maximum: maximum,
-                lx_top: vec![0;lx_size].into_boxed_slice(),
+                lx_top: lx_top,
             }
         }
     }
