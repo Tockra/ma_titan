@@ -1,8 +1,8 @@
 use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
-use crate::internal::{Splittable, MphfHashMap, MphfHashMapThres, LEVEL_COUNT, HASH_FUNCTION_COUNT};
-
+use crate::internal::{Splittable, MphfHashMapThres, LEVEL_COUNT, HASH_FUNCTION_COUNT};
+use std::sync::atomic::Ordering;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene = LevelPointer<L3Ebene>;
@@ -140,7 +140,7 @@ impl<T: Int> STree<T> {
             root_top: root_top,
             element_list: elements,
         };
-        unsafe {println!("STree ({}) angelegt. Anzahl der Level: {}, Anzahl der echten Hashfunktionen: {}",st.len(),LEVEL_COUNT,HASH_FUNCTION_COUNT);}
+        println!("STree ({}) angelegt. Anzahl der Level: {}, Anzahl der echten Hashfunktionen: {}",st.len(),LEVEL_COUNT.load(Ordering::SeqCst),HASH_FUNCTION_COUNT.load(Ordering::SeqCst));
         st
     }
 
