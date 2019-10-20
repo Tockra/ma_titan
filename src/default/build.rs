@@ -174,7 +174,7 @@ impl STreeBuilder {
                 match self.root_table[i].get() {
                     PointerEnum::First(l) => {
                         let second_level = l;
-                        println!("Level angelegt für i {}",i);
+
                         let val = Box::new(Level::new(std::mem::replace(&mut second_level.lx_top, Box::new([])), vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), Some(&second_level.keys),second_level.minimum, second_level.maximum));
                         tmp.push(LevelPointer::from_level(val));
                     },
