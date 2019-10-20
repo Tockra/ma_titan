@@ -556,12 +556,13 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
                     x.push((key,val));
                 }
                 else {
-                    let mut h = HashMap::<K,T>::default();
+                    let fnv = std::hash::BuildHasherDefault::<fnv::FnvHasher>::default();
+                    let mut h = HashMap::with_capacity_and_hasher(1025,fnv);
                     let x = std::mem::replace(x, vec![]);
                     for (k,v) in x.into_iter() {
                         h.insert(k,v);
                     }
-                    
+
                     h.insert(key,val);
                     self.pointer = Pointer::from_first(Box::new(h))
                 }
