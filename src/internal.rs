@@ -544,10 +544,6 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
                 }
             },
             PointerEnum::First(x) => {
-                if x.get_mut(k).is_none() {
-                    println!("Mayday Mayday!!!");
-                }
-
                 x.get_mut(k).unwrap()
             },
         }
@@ -565,6 +561,8 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
                     for (k,v) in x.into_iter() {
                         h.insert(k,v);
                     }
+                    
+                    h.insert(key,val);
                     self.pointer = Pointer::from_first(Box::new(h))
                 }
             },
