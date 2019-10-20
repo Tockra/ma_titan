@@ -572,7 +572,7 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
 impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
     pub fn new(keys: &Vec<K>, objects: Box<[T]>) -> Self {
         unsafe {LEVEL_COUNT += 1;}
-        if keys.len() <= 1024 {
+        if keys.len() <= 512 {
             let mut values = Vec::with_capacity(keys.len());
             
             let objects = objects.into_vec();
