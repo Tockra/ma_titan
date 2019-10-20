@@ -150,8 +150,8 @@ impl STreeBuilder {
                     l3_level_n.minimum = *e;
                     l3_level_n.maximum = index;
 
-                    l3_level_n.hash_map.insert(k, index);
                     l3_level_n.hash_map.insert(k2, *e);
+                    l3_level_n.hash_map.insert(k, index);
                     Self::build_lx_top(&mut l3_level_n.lx_top, k);
                     Self::build_lx_top(&mut l3_level_n.lx_top, k2);
                     
@@ -174,6 +174,7 @@ impl STreeBuilder {
                 match self.root_table[i].get() {
                     PointerEnum::First(l) => {
                         let second_level = l;
+                        println!("Level angelegt für i {}",i);
                         let val = Box::new(Level::new(std::mem::replace(&mut second_level.lx_top, Box::new([])), vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), Some(&second_level.keys),second_level.minimum, second_level.maximum));
                         tmp.push(LevelPointer::from_level(val));
                     },
