@@ -556,7 +556,7 @@ impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + st
 
 }
 
-type HashMap<K,T> = MphfHashMapThres<K,T>;
+type HashMap<K,T> = MphfHashMap<K,T>;
 
 pub struct MphfHashMapThres<K,T> {
     pointer: Pointer<HashMap<K,T>,Box<[(K,T)]>>,
@@ -570,10 +570,10 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
     }
 }
 
-impl<K:'static + Eq + std::fmt::Display + std::fmt::Debug + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
+impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
     pub fn new(keys: &Vec<K>, objects: Box<[T]>) -> Self {
         LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
-        if keys.len() <= 1024 {
+        if keys.len() <= 512 {
             let mut values = Vec::with_capacity(keys.len());
             
             let objects = objects.into_vec();
