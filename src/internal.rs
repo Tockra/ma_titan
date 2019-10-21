@@ -499,9 +499,8 @@ impl<T,E> Pointer<T,E> {
 }
 
 type HashMap<K,T> = fnv::FnvHashMap<K,T>;
-
 pub struct MphfHashMapThres<K,T> {
-    pointer: Pointer<HashMap<K,T>,Vec<(K,T)>>,
+    pointer: HashMap<K,T>,
 }
 
 impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
@@ -512,55 +511,24 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
     }
 }
 
-impl<K:'static + Eq + Into<u16> + Ord + std::fmt::Display + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
+impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
     pub fn new() -> Self {  
+        let hm = HashMap::default();
         Self {
-            pointer: Pointer::null(),
+            pointer: hm,
         }
     }
 
+    #[inline]
     pub fn get(&mut self, k: &K) -> &mut T {
-        match self.pointer.get() {
-            PointerEnum::Second(v) => {
-                match v.binary_search_by_key(k,|&(a,_)| a) {
-                    Ok(x) => &mut v.get_mut(x).unwrap().1,
-                    Err(_) => panic!("get wurde mit einem nicht existierenden Schlüssel {} aufgerufen",*k),
-                }
-            },
-            PointerEnum::First(x) => {
-                x.get_mut(k).unwrap()
-            },
-        }
+        self.pointer.get_mut(k).unwrap()
     }
 
+    #[inline]
     pub fn insert(&mut self, key: K, val: T) {
-        if self.pointer.is_null() {
-            self.pointer = Pointer::from_second(Box::new(Vec::new()));
-        }
-
-        match self.pointer.get() {
-            PointerEnum::Second(x) => {
-                if x.len() < 20000 {
-                    x.push((key,val));
-                    //x.reserve_exact(0);
-                }
-                else {
-                    let fnv = std::hash::BuildHasherDefault::<fnv::FnvHasher>::default();
-                    let mut h = HashMap::with_capacity_and_hasher(1025,fnv);
-                    let x = std::mem::replace(x, vec![]);
-                    for val in x.into_iter() {
-                        h.insert(val.0,val.1);
-                    }
-
-                    h.insert(key,val);
-                    self.pointer = Pointer::from_first(Box::new(h))
-                }
-            },
-            PointerEnum::First(x) => {
-                x.insert(key,val);
-            },
-        }
+        self.pointer.insert(key,val);
     }
+
 
     pub fn try_get(&self, key: K, lx_top: &[u64]) -> Option<&T> {
         let k: u16 = key.clone().into();
@@ -569,17 +537,7 @@ impl<K:'static + Eq + Into<u16> + Ord + std::fmt::Display + Copy + std::hash::Ha
 
         // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
         if (lx_top[index] & in_index_mask) != 0 {
-             match self.pointer.get() {
-                PointerEnum::Second(v) => {
-                    match v.binary_search_by_key(&key,|&(a,_)| a) {
-                        Ok(x) => v.get(x).map(|x| &x.1),
-                        Err(_) => None,
-                    }
-                },
-                PointerEnum::First(x) => {
-                    x.get(&key)
-                },
-             }
+            self.pointer.get(&key) 
         } else {
             None
         }
