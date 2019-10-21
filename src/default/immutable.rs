@@ -1,6 +1,6 @@
 use uint::{u40, u48};
 
-use crate::default::build::{build_lx_top,build_root_top, create_root_top};
+use crate::default::build::{insert_l3_level, build_lx_top,build_root_top, create_root_top};
 use crate::internal::{Splittable, MphfHashMapThres};
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
@@ -26,7 +26,12 @@ pub struct LevelPointer<T: 'static> {
 }
 
 impl<T: 'static> LevelPointer<T> {
+
     fn minimum(&self) -> usize {
+        if self.pointer.is_null() {
+            panic!("Minimum-Aufruf auf Null!");
+        }
+
         match self.pointer.get() {
             PointerEnum::First(l) => {
                 (*l).minimum
@@ -39,6 +44,10 @@ impl<T: 'static> LevelPointer<T> {
     }
 
     fn maximum(&self) -> usize {
+        if self.pointer.is_null() {
+            panic!("Maximum-Aufruf auf Null!");
+        }
+        
         match self.pointer.get() {
             PointerEnum::First(l) => {
                 (*l).maximum
@@ -74,10 +83,6 @@ impl<T: 'static> LevelPointer<T> {
         Self {
             pointer: internal::Pointer::from_second(usize_box)
         }
-    }
-
-    pub fn change_to_usize(&mut self, usize_box: Box<usize>) {
-        self.pointer = internal::Pointer::from_second(usize_box);
     }
 }
 
@@ -146,37 +151,16 @@ impl<T: Int> STree<T> {
                 match root_table[i].get() {
                     PointerEnum::First(l2_object) => {
                         l2_object.maximum = index;
-                        if l2_object.contains(j) {
-                            match l2_object.hash_map.get(&j).get() {
-                                PointerEnum::First(l3_object) => {
-                                    l3_object.maximum = index;
-                                    build_lx_top(&mut l3_object.lx_top, k);
-                                    l3_object.hash_map.insert(k, index);
-                                    
-                                },
-                                PointerEnum::Second(elem_index) => {
-                                    let mut l3_object = Level::new(1_usize<<(((std::mem::size_of::<T>()*8)/2)/2));
-                                    let (_,_,k2) = Splittable::split_integer_down(&elements[*elem_index]);
-                                    l3_object.minimum = *elem_index;
-                                    l3_object.maximum = index;
 
+                        if !l2_object.contains(j) {
+                            let mut l3_level = L3Ebene::from_null();
+                            insert_l3_level(&mut l3_level,index,k,&elements);
 
-                                    debug_assert!(k!=k2);
-                                    // da alle Elemente unterschiedlich sind: 
-
-                                    build_lx_top(&mut l3_object.lx_top, k);
-                                    build_lx_top(&mut l3_object.lx_top, k2);
-
-                                    
-                                    l3_object.hash_map.insert(k2, *elem_index);
-                                    l3_object.hash_map.insert(k, index);
-
-                                    *l2_object.hash_map.get(&j) = L3Ebene::from_level(Box::new(l3_object));
-                                }
-                            }
-                        } else {
+                            l2_object.hash_map.insert(j,l3_level);
                             build_lx_top(&mut l2_object.lx_top, j);
-                            l2_object.hash_map.insert(j,L3Ebene::from_usize(Box::new(index)));
+                        } else {
+                            // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
+                            insert_l3_level(l2_object.hash_map.get(&j),index,k,&elements);
                         }
       
                     },
@@ -192,30 +176,22 @@ impl<T: Int> STree<T> {
 
                         build_lx_top(&mut l2_object.lx_top, j);
 
-                        if j2 != j {
-                            let l3_ptr = L3Ebene::from_usize(Box::new(index));
-                            let l3_ptr2 = L3Ebene::from_usize(Box::new(*elem_index));
-                            l2_object.hash_map.insert(j2,l3_ptr2);
-                            l2_object.hash_map.insert(j,l3_ptr);
+                        let mut l3_level = L3Ebene::from_null();
 
+                        if j2 != j {
+                            let mut l3_level = L3Ebene::from_null();
+                            insert_l3_level(&mut l3_level,*elem_index,k2,&elements);
+
+                            l2_object.hash_map.insert(j2,l3_level);
                             build_lx_top(&mut l2_object.lx_top, j2);
                         } else {
-                            let mut l3_object = Level::new(lx_array_size);
-                            l3_object.minimum = l2_object.minimum;
-                            l3_object.maximum = l2_object.maximum;
-
-                            debug_assert!(k!=k2);
-
-                            build_lx_top(&mut l3_object.lx_top, k);
-                            build_lx_top(&mut l3_object.lx_top, k2);
-          
-                            l3_object.hash_map.insert(k2,*elem_index);
-                            l3_object.hash_map.insert(k,index);
-
-                            l2_object.hash_map.insert(j,L3Ebene::from_level(Box::new(l3_object)));
+                            insert_l3_level(&mut l3_level,*elem_index,k2,&elements);
                         }
  
-                        root_table[i] = LevelPointer::from_level(Box::new(l2_object));
+                        insert_l3_level(&mut l3_level,index,k,&elements);
+                        l2_object.hash_map.insert(j,l3_level);
+
+                        root_table[i] = L2Ebene::from_level(Box::new(l2_object));
                     },
                 }
             }

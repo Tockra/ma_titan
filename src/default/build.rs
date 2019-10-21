@@ -21,6 +21,47 @@ pub fn build_root_top(root_top: &mut Box<[Box<[u64]>]>, bit: &usize) {
     }
 }
 
+use crate::default::immutable::{Level,L3Ebene};
+use crate::internal::{Splittable,PointerEnum};
+#[inline]
+pub fn insert_l3_level<T: Int + Into<u64>>(l3_level: &mut L3Ebene,index: usize, k: u16, elements: &[T]) {
+    let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
+
+    if l3_level.is_null() {
+        *l3_level = L3Ebene::from_usize(Box::new(index));
+    } else {
+        match l3_level.get() {
+            PointerEnum::First(l3_level) => {
+
+                debug_assert!(!l3_level.contains(k));
+                build_lx_top(&mut l3_level.lx_top, k);
+            
+                //Maximasetzung auf der zweiten Ebene
+                l3_level.maximum = index;
+
+                l3_level.hash_map.insert(k, index);
+            },
+
+            PointerEnum::Second(e) => {
+                let (_,_,k2) = Splittable::split_integer_down(&elements[*e]);
+                let mut l3_level_n = Level::new(lx_array_size/64);
+
+                debug_assert!(k2!=k);
+
+                    // Minima- und Maximasetzung auf der zweiten Ebene
+                l3_level_n.minimum = *e;
+                l3_level_n.maximum = index;
+
+                l3_level_n.hash_map.insert(k2, *e);
+                l3_level_n.hash_map.insert(k, index);
+                build_lx_top(&mut l3_level_n.lx_top, k);
+                build_lx_top(&mut l3_level_n.lx_top, k2);
+                
+                *l3_level = L3Ebene::from_level(Box::new(l3_level_n));
+            }
+        }
+    }
+}
 /// Baut das Root-Top-Array mit Hilfe der sich in der Datenstruktur befindenden Werte.
 #[inline]
 pub fn create_root_top<T:Int>() -> Box<[Box<[u64]>]>{
