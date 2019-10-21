@@ -326,7 +326,7 @@ impl<T> BuilderLevel<T> {
 
 use crate::internal::{self, PointerEnum};
 pub struct BuildHM<K,T> {
-    pointer: internal::Pointer<HashMap<K,T>,Vec<(K,T)>>,
+    pointer: internal::Pointer<HashMap<K,T>,(Box<Vec<K>>,Box<Vec<T>>)>,
 }
 
 impl<K:'static + Clone,T:'static + Clone> Clone for BuildHM<K,T> {
@@ -340,7 +340,7 @@ impl<K:'static + Clone,T:'static + Clone> Clone for BuildHM<K,T> {
 impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
     fn new() -> Self{
         Self {
-            pointer: internal::Pointer::from_second(Box::new(Vec::<(K,T)>::new()))
+            pointer: internal::Pointer::from_second(Box::new((Box::new(vec![]),Box::new(vec![]))))
         }
     }
 
@@ -351,10 +351,10 @@ impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
                 if x.len() <= 512 {
                     x.push((key,val));
                 } else {
-                    let mut hm = HashMap::<K,T>::with_capacity(513);
-                    let x = std::mem::replace(x, vec![]);
-                    for val in x.into_iter() {
-                        hm.insert(val.0, val.1);
+                    let mut hm = HashMap::<K,T>::with_capacity(1025);
+                    let values = std::mem::replace(values, Box::new(vec![]));
+                    for (i,val) in values.into_iter().enumerate() {
+                        hm.insert(keys[i], val);
                     }
                     hm.insert(key, val);
                     self.pointer = internal::Pointer::from_first(Box::new(hm));
@@ -368,9 +368,9 @@ impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
 
     fn get_mut(&mut self, k: &K) -> Option<&mut T> {
         match self.pointer.get() {
-            PointerEnum::Second(v) => {
-                match v.binary_search_by_key(k,|&(a,_)| a) {
-                    Ok(x) => v.get_mut(x).map(|x| &mut x.1),
+            PointerEnum::Second((keys,values)) => {
+                match keys.binary_search(k) {
+                    Ok(x) => values.get_mut(x),
                     Err(_) => None,
                 }
             },
@@ -382,9 +382,9 @@ impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
 
     fn get(&mut self, k: &K) -> Option<&T> {
         match self.pointer.get() {
-            PointerEnum::Second(v) => {
-                match v.binary_search_by_key(k,|&(a,_)| a) {
-                    Ok(x) => v.get(x).map(|x| &x.1),
+            PointerEnum::Second((keys,values)) => {
+                match keys.binary_search(k) {
+                    Ok(x) => values.get(x),
                     Err(_) => None,
                 }
             },
