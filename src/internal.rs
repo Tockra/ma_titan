@@ -559,7 +559,7 @@ impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + st
 type HashMap<K,T> = MphfHashMap<K,T>;
 
 pub struct MphfHashMapThres<K,T> {
-    pointer: Pointer<HashMap<K,T>,Box<[(K,T)]>>,
+    pointer: Pointer<HashMap<K,T>,(Box<[K]>,Box<[T]>)>,
 }
 
 impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
@@ -574,14 +574,8 @@ impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync 
     pub fn new(keys: &Vec<K>, objects: Box<[T]>) -> Self {
         LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
         if keys.len() <= 512 {
-            let mut values = Vec::with_capacity(keys.len());
-            
-            let objects = objects.into_vec();
-            for (i,elem) in objects.into_iter().enumerate() {
-                values.push((keys[i],elem));
-            }
             Self {
-                pointer: Pointer::from_second(Box::new(values.into_boxed_slice())),
+                pointer: Pointer::from_second(Box::new((keys.clone().into_boxed_slice(),objects))),
             }
         } else {
             HASH_FUNCTION_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -594,9 +588,9 @@ impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync 
 
     pub fn get(&mut self, k: &K) -> &mut T {
         match self.pointer.get() {
-            PointerEnum::Second(v) => {
-                match v.binary_search_by_key(k,|&(a,_)| a) {
-                    Ok(x) => &mut v.get_mut(x).unwrap().1,
+            PointerEnum::Second((keys,values)) => {
+                match keys.binary_search(k) {
+                    Ok(x) => values.get_mut(x).unwrap(),
                     _ => panic!("get in internal wurde mit ungültigem Schlüssel {} aufgerufen.", k),
                 }
             },
@@ -614,9 +608,9 @@ impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync 
         // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
         if (lx_top[index] & in_index_mask) != 0 {
              match self.pointer.get() {
-                PointerEnum::Second(v) => {
-                    match v.binary_search_by_key(&key,|&(a,_)| a) {
-                        Ok(x) => v.get(x).map(|x| &x.1),
+                PointerEnum::Second((keys,values)) => {
+                    match keys.binary_search(&key) {
+                        Ok(x) => values.get(x),
                         _ => None,
                     }
                 },
