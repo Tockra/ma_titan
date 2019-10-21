@@ -540,7 +540,7 @@ impl<K:'static + Eq + Into<u16> + Ord + std::fmt::Display + Copy + std::hash::Ha
 
         match self.pointer.get() {
             PointerEnum::Second(x) => {
-                if x.len() < 1024 {
+                if x.len() < 20000 {
                     x.push((key,val));
                     //x.reserve_exact(0);
                 }
@@ -548,8 +548,8 @@ impl<K:'static + Eq + Into<u16> + Ord + std::fmt::Display + Copy + std::hash::Ha
                     let fnv = std::hash::BuildHasherDefault::<fnv::FnvHasher>::default();
                     let mut h = HashMap::with_capacity_and_hasher(1025,fnv);
                     let x = std::mem::replace(x, vec![]);
-                    for (k,v) in x.into_iter() {
-                        h.insert(k,v);
+                    for val in x.into_iter() {
+                        h.insert(val.0,val.1);
                     }
 
                     h.insert(key,val);
