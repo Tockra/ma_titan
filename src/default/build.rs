@@ -348,7 +348,7 @@ impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
     fn insert(&mut self, key: K, val: T) {
         match self.pointer.get() {
             PointerEnum::Second(x) => {
-                if x.len() <= 1024 {
+                if x.len() <= 512 {
                     x.push((key,val));
                 } else {
                     let mut hm = HashMap::<K,T>::with_capacity(513);
