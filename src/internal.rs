@@ -570,7 +570,7 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
     }
 }
 
-impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
+impl<K:'static + Eq + std::fmt::Display + std::fmt::Debug + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
     pub fn new(keys: &Vec<K>, objects: Box<[T]>) -> Self {
         LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
         if keys.len() <= 128 {
@@ -594,25 +594,10 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
 
     pub fn get(&mut self, k: &K) -> &mut T {
         match self.pointer.get() {
-            PointerEnum::Second(x) => {
-                let mut l = 0;
-                let mut r = x.len()-1;
-
-                while l != r && x[l].0 != *k && x[r].0 != *k{
-                    let m = (l+r)/2;
-                    if *k == x[m].0 {
-                        return &mut x[m].1;
-                    } else if *k > x[m].0 {
-                        l = m+1;
-                    } else {
-                        r = m-1;
-                    }
-                }
-
-                if x[l].0 == *k  {
-                    &mut x[l].1
-                } else {
-                    &mut x[r].1
+            PointerEnum::Second(v) => {
+                match v.binary_search_by_key(k,|&(a,_)| a) {
+                    Ok(x) => &mut v.get_mut(x).unwrap().1,
+                    _ => panic!("get in internal wurde mit ungültigem Schlüssel {} aufgerufen.", k),
                 }
             },
             PointerEnum::First(x) => {
@@ -629,25 +614,10 @@ impl<K:'static + Eq + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfH
         // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
         if (lx_top[index] & in_index_mask) != 0 {
              match self.pointer.get() {
-                PointerEnum::Second(x) => {
-                    let mut l = 0;
-                    let mut r = x.len()-1;
-
-                    while l != r && x[l].0 != key && x[r].0 != key{
-                        let m = (l+r)/2;
-                        if key == x[m].0 {
-                            return Some(&x[m].1);
-                        } else if key > x[m].0 {
-                            l = m+1;
-                        } else {
-                            r = m-1;
-                        }
-                    }
-
-                    if x[l].0 == key  {
-                        Some(&x[l].1)
-                    } else {
-                        Some(&x[r].1)
+                PointerEnum::Second(v) => {
+                    match v.binary_search_by_key(&key,|&(a,_)| a) {
+                        Ok(x) => v.get(x).map(|x| &x.1),
+                        _ => None,
                     }
                 },
                 PointerEnum::First(x) => {

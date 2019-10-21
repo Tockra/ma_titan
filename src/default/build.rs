@@ -87,7 +87,6 @@ impl STreeBuilder {
                         let (_,j2,k2) = Splittable::split_integer_down(&elements[*e]);
                         let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
                         let mut second_level = BuilderLevel::new(lx_array_size/64);
-                        second_level.keys.push(j);
 
                         Self::build_lx_top(&mut second_level.lx_top, j);
                         // Minima- und Maximasetzung auf der ersten Ebene
@@ -106,6 +105,9 @@ impl STreeBuilder {
                         } else {
                             Self::insert_l3_level(&mut l3_level,*e,k2,&elements);
                         }
+
+                        // Reihenfolge der keys ist relevant!
+                        second_level.keys.push(j);
                         Self::insert_l3_level(&mut l3_level,index,k,&elements);
                         second_level.hash_map.insert(j,l3_level);
 
@@ -141,8 +143,8 @@ impl STreeBuilder {
                 PointerEnum::Second(e) => {
                     let (_,_,k2) = Splittable::split_integer_down(&elements[*e]);
                     let mut l3_level_n = BuilderLevel::new(lx_array_size/64);
-                    l3_level_n.keys.push(k);
                     l3_level_n.keys.push(k2);
+                    l3_level_n.keys.push(k);
 
                     debug_assert!(k2!=k);
 
@@ -335,7 +337,7 @@ impl<K:'static + Clone,T:'static + Clone> Clone for BuildHM<K,T> {
     }
 }
 
-impl<K:'static + Eq + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
+impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
     fn new() -> Self{
         Self {
             pointer: internal::Pointer::from_second(Box::new(Vec::<(K,T)>::new()))
@@ -346,10 +348,10 @@ impl<K:'static + Eq + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
     fn insert(&mut self, key: K, val: T) {
         match self.pointer.get() {
             PointerEnum::Second(x) => {
-                if x.len() <= 1023 {
+                if x.len() <= 1024 {
                     x.push((key,val));
                 } else {
-                    let mut hm = HashMap::<K,T>::with_capacity(1025);
+                    let mut hm = HashMap::<K,T>::with_capacity(513);
                     let x = std::mem::replace(x, vec![]);
                     for val in x.into_iter() {
                         hm.insert(val.0, val.1);
@@ -366,25 +368,10 @@ impl<K:'static + Eq + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
 
     fn get_mut(&mut self, k: &K) -> Option<&mut T> {
         match self.pointer.get() {
-            PointerEnum::Second(x) => {
-                let mut l = 0;
-                let mut r = x.len()-1;
-
-                while l != r && x[l].0 != *k && x[r].0 != *k{
-                    let m = (l+r)/2;
-                    if *k == x[m].0 {
-                        return Some(&mut x[m].1);
-                    } else if *k > x[m].0 {
-                        l = m+1;
-                    } else {
-                        r = m-1;
-                    }
-                }
-
-                if x[l].0 == *k  {
-                    Some(&mut x[l].1)
-                } else {
-                    Some(&mut x[r].1)
+            PointerEnum::Second(v) => {
+                match v.binary_search_by_key(k,|&(a,_)| a) {
+                    Ok(x) => v.get_mut(x).map(|x| &mut x.1),
+                    Err(_) => None,
                 }
             },
             PointerEnum::First(x) => {
@@ -395,25 +382,10 @@ impl<K:'static + Eq + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
 
     fn get(&mut self, k: &K) -> Option<&T> {
         match self.pointer.get() {
-            PointerEnum::Second(x) => {
-                let mut l = 0;
-                let mut r = x.len()-1;
-
-                while l != r && x[l].0 != *k && x[r].0 != *k{
-                    let m = (l+r)/2;
-                    if *k == x[m].0 {
-                        return Some(&x[m].1);
-                    } else if *k > x[m].0 {
-                        l = m+1;
-                    } else {
-                        r = m-1;
-                    }
-                }
-
-                if x[l].0 == *k  {
-                    Some(&x[l].1)
-                } else {
-                    Some(&x[r].1)
+            PointerEnum::Second(v) => {
+                match v.binary_search_by_key(k,|&(a,_)| a) {
+                    Ok(x) => v.get(x).map(|x| &x.1),
+                    Err(_) => None,
                 }
             },
             PointerEnum::First(x) => {
