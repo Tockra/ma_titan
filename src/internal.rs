@@ -573,7 +573,7 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
 impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
     pub fn new(keys: &Vec<K>, objects: Box<[T]>) -> Self {
         LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
-        if keys.len() <= 512 {
+        if keys.len() <= 378 {
             let mut values = Vec::with_capacity(keys.len());
             
             let objects = objects.into_vec();
