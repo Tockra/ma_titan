@@ -1,7 +1,7 @@
 use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
-use crate::internal::{Splittable, MphfHashMapThres, LEVEL_COUNT, HASH_FUNCTION_COUNT};
+use crate::internal::{Splittable, MphfHashMapThres, LEVEL_COUNT, HASH_MAPS_IN_BYTES};
 use std::sync::atomic::Ordering;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
@@ -99,6 +99,12 @@ pub struct STree<T> {
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
     pub element_list: Box<[T]>,
+
+    /// DEBUG: Zur Evaluierung der Datenstruktur Nur in *_space Branches vorhanden
+    pub hash_maps_in_bytes: usize,
+
+    /// DEBUG: Zur Evaluierung der Datenstruktur Nur in *_space Branches vorhanden
+    pub level_count: usize,
 }
 
 /// Dieser Trait dient als Platzhalter für u40, u48 und u64. 
@@ -132,18 +138,18 @@ impl<T: Int> STree<T> {
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
     pub fn new(elements: Box<[T]>) -> Self {
-        HASH_FUNCTION_COUNT.store(0, Ordering::SeqCst);
+        HASH_MAPS_IN_BYTES.store(0, Ordering::SeqCst);
         LEVEL_COUNT.store(0, Ordering::SeqCst);
         let mut builder = STreeBuilder::new(elements.clone());
 
         let root_top = builder.get_root_tops();
-        let st = STree {
+        STree {
             root_table: builder.build::<T>(),
             root_top: root_top,
             element_list: elements,
-        };
-        println!("STree ({}) angelegt. Anzahl der Level: {}, Anzahl der echten Hashfunktionen: {}",st.len(),LEVEL_COUNT.load(Ordering::SeqCst),HASH_FUNCTION_COUNT.load(Ordering::SeqCst));
-        st
+            hash_maps_in_bytes: HASH_MAPS_IN_BYTES.load(Ordering::SeqCst),
+            level_count: LEVEL_COUNT.load(Ordering::SeqCst),
+        }
     }
 
 
