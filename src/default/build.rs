@@ -1,6 +1,7 @@
 use crate::internal::{Splittable};
 use crate::default::immutable::{Level, L2Ebene, Int, LevelPointer};
-
+use stats_alloc::{StatsAlloc};
+use std::alloc::System;
 type HashMap<K,T> = hashbrown::hash_map::HashMap<K,T>;
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
@@ -163,10 +164,11 @@ impl STreeBuilder {
         }
     }
 
+
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
     /// angelegt und miteinander verbunden. Nachdem die Struktur mit normalen Hashfunktionen gebaut wurde können nun perfekte Hashfunktionen berechnet 
     /// werden!
-    pub fn build<T: Int>(&mut self) -> Box<[L2Ebene]> {
+    pub fn build<T: Int>(&mut self, GLOBAL: &'static StatsAlloc<System>) -> Box<[L2Ebene]> {
         let mut tmp: Vec<L2Ebene> = Vec::with_capacity(T::root_array_size());
         // Die L2Level-Elemente werden angelegt. Hierbei wird direkt in der new()-Funktion die perfekte Hashfunktion berechnet
         for i in 0..tmp.capacity() {
@@ -177,7 +179,7 @@ impl STreeBuilder {
                     PointerEnum::First(l) => {
                         let second_level = l;
 
-                        let val = Box::new(Level::new(std::mem::replace(&mut second_level.lx_top, Box::new([])), vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), Some(&second_level.keys),second_level.minimum, second_level.maximum));
+                        let val = Box::new(Level::new(GLOBAL, std::mem::replace(&mut second_level.lx_top, Box::new([])), vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), Some(&second_level.keys),second_level.minimum, second_level.maximum));
                         tmp.push(LevelPointer::from_level(val));
                     },
 
@@ -209,7 +211,7 @@ impl STreeBuilder {
                                         *pointered_data =  match l3_level.get() {
                                             PointerEnum::First(l2) => {
                                                 let l3_level = l2;
-                                                let mut level = Level::new(std::mem::replace(&mut l3_level.lx_top, Box::new([])), vec![0; l3_level.keys.len()].into_boxed_slice(), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
+                                                let mut level = Level::new(GLOBAL, std::mem::replace(&mut l3_level.lx_top, Box::new([])), vec![0; l3_level.keys.len()].into_boxed_slice(), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
                                                 for k in &l3_level.keys {
                                                     let result = level.get(*k);
                                                     *result = *l3_level.hash_map.get(k).unwrap();

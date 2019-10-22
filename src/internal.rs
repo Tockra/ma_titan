@@ -498,10 +498,6 @@ impl<T,E> Pointer<T,E> {
     }
 }
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-pub static LEVEL_COUNT: AtomicUsize = AtomicUsize::new(0);
-pub static HASH_FUNCTION_COUNT: AtomicUsize = AtomicUsize::new(0);
-
 /// Dies ist ein Wrapper um die Mphf-Hashfunktion. Es wird nicht die interne Implementierung verwendet, da 
 /// bei dieser das Gamma nicht beeinflusst werden kann. 
 use crate::default::build::GAMMA;
@@ -570,18 +566,35 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
     }
 }
 
+extern crate stats_alloc;
+
+/// DEBUG: Zur Evaluierung der Datenstruktur Nur in *_space Branches vorhanden
+use std::sync::atomic::{AtomicUsize, Ordering};
+pub static LEVEL_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub static HASH_MAPS_IN_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+use stats_alloc::Region;
+use stats_alloc::{StatsAlloc};
+use std::alloc::System;
+
+
+
 impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
-    pub fn new(keys: &Vec<K>, objects: Box<[T]>) -> Self {
+    pub fn new(GLOBAL: &'static StatsAlloc<System>, keys: &Vec<K>, objects: Box<[T]>) -> Self {
         LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
         if keys.len() <= 378 {
             Self {
                 pointer: Pointer::from_second(Box::new((keys.clone().into_boxed_slice(),objects))),
             }
         } else {
-            HASH_FUNCTION_COUNT.fetch_add(1, Ordering::SeqCst);
-            Self {
+            let reg = Region::new(GLOBAL);
+
+            let result = Self {
                 pointer: Pointer::from_first(Box::new(HashMap::new(keys, objects))),
-            }
+            };
+            let change = reg.change();
+            HASH_MAPS_IN_BYTES.fetch_add(change.bytes_current_used, Ordering::SeqCst);
+            result
         }
 
     }
