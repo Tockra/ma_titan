@@ -1,7 +1,7 @@
 use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
-use crate::internal::{Splittable, MphfHashMapThres, LEVEL_COUNT, HASH_MAPS_IN_BYTES};
+use crate::internal::{Splittable, MphfHashMapThres, LEVEL_COUNT, HASH_MAPS_IN_BYTES, NUMBER_OF_KEYS};
 use std::sync::atomic::Ordering;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
@@ -109,6 +109,8 @@ pub struct STree<T> {
     /// DEBUG: Zur Evaluierung der Datenstruktur Nur in *_space Branches vorhanden
     pub level_count: usize,
 
+    pub number_of_keys: usize,
+
     pub GLOBAL: &'static StatsAlloc<System>,
 }
 
@@ -145,6 +147,8 @@ impl<T: Int> STree<T> {
     pub fn new(GLOBAL: &'static StatsAlloc<System>, elements: Box<[T]>) -> Self {
         HASH_MAPS_IN_BYTES.store(0, Ordering::SeqCst);
         LEVEL_COUNT.store(0, Ordering::SeqCst);
+        NUMBER_OF_KEYS.store(0, Ordering::SeqCst);
+        
         let mut builder = STreeBuilder::new(elements.clone());
 
         let root_top = builder.get_root_tops();
@@ -155,6 +159,7 @@ impl<T: Int> STree<T> {
             hash_maps_in_bytes: HASH_MAPS_IN_BYTES.load(Ordering::SeqCst),
             level_count: LEVEL_COUNT.load(Ordering::SeqCst),
             GLOBAL: GLOBAL,
+            number_of_keys: NUMBER_OF_KEYS.load(Ordering::SeqCst),
         }
     }
 
