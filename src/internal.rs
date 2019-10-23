@@ -572,6 +572,8 @@ extern crate stats_alloc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 pub static LEVEL_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static HASH_MAPS_IN_BYTES: AtomicUsize = AtomicUsize::new(0);
+pub static NUMBER_OF_KEYS: AtomicUsize = AtomicUsize::new(0);
+
 
 use stats_alloc::Region;
 use stats_alloc::{StatsAlloc};
@@ -582,7 +584,7 @@ use std::alloc::System;
 impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
     pub fn new(GLOBAL: &'static StatsAlloc<System>, keys: &Vec<K>, objects: Box<[T]>) -> Self {
         LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
-        if keys.len() <= 378 {
+        if keys.len() <= 168 {
             Self {
                 pointer: Pointer::from_second(Box::new((keys.clone().into_boxed_slice(),objects))),
             }
