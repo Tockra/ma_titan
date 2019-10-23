@@ -681,6 +681,8 @@ mod tests {
         }
     }
 
+    use num::Bounded;
+
     /// # Äquivalenzklassentest mit Bruteforce
     /// `locate_or_succ` wird getestet. Dabei werden in jeder Ebene die gesuchten Elemente einmal im Minimum, im Maximum und irgendwo dazwischen liegen.
     #[test]
