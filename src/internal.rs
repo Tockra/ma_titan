@@ -585,7 +585,7 @@ impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync 
     pub fn new(GLOBAL: &'static StatsAlloc<System>, keys: &Vec<K>, objects: Box<[T]>) -> Self {
         LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
         NUMBER_OF_KEYS.fetch_add(keys.len(),Ordering::SeqCst);
-        if keys.len() <= 512 {
+        if true {
             Self {
                 pointer: Pointer::from_second(Box::new((keys.clone().into_boxed_slice(),objects))),
             }
