@@ -11,3 +11,4 @@ fnv = "1.0.6"
 boomphf = {git = "https://github.com/10XGenomics/rust-boomphf.git"}
 uint = { git = "https://github.com/Tockra/uint.git" }
 vebtrees = {git = "https://github.com/Tockra/rust-vebtrees.git"}
+num = "0.2.0"
