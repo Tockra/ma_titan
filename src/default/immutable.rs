@@ -509,7 +509,6 @@ impl<E> LookupTable<E> {
         // benötigt die Eigenschaft, dass die keys sortiert sind
         let mut lookup_table = vec![0_u16;keys[keys.len()-1] as usize + 1];
         for (i,&k) in keys.into_iter().enumerate() {
-            debug_assert!(k < (1 <<10));
             lookup_table[k as usize] = i as u16;
         }
         Self {
