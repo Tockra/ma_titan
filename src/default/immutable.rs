@@ -1,7 +1,7 @@
 use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
-use crate::internal::{MphfHashMap,Splittable};
+use crate::internal::Splittable;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene = LevelPointer<L3Ebene>;
@@ -405,7 +405,7 @@ impl<T: Int> STree<T> {
 
 #[allow(dead_code)]
 /// Diese Datenstruktur dient als naive Hashmap. Sie speichert eine Lookuptable und die Daten
-struct LookupTableSmall<E> {
+pub struct LookupTableSmall<E> {
     /// (ehemaliges Array mit len= objects.len())
     table: *mut u8,
     objects: Box<[E]>,
@@ -431,7 +431,7 @@ impl<E> LookupTableSmall<E> {
     
     /// Vorbindung: keys sind sortiert. Weiterhin gilt keys.len() == objects.len() und  keys.len() > 0
     /// Nachbedingung : keys[i] -> objects[i]
-    fn new(keys: &[u8], objects: Box<[E]>) -> Self {
+    pub fn new(keys: &[u8], objects: Box<[E]>) -> Self {
         debug_assert!(keys.len() == objects.len());
 
         // benötigt die Eigenschaft, dass die keys sortiert sind
@@ -459,7 +459,7 @@ impl<E> LookupTableSmall<E> {
 }
 
 /// Diese Datenstruktur dient als naive Hashmap. Sie speichert eine Lookuptable und die Daten
-struct LookupTable<E> {
+pub struct LookupTable<E> {
     /// (ehemaliges Array mit len= objects.len())
     table: *mut u16,
     objects: Box<[E]>,
@@ -504,12 +504,12 @@ impl<E: Clone> Clone for LookupTable<E> {
 impl<E> LookupTable<E> {
     /// Vorbindung: keys sind sortiert. Weiterhin gilt keys.len() == objects.len() und  keys.len() > 0
     /// Nachbedingung : keys[i] -> objects[i]
-    fn new(keys: &[u16], objects: Box<[E]>) -> Self {
-        debug_assert!(keys.len() == objects.len());
+    pub fn new(keys: &[u16], objects: Box<[E]>) -> Self {
 
         // benötigt die Eigenschaft, dass die keys sortiert sind
         let mut lookup_table = vec![0_u16;keys[keys.len()-1] as usize + 1];
         for (i,&k) in keys.into_iter().enumerate() {
+            debug_assert!(k < (1 <<10));
             lookup_table[k as usize] = i as u16;
         }
         Self {
@@ -520,13 +520,13 @@ impl<E> LookupTable<E> {
 
     pub fn get(&self, key: &u16) -> &E {
         unsafe {
-            &self.objects[*((self.table as usize + (*key*2) as usize) as *mut u8) as usize]
+            &self.objects[*((self.table as usize + (*key*2) as usize) as *mut u16) as usize]
         }
     }
 
     pub fn get_mut(&mut self, key: &u16) -> &mut E {
         unsafe {
-            &mut self.objects[*((self.table as usize + (*key*2) as usize) as *mut u8) as usize]
+            &mut self.objects[*((self.table as usize + (*key*2) as usize) as *mut u16) as usize]
         }
     }
 }
@@ -536,7 +536,7 @@ impl<E> LookupTable<E> {
 #[repr(align(4))]
 pub struct Level<T: 'static> {
     /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist. 
-    hash_map: MphfHashMap<u16,T>,
+    hash_map: LookupTable<T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -560,7 +560,7 @@ impl<T> Level<T> {
     #[inline]
     pub fn new(lx_top: Box<[u64]>, objects: Box<[T]>, keys: Box<[u16]>, minimum: usize, maximum: usize) -> Level<T> {
         Level {
-            hash_map: MphfHashMap::new(keys, objects),
+            hash_map: LookupTable::new(&keys, objects),
             minimum: minimum,
             maximum: maximum,
             lx_top: lx_top,
@@ -575,7 +575,17 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn try_get(&self, key: u16) -> Option<&T> {
-        self.hash_map.try_get(key,&self.lx_top)
+        //self.hash_map.try_get(key,&self.lx_top)
+        let k: u16 = key;
+        let index = (k/64) as usize;
+        let in_index_mask = 1<<(63-(k % 64));
+
+        // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
+        if (self.lx_top[index] & in_index_mask) != 0 {
+            Some(self.hash_map.get(&key))
+        } else {
+            None
+        } 
     }
 
     /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
@@ -586,7 +596,8 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&mut self, key: u16) -> &mut T {
-        self.hash_map.get(&key)
+        //self.hash_map.get(&key)
+         self.hash_map.get_mut(&key)
     }
 
     
@@ -690,6 +701,7 @@ mod tests {
         assert_eq!(data_structure.maximum().unwrap(),u40::new(check.len() as u64 - 1));
         for val in check {
             let (i,j,k) = Splittable::split_integer_down(&val);
+
             match data_structure.root_table[i].get() {
                 PointerEnum::First(l) => {
                     let second_level = l.get(j);
