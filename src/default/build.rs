@@ -177,7 +177,7 @@ impl STreeBuilder {
                     PointerEnum::First(l) => {
                         let second_level = l;
 
-                        let val = Box::new(Level::new(std::mem::replace(&mut second_level.lx_top, Box::new([])), vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), Some(&second_level.keys),second_level.minimum, second_level.maximum));
+                        let val = Box::new(Level::new(std::mem::replace(&mut second_level.lx_top, Box::new([])), vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), second_level.clone().keys.into_boxed_slice(),second_level.minimum, second_level.maximum));
                         tmp.push(LevelPointer::from_level(val));
                     },
 
@@ -209,7 +209,7 @@ impl STreeBuilder {
                                         *pointered_data =  match l3_level.get() {
                                             PointerEnum::First(l2) => {
                                                 let l3_level = l2;
-                                                let mut level = Level::new(std::mem::replace(&mut l3_level.lx_top, Box::new([])), vec![0; l3_level.keys.len()].into_boxed_slice(), Some(&l3_level.keys),l3_level.minimum,l3_level.maximum);
+                                                let mut level = Level::new(std::mem::replace(&mut l3_level.lx_top, Box::new([])), vec![0; l3_level.keys.len()].into_boxed_slice(), l3_level.keys.clone().into_boxed_slice(),l3_level.minimum,l3_level.maximum);
                                                 for k in &l3_level.keys {
                                                     let result = level.get(*k);
                                                     *result = *l3_level.hash_map.get(k).unwrap();
