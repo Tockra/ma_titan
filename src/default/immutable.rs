@@ -418,10 +418,29 @@ impl<E> Drop for LookupTableSmall<E> {
             let max_index = self.objects.len()-1;
             let mut curr_value = self.table;
             while *curr_value as usize != max_index {
-                curr_value = (curr_value as usize + 1) as *mut u8;
+                curr_value = curr_value.offset(1);
                 len += 1;
             }
             Box::from_raw(std::slice::from_raw_parts_mut(self.table, len));
+        }
+    }
+}
+
+impl<E: Clone> Clone for LookupTableSmall<E> {
+    fn clone(&self) -> Self {
+        let mut new_lookup = vec![];
+        let max_index = self.objects.len()-1;
+        let mut curr_value = self.table;
+        unsafe {
+            while *curr_value as usize != max_index {
+                new_lookup.push(*curr_value);
+                curr_value = curr_value.offset(1);
+            }
+        }
+
+        Self {
+            table: Box::into_raw(new_lookup.into_boxed_slice()) as *mut u8,
+            objects: self.objects.clone()
         }
     }
 }
@@ -447,13 +466,13 @@ impl<E> LookupTableSmall<E> {
 
     pub fn get(&self, key: &u8) -> &E {
         unsafe {
-            &self.objects[*((self.table as usize + *key as usize) as *mut u8) as usize]
+            self.objects.get_unchecked(*self.table.offset(*key as isize) as usize)
         }
     }
 
     pub fn get_mut(&mut self, key: &u8) -> &mut E {
         unsafe {
-            &mut self.objects[*((self.table as usize + *key as usize) as *mut u8) as usize]
+            self.objects.get_unchecked_mut(*self.table.offset(*key as isize) as usize)
         }
     }
 }
@@ -472,7 +491,7 @@ impl<E> Drop for LookupTable<E> {
             let max_index = self.objects.len()-1;
             let mut curr_value = self.table;
             while *curr_value as usize != max_index {
-                curr_value = (curr_value as usize + 2) as *mut u16;
+                curr_value = curr_value.offset(1);
                 len += 1;
             }
             Box::from_raw(std::slice::from_raw_parts_mut(self.table, len));
@@ -489,7 +508,7 @@ impl<E: Clone> Clone for LookupTable<E> {
         unsafe {
             while *curr_value as usize != max_index {
                 new_lookup.push(*curr_value);
-                curr_value = (curr_value as usize + 2) as *mut u16;
+                curr_value = curr_value.offset(1);
             }
         }
 
@@ -519,13 +538,13 @@ impl<E> LookupTable<E> {
 
     pub fn get(&self, key: &u16) -> &E {
         unsafe {
-            &self.objects[*((self.table as usize + (*key*2) as usize) as *mut u16) as usize]
+            self.objects.get_unchecked(*self.table.offset(*key as isize) as usize)
         }
     }
 
     pub fn get_mut(&mut self, key: &u16) -> &mut E {
         unsafe {
-            &mut self.objects[*((self.table as usize + (*key*2) as usize) as *mut u16) as usize]
+            self.objects.get_unchecked_mut(*self.table.offset(*key as isize) as usize)
         }
     }
 }
