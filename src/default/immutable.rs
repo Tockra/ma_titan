@@ -403,12 +403,140 @@ impl<T: Int> STree<T> {
     }
 }
 
+#[allow(dead_code)]
+/// Diese Datenstruktur dient als naive Hashmap. Sie speichert eine Lookuptable und die Daten
+struct LookupTableSmall<E> {
+    /// (ehemaliges Array mit len= objects.len())
+    table: *mut u8,
+    objects: Box<[E]>,
+}
+
+impl<E> Drop for LookupTableSmall<E> {
+    fn drop(&mut self) {
+        unsafe {
+            let mut len = 0_usize;
+            let max_index = self.objects.len()-1;
+            let mut curr_value = self.table;
+            while *curr_value as usize != max_index {
+                curr_value = (curr_value as usize + 1) as *mut u8;
+                len += 1;
+            }
+            Box::from_raw(std::slice::from_raw_parts_mut(self.table, len));
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl<E> LookupTableSmall<E> {
+    
+    /// Vorbindung: keys sind sortiert. Weiterhin gilt keys.len() == objects.len() und  keys.len() > 0
+    /// Nachbedingung : keys[i] -> objects[i]
+    fn new(keys: &[u8], objects: Box<[E]>) -> Self {
+        debug_assert!(keys.len() == objects.len());
+
+        // benötigt die Eigenschaft, dass die keys sortiert sind
+        let mut lookup_table = vec![0_u8;keys[keys.len()-1] as usize + 1];
+        for (i,&k) in keys.into_iter().enumerate() {
+            lookup_table[k as usize] = i as u8;
+        }
+        Self {
+            table: Box::into_raw(lookup_table.into_boxed_slice()) as *mut u8,
+            objects: objects,
+        }
+    }
+
+    pub fn get(&self, key: &u8) -> &E {
+        unsafe {
+            &self.objects[*((self.table as usize + *key as usize) as *mut u8) as usize]
+        }
+    }
+
+    pub fn get_mut(&mut self, key: &u8) -> &mut E {
+        unsafe {
+            &mut self.objects[*((self.table as usize + *key as usize) as *mut u8) as usize]
+        }
+    }
+}
+
+/// Diese Datenstruktur dient als naive Hashmap. Sie speichert eine Lookuptable und die Daten
+struct LookupTable<E> {
+    /// (ehemaliges Array mit len= objects.len())
+    table: *mut u16,
+    objects: Box<[E]>,
+}
+
+impl<E> Drop for LookupTable<E> {
+    fn drop(&mut self) {
+        unsafe {
+            let mut len = 0_usize;
+            let max_index = self.objects.len()-1;
+            let mut curr_value = self.table;
+            while *curr_value as usize != max_index {
+                curr_value = (curr_value as usize + 2) as *mut u16;
+                len += 1;
+            }
+            Box::from_raw(std::slice::from_raw_parts_mut(self.table, len));
+        }
+    }
+}
+
+
+impl<E: Clone> Clone for LookupTable<E> {
+    fn clone(&self) -> Self {
+        let mut new_lookup = vec![];
+        let max_index = self.objects.len()-1;
+        let mut curr_value = self.table;
+        unsafe {
+            while *curr_value as usize != max_index {
+                new_lookup.push(*curr_value);
+                curr_value = (curr_value as usize + 2) as *mut u16;
+            }
+        }
+
+        Self {
+            table: Box::into_raw(new_lookup.into_boxed_slice()) as *mut u16,
+            objects: self.objects.clone()
+        }
+    }
+}
+
+
+impl<E> LookupTable<E> {
+    /// Vorbindung: keys sind sortiert. Weiterhin gilt keys.len() == objects.len() und  keys.len() > 0
+    /// Nachbedingung : keys[i] -> objects[i]
+    fn new(keys: &[u16], objects: Box<[E]>) -> Self {
+        debug_assert!(keys.len() == objects.len());
+
+        // benötigt die Eigenschaft, dass die keys sortiert sind
+        let mut lookup_table = vec![0_u16;keys[keys.len()-1] as usize + 1];
+        for (i,&k) in keys.into_iter().enumerate() {
+            lookup_table[k as usize] = i as u16;
+        }
+        Self {
+            table: Box::into_raw(lookup_table.into_boxed_slice()) as *mut u16,
+            objects: objects,
+        }
+    }
+
+    pub fn get(&self, key: &u16) -> &E {
+        unsafe {
+            &self.objects[*((self.table as usize + (*key*2) as usize) as *mut u8) as usize]
+        }
+    }
+
+    pub fn get_mut(&mut self, key: &u16) -> &mut E {
+        unsafe {
+            &mut self.objects[*((self.table as usize + (*key*2) as usize) as *mut u8) as usize]
+        }
+    }
+}
+
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 #[derive(Clone)]
 #[repr(align(4))]
 pub struct Level<T: 'static> {
     /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist. 
-    pub hash_map: MphfHashMap<u16,T>,
+    hash_map: MphfHashMap<u16,T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
