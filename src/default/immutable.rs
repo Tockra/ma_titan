@@ -435,7 +435,7 @@ impl<T: Int> STree<T> {
 #[repr(align(4))]
 pub struct Level<T: 'static> {
     /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist. 
-    pub hash_map: Option<MphfHashMapThres<u16,T>>,
+    pub hash_map: MphfHashMapThres<u16,T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -457,24 +457,13 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(GLOBAL: &'static StatsAlloc<System>, lx_top: Box<[u64]>, objects: Box<[T]>, keys: Option<&Vec<u16>>, minimum: usize, maximum: usize) -> Level<T> {
-        match keys {
-            Some(x) => {
-                Level {
-                    hash_map: Some(MphfHashMapThres::new(GLOBAL, x, objects)),
-                    minimum: minimum,
-                    maximum: maximum,
-                    lx_top: lx_top,
-                }
-    
-            },
-            None => Level {
-                hash_map: None,
-                minimum: minimum,
-                maximum: maximum,
-                lx_top: lx_top,
-            }
-        }
+    pub fn new(GLOBAL: &'static StatsAlloc<System>, lx_top: Box<[u64]>, objects: Box<[T]>, keys: Box<[u16]>, minimum: usize, maximum: usize) -> Level<T> {
+        Level {
+            hash_map: MphfHashMapThres::new(GLOBAL, keys, objects),
+            minimum: minimum,
+            maximum: maximum,
+            lx_top: lx_top,
+        } 
     }
 
     /// Mit Hilfe dieser Funktion kann die perfekte Hashfunktion verwendet werden. 
@@ -485,7 +474,7 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn try_get(&self, key: u16) -> Option<&T> {
-        self.hash_map.as_ref().map_or(None,|x| x.try_get(key,&self.lx_top))
+        self.hash_map.try_get(key,&self.lx_top)
     }
 
     /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
@@ -496,7 +485,7 @@ impl<T> Level<T> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&mut self, key: u16) -> &mut T {
-        self.hash_map.as_mut().unwrap().get(&key)
+        self.hash_map.get(&key)
     }
 
     
