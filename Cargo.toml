@@ -10,3 +10,4 @@ boomphf = {git = "https://github.com/10XGenomics/rust-boomphf.git"}
 uint = { git = "https://github.com/Tockra/uint.git" }
 stats_alloc = { git = "https://github.com/Tockra/stats_alloc.git" }
 vebtrees = {git = "https://github.com/Tockra/rust-vebtrees.git"}
+num = "0.2.0"
