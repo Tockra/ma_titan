@@ -1,14 +1,5 @@
-#![allow(dead_code)]  
-use std::mem::{self};
-use std::ptr;
-
 use uint::{u40, u48};
 
-pub struct List<T> {
-    pub first: Option<Box<Element<T>>>,
-    pub last: *mut Element<T>,
-    pub len: usize,
-}
 
 pub trait PredecessorSet<T> {
     fn insert(&mut self,element: T);
@@ -19,179 +10,6 @@ pub trait PredecessorSet<T> {
     fn maximum(&self) -> Option<T>; 
     fn contains(&self, number: T) -> bool;
 }
-
-pub struct Element<T> {
-    pub next: Option<Box<Element<T>>>,
-    pub prev: *mut Element<T>,
-    pub elem: T,
-}
-
-impl<T> List<T> {
-    #[inline]
-    pub fn new() -> Self {
-        List {
-            first: None,
-            last: ptr::null_mut(),
-            len: 0,
-        }
-    }
-
-    pub fn insert_after(&mut self, element: &mut Element<T>, mut to_insert: Box<Element<T>>) {
-        to_insert.prev = element;
-        match element.next.as_mut() {
-            Some(x) => {
-                x.prev = &mut *to_insert;
-            },
-            None => {
-                self.last = &mut *to_insert;
-            },
-        };
-        to_insert.next = mem::replace(&mut element.next, None);
-        element.next = Some(to_insert);
-        self.increase_len();
-    }
-
-    // TODO Hier reicht eine Referenz, denn mittels der Referenz kann man auf ref.prev.next zugreifen, was dann den richtigen Wert entspricht.
-    pub fn insert_before(&mut self, element: &mut Element<T>, mut to_insert: Box<Element<T>>) {
-        to_insert.prev = element.prev;
-        if element.prev.is_null() {
-            element.prev = &mut *to_insert;
-            to_insert.next = self.first.take();
-            self.first = Some(to_insert);
-        } else {
-            unsafe {
-                let mut before = &mut (*element.prev);
-                element.prev = &mut *to_insert;
-                to_insert.next = before.next.take();
-                before.next = Some(to_insert);
-            }
-        }
-        
-        self.increase_len();
-    }
-
-    // Fügt am Ende der Liste ein Element mit Wert 'elem' ein.
-    #[inline]
-    pub fn insert_at_end(&mut self, elem: T) {
-        if self.len() == 0 {
-            let mut node = Box::new(Element {
-                next: None,
-                prev: ptr::null_mut(),
-                elem
-            });
-            self.last = &mut *node;
-            self.first = Some(node);
-        }
-        else {
-            let mut node = Box::new(Element {
-                next: None,
-                prev: self.last,
-                elem
-            });
-
-            let tmp: *mut _ = &mut *node;
-            unsafe {
-                (*(self.last)).next = Some(node);
-            }
-            self.last = tmp;
-        }
-        self.increase_len();
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
-    #[inline]
-    pub fn pop_front(&mut self) -> Option<T> {
-        self.first.take().map(|head| {
-            let head = *head;
-            self.first = head.next;
-
-            if self.first.is_none() {
-                self.last = ptr::null_mut();
-            } else {
-                self.first.as_mut().unwrap().prev =  ptr::null_mut();
-            }
-            
-            self.decrease_len();
-            head.elem
-        })
-    }
-
-    #[inline]
-    pub fn pop_back(&mut self) -> Option<T> {
-        unsafe {
-            let node = self.last.as_mut()
-                .and_then(|last| last.prev.as_mut())
-                .and_then(|second_last| second_last.next.take())
-                .or_else(|| {
-                    self.last = ptr::null_mut();
-                    self.first.take()
-                })?;
-
-            self.last = node.prev;
-            self.decrease_len();
-            Some(node.elem)
-        }
-    }
-
-    #[inline]
-    pub fn increase_len(&mut self) {
-        self.len += 1;
-    }
-
-    #[inline]
-    pub fn decrease_len(&mut self) {
-        if self.len == 0 {
-            panic!("Die Länge einer internal::List kann nicht 0 unterschreiten!");
-        }
-        self.len -= 1;
-    }
-}
-
-impl<T> Element<T> {
-    #[inline]
-    pub fn new(elem: T) -> Self {
-        Element {
-            next: None,
-            prev: ptr::null_mut(),
-            elem,
-        }
-    }
-
-    /* Hinter dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
-        muss beachtet werden, dass extern die Size angepasst werden muss und der Last-Zeiger evtl. angepasst werden muss. */
-    #[inline]
-    pub fn insert_after(&mut self, mut elem: Box<Element<T>>) {
-        elem.prev = self;
-        match self.next.as_mut() {
-            Some(x) => {x.prev = &mut *elem},
-            None => {},
-        };
-        elem.next = mem::replace(&mut self.next, None);
-        self.next = Some(elem);
-    }
-
-    /* Vor dem Element (self) wird das Element elem in die Liste eingefügt. Hier bei
-        muss beachtet werden, dass extern die Size angepasst werden muss und ggf. der First-Zeiger angepasst werden muss.  */
-    #[inline]
-    pub fn insert_before(mut self: Box<Self>, mut elem: Box<Element<T>>) -> Result<(), Box<Element<T>>> {
-        elem.prev = self.prev;
-        self.prev = &mut *elem;
-        elem.next = Some(self);
-        if elem.prev.is_null() {
-                Err(elem)
-        } else {
-            unsafe {
-                let mut before = &mut (*elem.prev);
-                before.next = Some(elem);
-            }
-            Ok(())
-        }
-    }
-}
-
 
 pub trait Splittable {
     fn split_integer_down(&self) -> (usize,u16,u16);
@@ -254,3 +72,148 @@ impl Splittable for u64 {
         (i,j,k)
     }
 } 
+
+pub enum PointerEnum<T: 'static, E: 'static> {
+    First(&'static mut T),
+    Second(&'static mut E)
+}
+
+/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein T oder ein E Objekt zeigt. Wichtig ist hierbei, dass T mit einem Vielfachen von 2 alligned werden muss!
+pub struct Pointer<T,E> {
+    pointer: *mut T,
+    phantom: std::marker::PhantomData<E>,
+}
+
+impl<T:'static + Clone,E:'static + Clone> Clone for Pointer<T,E> {
+    fn clone(&self) -> Self {
+        if self.pointer.is_null() {
+            Self::null()
+        } else {
+            match self.get() {
+                PointerEnum::First(x) => Self::from_first(Box::new(x.clone())),
+                PointerEnum::Second(x) => Self::from_second(Box::new(x.clone())),
+            }
+        }
+    }
+}
+
+impl<T,E> Drop for Pointer<T,E> {
+    fn drop(&mut self) {
+        if self.pointer.is_null() {
+            return;
+        }
+
+        if (self.pointer as usize % 2) == 0 {
+            unsafe { Box::from_raw(self.pointer) };
+        } else {
+            debug_assert!((self.pointer as usize % 2) == 1);
+
+            unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
+        }
+    }
+}
+
+impl<T,E> Pointer<T,E> {
+    pub fn from_first(b: Box<T>) -> Self {
+        let pointer = Box::into_raw(b);
+        debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        debug_assert!((pointer as usize % 2) == 0);
+
+        Self {
+            pointer: pointer,
+            phantom: std::marker::PhantomData
+        }
+    }
+
+    pub fn from_second(b: Box<E>) -> Self {
+        let pointer = Box::into_raw(b);
+        debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        debug_assert!((pointer as usize % 2) == 0);
+
+        let pointer = (pointer as usize + 1) as *mut T;
+        Self {
+            pointer: pointer,
+            phantom: std::marker::PhantomData
+        }
+    }
+
+
+    pub fn get(&self) -> PointerEnum<T,E> {
+        if self.pointer.is_null() {
+            panic!("Pointer<T> is null!");
+        }
+
+        if (self.pointer as usize % 2) == 0 {
+            unsafe {PointerEnum::First(&mut (*self.pointer))}
+        } else {
+            debug_assert!((self.pointer as usize % 2) == 1);
+
+            unsafe {PointerEnum::Second(&mut *((self.pointer as usize -1) as *mut E))}
+        }
+    }
+
+    pub fn null() -> Self {
+        Self {
+            pointer: std::ptr::null_mut(),
+            phantom: std::marker::PhantomData
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.pointer.is_null()
+    }
+}
+
+/// Dies ist ein Wrapper um die Mphf-Hashfunktion. Es wird nicht die interne Implementierung verwendet, da 
+/// bei dieser das Gamma nicht beeinflusst werden kann. 
+use crate::default::build::GAMMA;
+use boomphf::Mphf;
+
+#[derive(Clone)]
+pub struct MphfHashMap<K,V> {
+    hash_function: Mphf<K>,
+    objects: Box<[V]>,
+}
+
+impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Clone,V> MphfHashMap<K,V> {
+    pub fn new(keys: Box<[K]>, objects: Box<[V]>) -> Self {
+        Self {
+            hash_function: Mphf::new_parallel(GAMMA,&keys.to_vec(),None),
+            objects: objects
+        }
+    }
+
+       /// Mit Hilfe dieser Funktion kann die perfekte Hashfunktion verwendet werden. 
+    /// Es muss beachtet werden, dass sichergestellt werden muss, dass der verwendete Key auch existiert!
+    /// 
+    /// # Arguments
+    ///
+    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    #[inline]
+    pub fn try_get(&self, key: K, lx_top: &[u64]) -> Option<&V> {
+        let k: u16 = key.clone().into();
+        let index = (k/64) as usize;
+        let in_index_mask = 1<<(63-(k % 64));
+
+        // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
+        if (lx_top[index] & in_index_mask) != 0 {
+            let hash = self.hash_function.hash(&key) as usize;
+            self.objects.get(hash)
+        } else {
+            None
+        }
+    }
+
+    /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
+    /// das zu `key` ein Schlüssel gehört. Anderenfalls sollte `try_hash` verwendet werden
+    /// 
+    /// # Arguments
+    ///
+    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    #[inline]
+    pub fn get(&mut self, key: &K) -> &mut V {
+        let hash = self.hash_function.try_hash(key).unwrap() as usize;
+        self.objects.get_mut(hash).unwrap()
+    }
+
+}
