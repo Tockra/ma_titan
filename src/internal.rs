@@ -251,6 +251,7 @@ impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync 
     pub fn new(GLOBAL: &'static StatsAlloc<System>, keys: Box<[K]>, objects: Box<[T]>) -> Self {
         LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
         NUMBER_OF_KEYS.fetch_add(keys.len(),Ordering::SeqCst);
+        if true {
             Self {
                 pointer: Pointer::from_second(Box::new((keys.to_vec().into_boxed_slice(),objects))),
             }
