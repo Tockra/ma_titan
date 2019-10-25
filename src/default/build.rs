@@ -350,7 +350,7 @@ impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
     fn insert(&mut self, key: K, val: T) {
         match self.pointer.get() {
             PointerEnum::Second((keys,values)) => {
-                if false {
+                if true {
                     keys.push(key);
                     values.push(val);
                 } else {
