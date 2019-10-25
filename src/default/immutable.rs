@@ -78,6 +78,9 @@ impl<T: 'static> LevelPointer<T> {
     }
 }
 
+use stats_alloc::{StatsAlloc};
+use std::alloc::System;
+
 /// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 #[derive(Clone)]
@@ -100,6 +103,8 @@ pub struct STree<T> {
 
     /// DEBUG: Zur Evaluierung der Datenstruktur Nur in *_space Branches vorhanden
     pub level_count: usize,
+
+    pub GLOBAL: &'static StatsAlloc<System>,
 }
 
 /// Dieser Trait dient als Platzhalter für u40, u48 und u64. 
@@ -132,18 +137,19 @@ impl<T: Int> STree<T> {
     /// # Arguments
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new(elements: Box<[T]>) -> Self {
+    pub fn new(GLOBAL: &'static StatsAlloc<System>, elements: Box<[T]>) -> Self {
         HASH_MAPS_IN_BYTES.store(0, Ordering::SeqCst);
         LEVEL_COUNT.store(0, Ordering::SeqCst);
         let mut builder = STreeBuilder::new(elements.clone());
 
         let root_top = builder.get_root_tops();
         STree {
-            root_table: builder.build::<T>(),
+            root_table: builder.build::<T>(GLOBAL),
             root_top: root_top,
             element_list: elements,
             hash_maps_in_bytes: HASH_MAPS_IN_BYTES.load(Ordering::SeqCst),
             level_count: LEVEL_COUNT.load(Ordering::SeqCst),
+            GLOBAL: GLOBAL,
         }
     }
 
@@ -578,6 +584,13 @@ pub struct Level<T: 'static> {
     pub lx_top: Box<[u64]>,
 }
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+pub static LEVEL_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub static HASH_MAPS_IN_BYTES: AtomicUsize = AtomicUsize::new(0);
+use stats_alloc::{StatsAlloc};
+use stats_alloc::Region;
+use std::alloc::System;
+
 impl<T> Level<T> {
     /// Gibt ein Level<T> mit Origin-Key j zurück. Optional kann eine Schlüsselliste übergeben werden, für welche dann
     /// eine perfekte Hashfunktion generiert wird.
@@ -587,9 +600,9 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(lx_top: Box<[u64]>, objects: Box<[T]>, keys: Box<[u16]>, minimum: usize, maximum: usize) -> Level<T> {
+    pub fn new(GLOBAL: &'static StatsAlloc<System>, lx_top: Box<[u64]>, objects: Box<[T]>, keys: Box<[u16]>, minimum: usize, maximum: usize) -> Level<T> {
         Level {
-            hash_map: LookupTable::new(&keys, objects),
+            hash_map: LookupTable::new(GLOBAL, &keys, objects),
             minimum: minimum,
             maximum: maximum,
             lx_top: lx_top,
