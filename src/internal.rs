@@ -239,7 +239,7 @@ impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
 impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
     pub fn new(keys: Box<[K]>, objects: Box<[T]>) -> Self {
         LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
-        if keys.len() <= 168 {
+        if keys.len() <= 161 {
             Self {
                 pointer: Pointer::from_second(Box::new((keys.to_vec().into_boxed_slice(),objects))),
             }
