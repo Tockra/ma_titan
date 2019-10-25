@@ -164,10 +164,6 @@ impl<T,E> Pointer<T,E> {
     }
 }
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-pub static LEVEL_COUNT: AtomicUsize = AtomicUsize::new(0);
-pub static HASH_FUNCTION_COUNT: AtomicUsize = AtomicUsize::new(0);
-
 /// Dies ist ein Wrapper um die Mphf-Hashfunktion. Es wird nicht die interne Implementierung verwendet, da 
 /// bei dieser das Gamma nicht beeinflusst werden kann. 
 use crate::default::build::GAMMA;
@@ -201,7 +197,7 @@ impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + st
 
         // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
         if (lx_top[index] & in_index_mask) != 0 {
-            let hash = self.hash_function.try_hash(&key)? as usize;
+            let hash = self.hash_function.hash(&key) as usize;
             self.objects.get(hash)
         } else {
             None
@@ -220,73 +216,4 @@ impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + st
         self.objects.get_mut(hash).unwrap()
     }
 
-}
-
-type HashMap<K,T> = MphfHashMap<K,T>;
-
-pub struct MphfHashMapThres<K,T> {
-    pointer: Pointer<HashMap<K,T>,(Box<[K]>,Box<[T]>)>,
-}
-
-impl<K:'static + Clone,T:'static + Clone> Clone for MphfHashMapThres<K,T> {
-    fn clone(&self) -> Self {
-        Self {
-            pointer: self.pointer.clone()
-        }
-    }
-}
-
-impl<K:'static + Eq + std::fmt::Display + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Into<u16> + Ord + Copy + std::hash::Hash,T: 'static> MphfHashMapThres<K,T> {
-    pub fn new(keys: Box<[K]>, objects: Box<[T]>) -> Self {
-        LEVEL_COUNT.fetch_add(1, Ordering::SeqCst);
-        //if keys.len() <= 512 {
-        if true {
-            Self {
-                pointer: Pointer::from_second(Box::new((keys.to_vec().into_boxed_slice(),objects))),
-            }
-        } else {
-            HASH_FUNCTION_COUNT.fetch_add(1, Ordering::SeqCst);
-            Self {
-                pointer: Pointer::from_first(Box::new(HashMap::new(keys, objects))),
-            }
-        }
-
-    }
-
-    pub fn get(&mut self, k: &K) -> &mut T {
-        match self.pointer.get() {
-            PointerEnum::Second((keys,values)) => {
-                match keys.binary_search(k) {
-                    Ok(x) => values.get_mut(x).unwrap(),
-                    _ => panic!("get in internal wurde mit ungültigem Schlüssel {} aufgerufen.", k),
-                }
-            },
-            PointerEnum::First(x) => {
-                x.get(k)
-            },
-        }
-    }
-
-    pub fn try_get(&self, key: K, lx_top: &[u64]) -> Option<&T> {
-        let k: u16 = key.clone().into();
-        let index = (k/64) as usize;
-        let in_index_mask = 1<<(63-(k % 64));
-
-        // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
-        if (lx_top[index] & in_index_mask) != 0 {
-             match self.pointer.get() {
-                PointerEnum::Second((keys,values)) => {
-                    match keys.binary_search(&key) {
-                        Ok(x) => values.get(x),
-                        _ => None,
-                    }
-                },
-                PointerEnum::First(x) => {
-                    x.try_get(key,lx_top)
-                },
-             }
-        } else {
-            None
-        }
-    }
 }

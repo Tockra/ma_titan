@@ -32,7 +32,7 @@ impl STreeBuilder {
     /// # Arguments
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new<T: Int>(elements: Box<[T]>) ->  Self{
+    pub fn new<T: Int>(elements: Box<[T]>) -> Self {
         let mut root_indexs = vec![];
                 
         // root_top_deep verwenden um die richtige Tiefe von root_top zu bestimmen
@@ -130,7 +130,8 @@ impl STreeBuilder {
                 PointerEnum::First(l) => {
                     let l3_level = l;
 
-                    debug_assert!(!l3_level.contains(k));
+                    debug_assert!(!l3_level.keys.contains(&k));
+
                     Self::build_lx_top(&mut l3_level.lx_top, k);
                     l3_level.keys.push(k);
                 
@@ -176,8 +177,7 @@ impl STreeBuilder {
                 match self.root_table[i].get() {
                     PointerEnum::First(l) => {
                         let second_level = l;
-
-                        let val = Box::new(Level::new(std::mem::replace(&mut second_level.lx_top, Box::new([])), vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), second_level.clone().keys.into_boxed_slice(),second_level.minimum, second_level.maximum));
+                        let val = Box::new(Level::new(std::mem::replace(&mut second_level.lx_top,Box::new([])),vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), second_level.keys.clone().into_boxed_slice(),second_level.minimum, second_level.maximum));
                         tmp.push(LevelPointer::from_level(val));
                     },
 
