@@ -1,33 +1,27 @@
 use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
-use crate::internal::{Splittable, MphfHashMapThres, LEVEL_COUNT, HASH_FUNCTION_COUNT};
-use std::sync::atomic::Ordering;
+use crate::internal::{MphfHashMapThres,Splittable};
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
-pub type L2Ebene = LevelPointer<L3Ebene>;
+pub type L2Ebene<T> = LevelPointer<L3Ebene<T>,T>;
 
 
 
 /// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf 
 /// ein Indize der STree.element_list zeigt.
-pub type L3Ebene = LevelPointer<usize>;
-
-pub enum Pointer<T: 'static> {
-    Level(&'static mut Level<T>),
-    Element(&'static mut usize)
-}
+pub type L3Ebene<T> = LevelPointer<usize,T>;
 
 use crate::internal::{self, PointerEnum};
 
 /// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
 /// oder auf ein Levelobjekt
 #[derive(Clone)]
-pub struct LevelPointer<T: 'static> {
-    pointer: internal::Pointer<Level<T>,usize>
+pub struct LevelPointer<T: 'static,E: 'static> {
+    pointer: internal::Pointer<Level<T,E>,usize>
 }
 
-impl<T: 'static> LevelPointer<T> {
+impl<T,E> LevelPointer<T,E> {
     fn minimum(&self) -> usize {
         match self.pointer.get() {
             PointerEnum::First(l) => {
@@ -52,13 +46,13 @@ impl<T: 'static> LevelPointer<T> {
         }
     }
 
-    pub fn from_level(level_box: Box<Level<T>>) -> Self {
+    pub fn from_level(level_box: Box<Level<T,E>>) -> Self {
         Self {
             pointer: internal::Pointer::from_first(level_box)
         }
     }
 
-    pub fn get(&self) -> PointerEnum<Level<T>, usize> {
+    pub fn get(&self) -> PointerEnum<Level<T,E>, usize> {
         self.pointer.get()
     }
 
@@ -86,19 +80,255 @@ impl<T: 'static> LevelPointer<T> {
 /// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 #[derive(Clone)]
-pub struct STree<T> {
+pub struct STree<T: 'static> {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
-    pub root_table: Box<[L2Ebene]>,
+    pub root_table: Box<[L2Ebene<T>]>,
     
     /// Das Root-Top-Array speichert für jeden Eintrag `root_table[i][x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
     /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert.
     /// i steht dabei für die Ebene der root_tabelle. Ebene i+1 beinhaltet an Index [x] immer 64 Veroderungen aus Ebene i. 
     /// Somit gilt |root_table[i+1]| = |root_table[i]|/64  
-    pub root_top: Box<[Box<[u64]>]>,
+    pub root_top: TopArray<T,usize>,
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
     pub element_list: Box<[T]>,
+}
+
+/// Liste von Bitarrays zur Speicherung der LX-Top-Datenstrukturen
+/// Zur Speicherplatzreduzierung werden die Längen der Arrays weggeworfen und zum Drop-Zeitpunkt erneut berechnet 
+pub struct TopArray<T,V> {
+    /// 2-dimensionales Array mit 
+    data: Box<[*mut u64]>,
+    
+    // Länge der untersten Ebene. Kleiner Tradeoff zwischen Länge aller Ebenen Speichern und Level der tiefsten Ebene Speichern...
+    lowest_len: usize,
+
+    /// entspricht dem Nutzdatentyp (u40,u48 oder u64)
+    phantom: std::marker::PhantomData<T>,
+
+    /// Entspricht dem Key der gehasht wird. Wenn Wurzeltop, dann usize, wenn LXTop dann LXKey
+    phantom_type: std::marker::PhantomData<V>,
+}
+
+impl<T,V> Drop for TopArray<T,V> {
+    fn drop(&mut self) {
+        // Hier muss editiert werden, wenn die Größen der L2- und L3- Level angepasst werden sollen
+        let mut length = Self::get_length();
+
+        // Solange Länge / 2^i > 256
+        for (i,&ptr) in self.data.into_iter().enumerate() {
+            length = length>>(i+1)*6;
+            unsafe {
+                Box::from_raw(std::slice::from_raw_parts_mut(ptr, length));
+            } 
+        }
+    }
+}
+
+impl<T,V> Clone for TopArray<T,V> {
+    fn clone(&self) -> Self {
+        // Hier muss editiert werden, wenn die Größen der L2- und L3- Level angepasst werden sollen
+        let mut length = Self::get_length();
+
+        // Lege alle Rootarrays an
+        let mut top_arrays = vec![];
+
+        // Solange Länge / 2^i > 256
+        for (i,&ptr) in self.data.iter().enumerate() {
+            length = length>>(i+1)*6;
+            let mut tmp = vec![];
+            unsafe {
+                for i in 0..length {
+                    tmp.push(*ptr.add(i));
+                }
+            } 
+            top_arrays.push(Box::into_raw(tmp.into_boxed_slice()) as *mut u64);
+        }
+        Self {
+            data: top_arrays.into_boxed_slice(),
+            lowest_len: length,
+            phantom: std::marker::PhantomData,
+            phantom_type: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T,V> TopArray<T,V> {
+    #[inline]
+    fn get_length() -> usize {
+        if std::mem::size_of::<V>() == std::mem::size_of::<usize>() {
+            1 << std::mem::size_of::<T>()*8/2
+        } else if std::mem::size_of::<V>() == std::mem::size_of::<LXKey>() {
+            1 << std::mem::size_of::<T>()*8/4
+        } else {
+            panic!("Ungültige Parameterkombination vom TopArray!")
+        }
+    }
+}
+
+impl<T,V> TopArray<T,V> {
+    /// Erzeugt mehrere Ebenen für einen Bitvector der Länge length
+    #[inline]
+    pub fn new() -> Self {
+        // Hier muss editiert werden, wenn die Größen der L2- und L3- Level angepasst werden sollen
+        let mut length = Self::get_length();
+
+        // Lege alle Rootarrays an
+        let mut top_arrays = vec![];
+        // Solange Länge / 64^i > 64
+        while length >= 64 {
+            length = length>>6;
+            top_arrays.push(Box::into_raw(vec![0_u64;length].into_boxed_slice()) as *mut u64);
+        }
+
+        Self {
+            data: top_arrays.into_boxed_slice(),
+            lowest_len: length,
+            phantom: std::marker::PhantomData,
+            phantom_type: std::marker::PhantomData,
+        }
+    }
+
+    #[inline]
+    const fn get_bit_mask(in_index: usize) -> u64 {
+        1<<63-in_index
+    }
+
+    /// Baut das Root-Top-Array mit Hilfe der sich in der Datenstruktur befindenden Werte.
+    #[inline]
+    pub fn set_bit(&mut self, bit: usize) {
+        let mut index = bit/64;
+        let mut in_index = bit%64;
+
+        // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
+        for i in 0..(self.data.len()) {
+            // Aktueller in_index wird für Bitmaske verwendet
+            let bit_mask = Self::get_bit_mask(in_index);
+            let bit_window = unsafe { self.data.get_unchecked(i).add(index) };
+
+            in_index = index%64;
+            index = index/64;
+    
+            unsafe {
+                *bit_window = *bit_window | bit_mask;
+            }
+
+        }
+    }
+
+    #[inline]
+    pub fn is_set(&self, bit: usize) -> bool {
+        let (index,in_index) = (bit/64,bit%64);
+        let bit_mask = Self::get_bit_mask(in_index);
+        let bit_window = unsafe { self.data.get_unchecked(0).add(index) };
+
+        unsafe {
+            *bit_window & bit_mask != 0
+        }
+    }
+
+    #[inline]
+    fn get_next_set_bit_translation(&self, index: usize, last_level: usize) -> usize {
+        let mut index = index;
+        for i in (0..(last_level)).rev() {
+            let zeros_to_bit = unsafe {*self.data.get_unchecked(i).add(index)};
+            index = index * 64 + zeros_to_bit.leading_zeros() as usize;
+        }
+        index
+    }
+
+    /// Diese Funktion as nächste Bit zurück, dass hinter `bit` gesetzt ist.
+    #[inline]
+    pub fn get_next_set_bit(&self, bit: usize) -> Option<usize> {
+        let mut index = bit/64;
+        let mut in_index = bit%64;
+
+        // Steigt alle Ebenen des TopArrays herunter und prüft, ob in den 64-Bit Blöcken bereits das nachfolgende Bit liegt.
+        for level in 0..(self.data.len()) {
+            let bit_mask: u64 = u64::max_value().checked_shr(in_index as u32 + 1).unwrap_or(0); 
+            let zeros_to_bit = unsafe {*self.data.get_unchecked(level).add(index) & bit_mask};
+
+            if zeros_to_bit != 0 {
+                let zeros = zeros_to_bit.leading_zeros() as usize;
+                if zeros != 0 {
+                     return Some(self.get_next_set_bit_translation(index * 64 + zeros, level));
+                }
+            }
+
+            if level < self.data.len()-1 {
+                in_index = index%64;
+                index = index / 64 ;
+            }
+
+        }
+
+        let bit_mask: u64 = u64::max_value().checked_shr(in_index as u32 + 1).unwrap_or(0); 
+        let mut zeros_to_bit = unsafe {(*self.data.get_unchecked(self.data.len()-1).add(index))& bit_mask};
+
+        for i in (index)..self.lowest_len {
+            if zeros_to_bit != 0 {
+                return Some(self.get_next_set_bit_translation(i * 64 + zeros_to_bit.leading_zeros() as usize, self.data.len()-1));
+            }
+
+            if i < self.lowest_len-1 {
+                zeros_to_bit = unsafe {*self.data.get_unchecked(self.data.len()-1).add(i+1)};
+            }
+        }
+        None
+    }
+
+        #[inline]
+    fn get_prev_set_bit_translation(&self, index: usize, last_level: usize) -> usize {
+        let mut index = index;
+        for i in (0..(last_level)).rev() {
+            let zeros_to_bit = unsafe {*self.data.get_unchecked(i).add(index)};
+            index = index * 64 + 63 - zeros_to_bit.trailing_zeros() as usize;
+        }
+        index
+    }
+
+    /// Diese Funktion as nächste Bit zurück, dass vor `bit` gesetzt ist.
+    #[inline]
+    pub fn get_prev_set_bit(&self, bit: usize) -> Option<usize> {
+        let mut index = bit/64;
+        let mut in_index = bit%64;
+
+        // Steigt alle Ebenen des TopArrays herunter und prüft, ob in den 64-Bit Blöcken bereits das Vorgänger Bit liegt.
+        for level in 0..self.data.len() {
+            let bit_mask: u64 = u64::max_value().checked_shl(64-in_index as u32).unwrap_or(0); 
+
+            let zeros_to_bit = unsafe {*self.data.get_unchecked(level).add(index) & bit_mask};
+            if zeros_to_bit != 0 {
+                let zeros = zeros_to_bit.trailing_zeros();
+
+                if zeros != 0 {
+                    return Some(self.get_prev_set_bit_translation(index * 64 + 63 - zeros as usize, level)); 
+                }
+
+            }
+
+            if level < self.data.len()-1 {
+                in_index = index%64;
+                index = index / 64 ;
+            }
+        }
+        
+        let bit_mask: u64 = u64::max_value().checked_shl(64-in_index as u32).unwrap_or(0); 
+        let mut zeros_to_bit = unsafe {(*self.data.get_unchecked(self.data.len()-1).add(index))& bit_mask};
+
+        for i in (0..(index+1)).rev() {
+            if zeros_to_bit != 0 {
+                return Some(self.get_prev_set_bit_translation(i * 64 + 63 - zeros_to_bit.trailing_zeros() as usize, self.data.len()-1));
+            }
+
+            if i > 0 {
+                zeros_to_bit = unsafe {*self.data.get_unchecked(self.data.len()-1).add(i-1)};
+            }
+        }
+
+        None
+    }
 }
 
 /// Dieser Trait dient als Platzhalter für u40, u48 und u64. 
@@ -125,25 +355,23 @@ impl Int for u64 {
 
 }
 
+pub type LXKey = u16;
 impl<T: Int> STree<T> {
     /// Gibt einen STree mit den in `elements` enthaltenen Werten zurück.
     ///
     /// # Arguments
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
+    #[inline]
     pub fn new(elements: Box<[T]>) -> Self {
-        HASH_FUNCTION_COUNT.store(0, Ordering::SeqCst);
-        LEVEL_COUNT.store(0, Ordering::SeqCst);
-        let mut builder = STreeBuilder::new(elements.clone());
+        let mut builder = STreeBuilder::<T>::new(elements.clone());
 
-        let root_top = builder.get_root_tops();
-        let st = STree {
-            root_table: builder.build::<T>(),
+        let root_top = builder.get_root_top();
+        STree {
+            root_table: builder.build(),
             root_top: root_top,
             element_list: elements,
-        };
-        println!("STree ({}) angelegt. Anzahl der Level: {}, Anzahl der echten Hashfunktionen: {}",st.len(),LEVEL_COUNT.load(Ordering::SeqCst),HASH_FUNCTION_COUNT.load(Ordering::SeqCst));
-        st
+        }
     }
 
 
@@ -177,7 +405,7 @@ impl<T: Int> STree<T> {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Maximum zurückgegeben werden soll.
     #[inline]
-    pub fn maximum_level<E>(&self, lx: &Level<E>) -> T {
+    pub fn maximum_level<E>(&self, lx: &Level<E,T>) -> T {
         self.element_list[lx.maximum]
     }
 
@@ -187,7 +415,7 @@ impl<T: Int> STree<T> {
     ///
     /// * `lx` - Referenz auf die Ebene, dessen Minimum zurückgegeben werden soll.
     #[inline]
-    pub fn minimum_level<E>(&self, lx: &Level<E>) -> T {
+    pub fn minimum_level<E>(&self, lx: &Level<E, T>) -> T {
         self.element_list[lx.minimum]
     }
 
@@ -211,7 +439,7 @@ impl<T: Int> STree<T> {
 
         // Paper z.3
         if self.root_table[i].is_null() || element < self.element_list[self.root_table[i].minimum()] {
-            return self.compute_last_set_bit_deep(T::new(i as u64),0)
+            return self.root_top.get_prev_set_bit(i as usize)
                 .map(|x| self.root_table[x].maximum());
         }
 
@@ -222,19 +450,24 @@ impl<T: Int> STree<T> {
                 let third_level = second_level.try_get(j);
                 // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
                 if third_level.is_none() || element < self.element_list[third_level.unwrap().minimum()] {
-                    let new_j = second_level.compute_last_set_bit(&(j-1u16));
+                    let new_j = second_level.lx_top.get_prev_set_bit(j as usize);
                     return new_j
-                        .and_then(|x| second_level.try_get(x))
+                        .and_then(|x| second_level.try_get(x as LXKey))
                         .map(|x| x.maximum());
                 }
 
                 // Paper z.7
                 match third_level.unwrap().get() {
                     PointerEnum::First(l) => {
-                        // Paper z.8
-                        let new_k = (*l).compute_last_set_bit(&k);
-                        return new_k
-                            .map(|x| *(*l).try_get(x).unwrap());
+                        if l.lx_top.is_set(k as usize) {
+                            return Some(*l.get(k));
+                        } else {
+                            // Paper z.8
+                            let new_k = (*l).lx_top.get_prev_set_bit(k as usize);
+                            return new_k
+                                .map(|x| *(*l).try_get(x as LXKey).unwrap());
+                        }
+
                     }
                     // Paper z.7
                     PointerEnum::Second(e) => {
@@ -252,57 +485,6 @@ impl<T: Int> STree<T> {
         }
 
 
-}
-
-    /// Hilfsfunktion, die in der Root-Top-Tabelle das letzte Bit, dass vor Index `bit` gesetzt ist, zurückgibt. 
-    /// Achtung diese Funktion funktioniert etwas anders als Level::compute_last_set_bit_deep !
-    /// 
-    /// # Arguments
-    ///
-    /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Vorgänger" gesucht werden soll.
-    fn compute_last_set_bit_deep(&self, bit: T, level:usize) -> Option<usize> {
-        let bit: u64 = bit.into() - 1u64;
-        let index = bit as usize/64;
-        let in_index = bit%64;
-        // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
-        // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
-        let bit_mask: u64 = u64::max_value() << (63-in_index); // genau andersrum (in 111..11 werden 0en reingeschoben)
-
-        if level != self.root_top.len()-1 {
-            // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
-            let nulls = (self.root_top[0][index] & bit_mask).trailing_zeros();
-            if nulls != 64 {
-                return Some(((index + 1) as u64 *64-(nulls+1) as u64) as usize);
-            }
-            
-            // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-            let new_index = self.compute_last_set_bit_deep(T::new(bit as u64/64) ,1);
-            new_index.and_then(|x|
-                match self.root_top[0][x].trailing_zeros() {
-                    64 => None,
-                    val => Some(((x+1) as u64 *64 - (val+1) as u64) as usize)
-                }
-            )
-        }
-        else {
-            let nulls = (self.root_top[1][index] & bit_mask).trailing_zeros();
-            if nulls != 64 {
-                return Some(((index+1) as u64 *64 - (nulls+1) as u64) as usize);
-            } else {
-                for i in (0..index).rev() {
-                    if self.root_top[1][i] != 0 {
-                        let nulls = self.root_top[1][i].trailing_zeros();
-                        return Some(((i+1) as u64 * 64 - (nulls+1) as u64) as usize);
-                    }
-                } 
-            }
-            
-            None
-        }
-        /*else {
-            //self.compute_last_set_bit_deep(T::new(bit+1))
-        }*/
-       
     }
 
     /// Diese Methode gibt den Index INDEX des kleinsten Elements zurück für das gilt element<=element_list[INDEX].
@@ -323,7 +505,7 @@ impl<T: Int> STree<T> {
 
         // Paper z.3
         if self.root_table[i].is_null() || self.element_list[self.root_table[i].maximum()] < element {
-            return self.compute_next_set_bit_deep(T::new(i as u64),0)
+            return self.root_top.get_next_set_bit(i as usize)
                 .map(|x| self.root_table[x].minimum());
         }
 
@@ -334,19 +516,26 @@ impl<T: Int> STree<T> {
                 let third_level = second_level.try_get(j);
                 // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
                 if third_level.is_none() || self.element_list[third_level.unwrap().maximum()] < element {
-                    let new_j = second_level.compute_next_set_bit(&(j+1u16));
+                    let new_j = second_level.lx_top.get_next_set_bit(j as usize);
                     return new_j
-                        .and_then(|x| second_level.try_get(x))
+                        .and_then(|x| second_level.try_get(x as LXKey))
                         .map(|x| x.minimum());
                 }
 
                 // Paper z.7
                 match third_level.unwrap().get() {
                     PointerEnum::First(l) => {
-                        // Paper z.8
-                        let new_k = (*l).compute_next_set_bit(&k);
-                        return new_k
-                            .map(|x| *(*l).try_get(x).unwrap());
+                         
+                        if l.lx_top.is_set(k as usize) {
+                            return Some(*l.get(k));
+                        } else {
+                            // Paper z.8
+                            let new_k = (*l).lx_top.get_next_set_bit(k as usize);
+                            return new_k
+                                .map(|x| *(*l).try_get(x as LXKey).unwrap());
+                        };
+                                        
+  
                     }
                     // Paper z.7
                     PointerEnum::Second(e) => {
@@ -364,61 +553,14 @@ impl<T: Int> STree<T> {
         }
         
     }
-
-    /// Hilfsfunktion, die in der Root-Top-Tabelle das nächste Bit, dass nach Index `bit` gesetzt ist, zurückgibt. 
-    /// Achtung diese Funktion funktioniert etwas anders als Level::compute_next_set_bit_deep !
-    /// # Arguments
-    ///
-    /// * `bit` - Bitgenauer Index in self.root_top_sub, dessen "Nachfolger" gesucht werden soll.
-    fn compute_next_set_bit_deep(&self, bit: T, level:usize) -> Option<usize> {
-        let bit: u64 = bit.into() + 1u64;
-        let index = bit as usize/64;
-        let in_index = bit%64;
-        // Da der Index von links nach rechts gezählt wird, aber 2^i mit i=index von rechts nach Links gilt, muss 64-in_index gerechnet werden.
-        // Diese Bit_Maske dient dem Nullen der Zahlen hinter in_index
-        let bit_mask: u64 = u64::max_value() >> in_index; // genau andersrum (in 111..11 werden 0en reingeschoben)
-
-        if level != self.root_top.len()-1 {
-            // Leading Zeros von root_top[index] bestimmen und mit in_index vergleichen. Die erste führende 1 muss rechts von in_index liegen oder an Position in_index.
-            let nulls = (self.root_top[0][index] & bit_mask).leading_zeros();
-            if nulls != 64 {
-                return Some((index as u64 *64+nulls as u64) as usize);
-            }
-            
-            // Wenn Leading Zeros=64, dann locate_top_level(element,level+1)
-            let new_index = self.compute_next_set_bit_deep(T::new(bit as u64/64) ,1);
-            new_index.and_then(|x|
-                match self.root_top[0][x].leading_zeros() {
-                    64 => None,
-                    val => Some(((x as u64)*64 + val as u64) as usize)
-                }
-            ) 
-        } else {
-            let nulls = (self.root_top[1][index] & bit_mask).leading_zeros();
-            if nulls != 64 {
-                return Some((index as u64 *64 + nulls as u64) as usize);
-            } else {
-                for i in index+1..self.root_top[1].len() {
-                    if self.root_top[1][i] != 0 {
-                        let nulls = self.root_top[1][i].leading_zeros();
-                        return Some((i as u64 * 64 + nulls as u64) as usize);
-                    }
-                } 
-            }
-            None
-        }
-        /*else {
-            self.compute_next_set_bit(T::new(bit-1))
-        }*/
-    }
 }
 
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 #[derive(Clone)]
 #[repr(align(4))]
-pub struct Level<T: 'static> {
+pub struct Level<T: 'static, E> {
     /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist. 
-    pub hash_map: MphfHashMapThres<u16,T>,
+    pub hash_map: MphfHashMapThres<LXKey,T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -428,10 +570,10 @@ pub struct Level<T: 'static> {
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
-    pub lx_top: Box<[u64]>,
+    lx_top: TopArray<E,u16>,
 }
 
-impl<T> Level<T> {
+impl<T,E> Level<T,E> {
     /// Gibt ein Level<T> mit Origin-Key j zurück. Optional kann eine Schlüsselliste übergeben werden, für welche dann
     /// eine perfekte Hashfunktion generiert wird.
     ///
@@ -440,7 +582,7 @@ impl<T> Level<T> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(lx_top: Box<[u64]>, objects: Box<[T]>, keys: Box<[u16]>, minimum: usize, maximum: usize) -> Level<T> {
+    pub fn new(lx_top: TopArray<E, u16>, objects: Box<[T]>, keys: Box<[LXKey]>, minimum: usize, maximum: usize) -> Level<T,E> {
         Level {
             hash_map: MphfHashMapThres::new(keys, objects),
             minimum: minimum,
@@ -456,8 +598,12 @@ impl<T> Level<T> {
     ///
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
-    pub fn try_get(&self, key: u16) -> Option<&T> {
-        self.hash_map.try_get(key,&self.lx_top)
+    pub fn try_get(&self, key: LXKey) -> Option<&T> {
+        if self.lx_top.is_set(key as usize) {
+            Some(self.hash_map.get(&key))
+        } else {
+            None
+        }
     }
 
     /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
@@ -467,94 +613,33 @@ impl<T> Level<T> {
     ///
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
-    pub fn get(&mut self, key: u16) -> &mut T {
-        self.hash_map.get(&key)
+    pub fn get(&mut self, key: LXKey) -> &mut T {
+        self.hash_map.get_mut(&key)
     }
-
-    
-
-    
-
-    /// Hilfsfunktion, die in der Lx-Top-Tabelle das nächste Bit, dass nach `bit` gesetzt ist, zurückgibt. Ist `bit=1` dann wird
-    /// `bit` selbst zurückgegeben.
-    /// 
-    /// # Arguments
-    ///
-    /// * `bit` - Bitgenauer Index in self.root_top, dessen "Nachfolger" gesucht werden soll.
-    #[inline]
-    pub fn compute_next_set_bit(&self, bit: &u16) -> Option<u16> {
-        let bit = u16::from(*bit);
-        let index = bit as usize/64;
-
-        if self.lx_top[index] != 0 {
-            let in_index = bit%64;
-            let bit_mask: u64 = u64::max_value() >> in_index;
-            let num_zeroes = (self.lx_top[index] & bit_mask).leading_zeros();
-
-            if num_zeroes != 64 {
-                return Some(index as u16 *64 + num_zeroes as u16);
-            }
-        }
-        for i in index+1..self.lx_top.len() {
-            let val = self.lx_top[i];
-            if val != 0 {
-                let num_zeroes = val.leading_zeros();
-                return Some(i as u16 *64 + num_zeroes as u16);
-            }
-        }
-        None
-    }
-
-    /// Hilfsfunktion, die in der Lx-Top-Tabelle das letzte Bit, dass vor `bit` gesetzt ist, zurückgibt. Ist `bit=1` dann wird
-    /// `bit` selbst zurückgegeben. 
-    /// 
-    /// # Arguments
-    ///
-    /// * `bit` - Bitgenauer Index in self.root_top, dessen "Vorgänger" gesucht werden soll.
-    #[inline]
-    pub fn compute_last_set_bit(&self, bit: &u16) -> Option<u16> {
-        let bit = u16::from(*bit);
-        let index = bit as usize/64;
-
-        if self.lx_top[index] != 0 {
-            let in_index = bit%64;
-            let bit_mask: u64 = u64::max_value() << (63-in_index);
-            let num_zeroes = (self.lx_top[index] & bit_mask).trailing_zeros();
-
-            if num_zeroes != 64 {
-                return Some((index + 1) as u16 *64 - (num_zeroes+1) as u16);
-            }
-        }
-        for i in (0..index).rev() {
-            let val = self.lx_top[i];
-            if val != 0 {
-                let num_zeroes = val.trailing_zeros();
-                return Some((i + 1) as u16 *64 - (num_zeroes+1) as u16);
-            }
-        }
-        None
-    }
-
 }
 
 #[cfg(test)]
 mod tests {
-    use uint::u40;
-    use super::STree;
-    use crate::internal::Splittable;
+    use uint::{u40,u48};
+    use super::{STree};
+    use crate::internal::{PointerEnum,Splittable};
 
-    use crate::internal::{PointerEnum};
-    
-    /// Größe der LX-Top-Arrays
-    const LX_ARRAY_SIZE: usize = 1 << 10;
+    /// Größe der LX-Top-Arrays 40 Bit
+    const LX_ARRAY_SIZE_U40: usize = 1 << 10;
+
+    /// Größe der LX-Top-Arrays 48 Bit
+    const LX_ARRAY_SIZE_U48: usize = 1 << 12;
+
+    // u64 Tests werden ausgespart, da der STree (leer) nach Initialisierung 2^32 * 8 Byte = 34 Gbyte RAM benötigt
+    // Diese Tests sind nicht auf gängigen Laptop ausführbar. (Zukunft, ich rede von 2019 :p).
 
     /// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
     #[test]
-    fn test_new_hashfunctions() {
+    fn test_u40_new_hashfunctions() {
 
         // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
         // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
-        let mut data: Vec<u40> = vec![u40::new(0);LX_ARRAY_SIZE];
+        let mut data: Vec<u40> = vec![u40::new(0);LX_ARRAY_SIZE_U40];
         
         for i in 0..data.len() {
             data[i] = u40::new(i as u64);
@@ -589,11 +674,53 @@ mod tests {
 
         }
     }
+
+
+    /// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
+    #[test]
+    fn test_u48_new_hashfunctions() {
+        // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
+        // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
+        let mut data: Vec<u48> = vec![u48::new(0);LX_ARRAY_SIZE_U48];
+        
+        for i in 0..data.len() {
+            data[i] = u48::new(i as u64);
+        }
+ 
+        let check = data.clone();
+        let data_structure: STree<u48> = STree::new(data.into_boxed_slice());
+
+        assert_eq!(data_structure.len(),check.len());
+        assert_eq!(data_structure.minimum().unwrap(),u48::new(0));
+        assert_eq!(data_structure.maximum().unwrap(),u48::new(check.len() as u64 - 1));
+        for val in check {
+            let (i,j,k) = Splittable::split_integer_down(&val);
+            match data_structure.root_table[i].get() {
+                PointerEnum::First(l) => {
+                    let second_level = l.get(j);
+                    let saved_val = match second_level.get() {
+                        PointerEnum::First(l) => {
+                            *(*l).get(k)
+                        },
+                        PointerEnum::Second(e) => {
+                            *e
+                        }
+                    };
+                    assert_eq!(data_structure.element_list[saved_val],val);
+                },
+
+                PointerEnum::Second(e) => {
+                    assert_eq!(data_structure.element_list[*e],val);
+                }
+            };
+
+        }
+    }
     
     /// Die Top-Arrays werden geprüft. Dabei wird nur grob überprüft, ob sinnvolle Werte gesetzt wurden.
     /// Dieser Test ist ein Kandidat zum Entfernen oder Erweitern.
     #[test]
-    fn test_top_arrays() {
+    fn test_u40_top_arrays() {
         let data: Vec<u40> = vec![u40::new(0b00000000000000000000_1010010010_0101010101),u40::new(0b00000000000000000000_1010010010_0101010111),u40::new(0b11111111111111111111_1010010010_0101010101_u64)];
         let check = data.clone();
         let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
@@ -632,27 +759,60 @@ mod tests {
             }
 
         }
-        // Root_TOP
-        // 61 Nullen
-        assert_eq!(data_structure.root_top[0][0],0b1000000000000000000000000000000000000000000000000000000000000000);
-        for i in 1..16383 {
-            assert_eq!(data_structure.root_top[0][i],0);
-        }
-        assert_eq!(data_structure.root_top[0][16383],1);
-
-        // ROOT_TOP_SUB
-        assert_eq!(data_structure.root_top[1][0], 0b1000000000000000000000000000000000000000000000000000000000000000);
-        for i in 1..255 {
-            assert_eq!(data_structure.root_top[1][i],0);
-        }
-        assert_eq!(data_structure.root_top[1][255], 1);
         
     }
+
+    /// Die Top-Arrays werden geprüft. Dabei wird nur grob überprüft, ob sinnvolle Werte gesetzt wurden.
+    /// Dieser Test ist ein Kandidat zum Entfernen oder Erweitern.
+    #[test]
+    fn test_u48_top_arrays() {
+        let data: Vec<u48> = vec![u48::new(0b10010010_00000000000000000000_1010010010_0101010101_u64),u48::new(0b10010010_00000000000000000000_1010010010_0101010111_u64),u48::new(0b11111111_11111111111111111111_1010010010_0101010101_u64)];
+        let check = data.clone();
+        let data_structure: STree<u48> = STree::new(data.into_boxed_slice());
+
+        assert_eq!(data_structure.len(),check.len());
+        assert_eq!(data_structure.minimum().unwrap(),u48::new(0b10010010_00000000000000000000_1010010010_0101010101_u64));
+        assert_eq!(data_structure.maximum().unwrap(),u48::new(0b11111111_11111111111111111111_1010010010_0101010101_u64));
+
+        for val in check {
+            let (i,j,k) = Splittable::split_integer_down(&val);
+            if data_structure.root_table[i].minimum() != data_structure.root_table[i].maximum() {
+                let second_level = match data_structure.root_table[i].get() {
+                        PointerEnum::First(l) => {
+                            l.get(j)
+                        },
+                        _ => {
+                            panic!("Das sollte nicht geschehen");
+                        }
+                };
+                if second_level.minimum() != second_level.maximum() {
+                    let saved_val = match second_level.get() {
+                        PointerEnum::First(l) => {
+                            l.get(k)
+                        },
+                        _ => {
+                            panic!("Das sollte nicht geschehen");
+                        }
+                    };
+                    assert_eq!(data_structure.element_list[*saved_val],val);
+                } else {
+                    assert_eq!(data_structure.element_list[second_level.minimum()],val);
+                }
+
+            } else {
+                assert_eq!(data_structure.element_list[data_structure.root_table[i].minimum()],val);
+            }
+
+        }
+
+        
+    }
+
 
     /// Die locate_or_succ-Funktion wird getestet. Dabei werden beliebige Werte in ein STree gegeben und anschließend wird
     /// `locate_or_succ(x) mit allen x zwischen STree.min() und STree.max() getestet.
     #[test]
-    fn test_locate_or_succ_bruteforce() {
+    fn test_u40_locate_or_succ_bruteforce() {
         let data_v1: Vec<u64> = vec![0,1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 1065983];
         let mut data: Vec<u40> = vec![];
         for val in data_v1.iter() {
@@ -674,7 +834,7 @@ mod tests {
     /// # Äquivalenzklassentest mit Bruteforce
     /// `locate_or_succ` wird getestet. Dabei werden in jeder Ebene die gesuchten Elemente einmal im Minimum, im Maximum und irgendwo dazwischen liegen.
     #[test]
-    fn test_locate_or_succ_eqc_bruteforce_test() {
+    fn test_u40_locate_or_succ_eqc_bruteforce_test() {
         let data_raw: Vec<u64> = vec![
             0b00000000000000000000_0000000000_0000000001,
             0b00000000000000000000_0000000000_0000111000,
@@ -738,10 +898,75 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_u48_locate_or_succ_eqc_bruteforce_test() {
+        let data_raw: Vec<u64> = vec![
+            0b000000000000000000000000_000000000000_000000000001,
+            0b000000000000000000000000_000000000000_000001110000,
+            0b000000000000000000000000_000000000000_111111111111,
+
+            0b000000000000000000000000_000001110000_000000000000,
+            0b000000000000000000000000_000001110000_000001110000,
+            0b000000000000000000000000_000001110000_111111111111,
+
+            0b000000000000000000000000_111111111111_000000000001,
+            0b000000000000000000000000_111111111111_000001110000,
+            0b000000000000000000000000_111111111111_111111111111,
+
+            0b000000001100000000000011_000000000000_000000000001,
+            0b000000001100000000000011_000000000000_000001110000,
+            0b000000001100000000000011_000000000000_111111111111,
+
+            0b000000001100000000000011_000001110000_000000000000,
+            0b000000001100000000000011_000001110000_000001110000,
+            0b000000001100000000000011_000001110000_111111111111,
+
+            0b000000001100000000000011_111111111111_000000000001,
+            0b000000001100000000000011_111111111111_000001110000,
+            0b000000001100000000000011_111111111111_111111111111,
+
+
+            0b111111111111111111111111_000000000000_000000000001,
+            0b111111111111111111111111_000000000000_000001110000,
+            0b111111111111111111111111_000000000000_111111111111,
+
+            0b111111111111111111111111_000001110000_000000000000,
+            0b111111111111111111111111_000001110000_000001110000,
+            0b111111111111111111111111_000001110000_111111111111,
+
+            0b111111111111111111111111_111111111111_000000000001,
+            0b111111111111111111111111_111111111111_000001110000,
+            0b111111111111111111111111_111111111111_111111111110,
+        ];
+
+        let mut data: Vec<u48> = vec![];
+        for val in data_raw.iter() {
+            data.push(u48::new(*val));
+        }
+        let data_structure: STree<u48> = STree::new(data.clone().into_boxed_slice());
+        assert_eq!(data_structure.locate_or_succ(u48::new(0b111111111111111111111111_111111111111_111111111111_u64)), None);
+        
+        for (i,&elem) in data.iter().enumerate() {
+            if i > 0 {
+                for j in 0..16877216 {
+                    if u64::from(elem)>=j as u64 {
+                        let index = elem - u48::new(j);
+                        if index > data_structure.element_list[i-1] {
+                            assert_eq!(data_structure.element_list[data_structure.locate_or_succ(index).unwrap() as usize], elem);
+                        }
+                    }
+                }
+            } else {
+                assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem).unwrap() as usize], elem);
+                assert_eq!(data_structure.element_list[data_structure.locate_or_succ(elem-u48::new(1)).unwrap() as usize], elem);
+            }
+        }
+    }
+
     /// Die locate_or_pred-Funktion wird getestet. Dabei werden beliebige (fest gewählte) Werte in ein STree gegeben und anschließend wird
     /// `locate_or_pred(x) mit allen x zwischen STree.min() und STree.max() getestet.
     #[test]
-    fn test_locate_or_pred_bruteforce() {
+    fn test_u40_locate_or_pred_bruteforce() {
         let data_v1: Vec<u64> = vec![0,1,3,23,123,232,500,20000, 30000, 50000, 100000, 200000, 200005, 1065983];
         let mut data: Vec<u40> = vec![];
         for val in data_v1.iter() {
@@ -765,7 +990,7 @@ mod tests {
      /// # Äquivalenzklassentest mit Bruteforce
     /// `locate_or_pred` wird getestet. Dabei werden in jeder Ebene die gesuchten Elemente einmal im Minimum, im Maximum und irgendwo dazwischen liegen.
     #[test]
-    fn test_locate_or_pred_eqc_bruteforce_test() {
+    fn test_u40_locate_or_pred_eqc_bruteforce_test() {
         let data_raw: Vec<u64> = vec![
             0b00000000000000000000_0000000000_0000000001,
             0b00000000000000000000_0000000000_0000111000,
@@ -826,6 +1051,235 @@ mod tests {
                 assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem).unwrap() as usize], elem);
                 assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem+u40::new(1)).unwrap() as usize], elem);
             }
+        }
+    }
+
+#[test]
+    fn test_u48_locate_or_pred_eqc_bruteforce_test() {
+        let data_raw: Vec<u64> = vec![
+            0b00000000000000000000_0000000000_0000000001,
+            0b00000000000000000000_0000000000_0000111000,
+            0b00000000000000000000_0000000000_1111111111,
+
+            0b00000000000000000000_0001110000_0000000000,
+            0b00000000000000000000_0001110000_0000111000,
+            0b00000000000000000000_0001110000_1111111111,
+
+            0b00000000000000000000_1111111111_0000000000,
+            0b00000000000000000000_1111111111_0000111000,
+            0b00000000000000000000_1111111111_1111111111,
+
+            0b00000000001111000000_0000000000_0000000000,
+            0b00000000001111000000_0000000000_0000111000,
+            0b00000000001111000000_0000000000_1111111111,
+
+            0b00000000001111000000_0001110000_0000000000,
+            0b00000000001111000000_0001110000_0000111000,
+            0b00000000001111000000_0001110000_1111111111,
+
+            0b00000000001111000000_1111111111_0000000000,
+            0b00000000001111000000_1111111111_0000111000,
+            0b00000000001111000000_1111111111_1111111111,
+
+            0b11111111111111111111_0000000000_0000000000,
+            0b11111111111111111111_0000000000_0000111000,
+            0b11111111111111111111_0000000000_1111111111,
+
+            0b11111111111111111111_0001110000_0000000000,
+            0b11111111111111111111_0001110000_0000111000,
+            0b11111111111111111111_0001110000_1111111111,
+
+            0b11111111111111111111_1111111111_0000000000,
+            0b11111111111111111111_1111111111_0000111000,
+            0b11111111111111111111_1111111111_1111111110,
+        ];
+
+        let mut data: Vec<u48> = vec![];
+        for val in data_raw.iter() {
+            data.push(u48::new(*val));
+        }
+        let data_structure: STree<u48> = STree::new(data.clone().into_boxed_slice());
+        assert_eq!(data_structure.locate_or_pred(u48::new(0)), None);
+
+        for (i,&elem) in data.iter().enumerate().rev() {
+            if i < data.len()-1 {
+                for j in 0..16877216 {
+                    if u48::max_value() > elem && u48::new(j) < u48::max_value() - elem {
+                        let index = elem + u48::new(j);
+                        if index < data_structure.element_list[i+1] {
+                            assert_eq!(data_structure.element_list[data_structure.locate_or_pred(index).unwrap() as usize], elem);
+                        }
+                    }
+                }
+            } else {
+                assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem).unwrap() as usize], elem);
+                assert_eq!(data_structure.element_list[data_structure.locate_or_pred(elem+u48::new(1)).unwrap() as usize], elem);
+            }
+        }
+    }
+
+    use rand_distr::{Distribution, Uniform};
+    use crate::default::immutable::TopArray;
+    /*#[test]*/
+    /// Fügt einige Bits in eine ArrayTop-Struktur und prüft anschließend, ob die Bits gesetted sind.
+    /// (Deaktiviert, da der Test sehr lange dauert)
+    fn test_top_array_set_bit() {
+        let between = Uniform::from(0u64..(1<<10));
+        let mut rng = rand::thread_rng();
+
+        let mut bits_set: Vec<usize> = vec![];
+        for _ in 0..230 {
+            bits_set.push(between.sample(&mut rng) as usize);
+        }
+        bits_set.sort();
+        bits_set.dedup();
+
+        let mut lxtop = TopArray::<u40, u16>::new();
+
+        for &i in bits_set.iter() {
+            lxtop.set_bit(i);
+        }
+
+        for i in 0..(1<<10) {
+            assert_eq!(bits_set.contains(&i),lxtop.is_set(i));
+        }
+
+        for i in 0..bits_set.len()-1 {
+            assert_eq!(bits_set[i+1],lxtop.get_next_set_bit(bits_set[i]).unwrap());
+        }
+
+        for i in 1..bits_set.len() {
+            assert_eq!(bits_set[i-1],lxtop.get_prev_set_bit(bits_set[i]).unwrap());
+        }
+
+        let between = Uniform::from(0u64..(1<<12));
+        let mut bits_set: Vec<usize> = vec![];
+        for _ in 0..230 {
+            bits_set.push(between.sample(&mut rng) as usize);
+        }
+        bits_set.sort();
+        bits_set.dedup();
+        
+        let mut lxtop = TopArray::<u48, u16>::new();
+        
+        for &i in bits_set.iter() {
+            lxtop.set_bit(i);
+        }
+
+        for i in 0..(1<<12) {
+            assert_eq!(bits_set.contains(&i),lxtop.is_set(i));
+        }
+
+        for i in 0..bits_set.len()-1 {
+            assert_eq!(bits_set[i+1],lxtop.get_next_set_bit(bits_set[i]).unwrap());
+        }
+
+        for i in 1..bits_set.len() {
+            assert_eq!(bits_set[i-1],lxtop.get_prev_set_bit(bits_set[i]).unwrap());
+        } 
+
+        let between = Uniform::from(0u64..(1<<16));
+        let mut bits_set: Vec<usize> = vec![];
+        for _ in 0..20000 {
+            bits_set.push(between.sample(&mut rng) as usize);
+        }
+        bits_set.sort();
+        bits_set.dedup();
+        let mut lxtop = TopArray::<u64, u16>::new();
+
+        for &i in bits_set.iter() {
+            lxtop.set_bit(i);
+        }
+
+        for i in 0..(1<<16) {
+            assert_eq!(bits_set.contains(&i),lxtop.is_set(i));
+        }
+
+        for i in 0..bits_set.len()-1 {
+            assert_eq!(bits_set[i+1],lxtop.get_next_set_bit(bits_set[i]).unwrap());
+        }
+
+        for i in 1..bits_set.len() {
+            assert_eq!(bits_set[i-1],lxtop.get_prev_set_bit(bits_set[i]).unwrap());
+        }
+        
+        let between = Uniform::from(0u64..(1<<20));
+        let mut bits_set: Vec<usize> = vec![];
+        for _ in 0..20000 {
+            bits_set.push(between.sample(&mut rng) as usize);
+        }
+        bits_set.sort();
+        bits_set.dedup();
+        let mut lxtop = TopArray::<u40, usize>::new();
+
+        for &i in bits_set.iter() {
+            lxtop.set_bit(i);
+        }
+
+        for i in 0..(1<<20) {
+            assert_eq!(bits_set.contains(&i),lxtop.is_set(i));
+        }
+
+        for i in 0..bits_set.len()-1 {
+            assert_eq!(bits_set[i+1],lxtop.get_next_set_bit(bits_set[i]).unwrap());
+        }
+
+        for i in 1..bits_set.len() {
+            assert_eq!(bits_set[i-1],lxtop.get_prev_set_bit(bits_set[i]).unwrap());
+        }
+
+        let between = Uniform::from(0u64..(1<<22));
+        let mut bits_set: Vec<usize> = vec![];
+        for _ in 0..20000 {
+            bits_set.push(between.sample(&mut rng) as usize);
+        }
+        bits_set.sort();
+        bits_set.dedup();
+        let mut lxtop = TopArray::<u48, usize>::new();
+
+        for &i in bits_set.iter() {
+            lxtop.set_bit(i);
+        }
+
+        for i in 0..(1<<22) {
+            assert_eq!(bits_set.contains(&i),lxtop.is_set(i));
+        }
+
+        for i in 0..bits_set.len()-1 {
+            assert_eq!(bits_set[i+1],lxtop.get_next_set_bit(bits_set[i]).unwrap());
+        }
+
+        for i in 1..bits_set.len() {
+            assert_eq!(bits_set[i-1],lxtop.get_prev_set_bit(bits_set[i]).unwrap());
+        }
+
+        let between = Uniform::from(0u64..(1<<32));
+        let mut bits_set: Vec<usize> = vec![];
+        for _ in 0..20000 {
+            bits_set.push(between.sample(&mut rng) as usize);
+        }
+        println!("Did it");
+        bits_set.sort();
+        bits_set.dedup();
+        println!("Did sort");
+        let mut lxtop = TopArray::<u64, usize>::new();
+
+        for &i in bits_set.iter() {
+            lxtop.set_bit(i);
+        }
+        println!("Did set");
+
+        // Abgespeckt da das verdammt lange dauert!
+        for i in 0..(1<<22) {
+            assert_eq!(bits_set.contains(&i),lxtop.is_set(i));
+        }
+
+        for i in 0..bits_set.len()-1 {
+            assert_eq!(bits_set[i+1],lxtop.get_next_set_bit(bits_set[i]).unwrap());
+        }
+
+        for i in 1..bits_set.len() {
+            assert_eq!(bits_set[i-1],lxtop.get_prev_set_bit(bits_set[i]).unwrap());
         }
     }
 }
