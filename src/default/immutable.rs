@@ -158,9 +158,9 @@ impl<T,V> TopArray<T,V> {
     #[inline]
     fn get_length() -> usize {
         if std::mem::size_of::<V>() == std::mem::size_of::<usize>() {
-            1 << std::mem::size_of::<T>()*8/2
+            1 << std::mem::size_of::<T>()*8-16
         } else if std::mem::size_of::<V>() == std::mem::size_of::<LXKey>() {
-            1 << std::mem::size_of::<T>()*8/4
+            1 << 8
         } else {
             panic!("Ungültige Parameterkombination vom TopArray!")
         }
@@ -339,7 +339,7 @@ pub trait Int: Ord + PartialOrd + From<u64> + Into<u64> + Copy + Splittable {
         Self::from(k)
     }
     fn root_array_size() -> usize {
-        1 << (std::mem::size_of::<Self>()*8/2)
+        1 << (std::mem::size_of::<Self>()*8-16)
     }
 }
 
