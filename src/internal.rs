@@ -176,31 +176,11 @@ pub struct MphfHashMap<K,V> {
 }
 
 impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Clone,V> MphfHashMap<K,V> {
+    #[inline]
     pub fn new(keys: Box<[K]>, objects: Box<[V]>) -> Self {
         Self {
             hash_function: Mphf::new_parallel(GAMMA,&keys.to_vec(),None),
             objects: objects
-        }
-    }
-
-       /// Mit Hilfe dieser Funktion kann die perfekte Hashfunktion verwendet werden. 
-    /// Es muss beachtet werden, dass sichergestellt werden muss, dass der verwendete Key auch existiert!
-    /// 
-    /// # Arguments
-    ///
-    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
-    #[inline]
-    pub fn try_get(&self, key: K, lx_top: &[u64]) -> Option<&V> {
-        let k: u16 = key.clone().into();
-        let index = (k/64) as usize;
-        let in_index_mask = 1<<(63-(k % 64));
-
-        // Hier wird überprüft ob der Key zur Initialisierung bekannt war. Anderenfalls wird die Hashfunktion nicht ausgeführt.
-        if (lx_top[index] & in_index_mask) != 0 {
-            let hash = self.hash_function.hash(&key) as usize;
-            self.objects.get(hash)
-        } else {
-            None
         }
     }
 
@@ -211,9 +191,26 @@ impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + st
     ///
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
-    pub fn get(&mut self, key: &K) -> &mut V {
+    pub fn get(&self, key: &K) -> &V {
         let hash = self.hash_function.try_hash(key).unwrap() as usize;
-        self.objects.get_mut(hash).unwrap()
+        unsafe {
+            self.objects.get_unchecked(hash)
+        }
+    }
+
+        /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
+    /// das zu `key` ein Schlüssel gehört. Anderenfalls sollte `try_hash` verwendet werden
+    /// 
+    /// # Arguments
+    ///
+    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    #[inline]
+    pub fn get_mut(&mut self, key: &K) -> &mut V {
+        let hash = self.hash_function.try_hash(key).unwrap() as usize;
+
+        unsafe {
+            self.objects.get_unchecked_mut(hash)
+        }
     }
 
 }

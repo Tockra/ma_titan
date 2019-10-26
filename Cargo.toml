@@ -6,8 +6,12 @@ edition = "2018"
 
 [dependencies]
 hashbrown = "0.6.1"
-boomphf = {git = "https://github.com/10XGenomics/rust-boomphf.git"}
+boomphf = {git = "https://github.com/Tockra/rust-boomphf.git"}
 uint = { git = "https://github.com/Tockra/uint.git" }
 stats_alloc = { git = "https://github.com/Tockra/stats_alloc.git" }
 vebtrees = {git = "https://github.com/Tockra/rust-vebtrees.git"}
 num = "0.2.0"
+
+[dev-dependencies]
+rand = "0.7.0"
+rand_distr = "0.2.2"
