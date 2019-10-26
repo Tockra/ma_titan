@@ -175,13 +175,27 @@ pub struct MphfHashMap<K,V> {
     objects: Box<[V]>,
 }
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use stats_alloc::{StatsAlloc};
+use std::alloc::System;
+pub static LEVEL_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub static HASH_MAPS_IN_BYTES: AtomicUsize = AtomicUsize::new(0);
+pub static NUMBER_OF_KEYS: AtomicUsize = AtomicUsize::new(0);
+use stats_alloc::Region;
+
 impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Clone,V> MphfHashMap<K,V> {
     #[inline]
-    pub fn new(keys: Box<[K]>, objects: Box<[V]>) -> Self {
-        Self {
+    pub fn new(GLOBAL: &'static StatsAlloc<System>, keys: Box<[K]>, objects: Box<[V]>) -> Self {
+
+        let reg = Region::new(GLOBAL);
+        let std = Self {
             hash_function: Mphf::new_parallel(GAMMA,&keys.to_vec(),None),
             objects: objects
-        }
+        };
+        
+        let change = reg.change();
+        HASH_MAPS_IN_BYTES.fetch_add(change.bytes_current_used, Ordering::SeqCst);
+        std
     }
 
     /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein

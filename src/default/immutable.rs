@@ -383,7 +383,7 @@ impl<T: Int> STree<T> {
         
         let mut builder = STreeBuilder::<T>::new(elements.clone());
 
-        let root_top = builder.get_root_tops();
+        let root_top = builder.get_root_top();
         STree {
             root_table: builder.build(GLOBAL),
             root_top: root_top,
@@ -603,7 +603,7 @@ impl<T,E> Level<T,E> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(GLOBAL, lx_top: TopArray<E, u16>, objects: Box<[T]>, keys: Box<[LXKey]>, minimum: usize, maximum: usize) -> Level<T,E> {
+    pub fn new(GLOBAL: &'static StatsAlloc<System>, lx_top: TopArray<E, u16>, objects: Box<[T]>, keys: Box<[LXKey]>, minimum: usize, maximum: usize) -> Level<T,E> {
         Level {
             hash_map: MphfHashMap::new(GLOBAL,keys, objects),
             minimum: minimum,
@@ -637,63 +637,4 @@ impl<T,E> Level<T,E> {
     pub fn get(&mut self, key: LXKey) -> &mut T {
         self.hash_map.get_mut(&key)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use uint::{u40,u48};
-    use super::{STree};
-    use crate::internal::{PointerEnum,Splittable};
-
-    /// Größe der LX-Top-Arrays 40 Bit
-    const LX_ARRAY_SIZE_U40: usize = 1 << 10;
-
-    /// Größe der LX-Top-Arrays 48 Bit
-    const LX_ARRAY_SIZE_U48: usize = 1 << 12;
-
-    // u64 Tests werden ausgespart, da der STree (leer) nach Initialisierung 2^32 * 8 Byte = 34 Gbyte RAM benötigt
-    // Diese Tests sind nicht auf gängigen Laptop ausführbar. (Zukunft, ich rede von 2019 :p).
-
-    /// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
-    #[test]
-    fn test_u40_new_hashfunctions() {
-
-        // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
-        // und alle Top-Level-Datenstrukturen sollten mit 1 belegt sein.
-        let mut data: Vec<u40> = vec![u40::new(0);LX_ARRAY_SIZE_U40];
-        
-        for i in 0..data.len() {
-            data[i] = u40::new(i as u64);
-        }
- 
-        let check = data.clone();
-        let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
-
-        assert_eq!(data_structure.len(),check.len());
-        assert_eq!(data_structure.minimum().unwrap(),u40::new(0));
-        assert_eq!(data_structure.maximum().unwrap(),u40::new(check.len() as u64 - 1));
-        for val in check {
-            let (i,j,k) = Splittable::split_integer_down(&val);
-            match data_structure.root_table[i].get() {
-                PointerEnum::First(l) => {
-                    let second_level = l.get(j);
-                    let saved_val = match second_level.get() {
-                        PointerEnum::First(l) => {
-                            *(*l).get(k)
-                        },
-                        PointerEnum::Second(e) => {
-                            *e
-                        }
-                    };
-                    assert_eq!(data_structure.element_list[saved_val],val);
-                },
-
-                PointerEnum::Second(e) => {
-                    assert_eq!(data_structure.element_list[*e],val);
-                }
-            };
-
-        }
-    }
-
 }

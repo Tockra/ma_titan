@@ -157,8 +157,8 @@ impl<T: Int> STreeBuilder<T> {
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
     /// angelegt und miteinander verbunden. Nachdem die Struktur mit normalen Hashfunktionen gebaut wurde können nun perfekte Hashfunktionen berechnet 
     /// werden!
-    pub fn build<T: Int>(&mut self, GLOBAL: &'static StatsAlloc<System>) -> Box<[L2Ebene]> {
-        let mut tmp: Vec<L2Ebene> = Vec::with_capacity(T::root_array_size());
+    pub fn build(&mut self, GLOBAL: &'static StatsAlloc<System>) -> Box<[L2Ebene<T>]> {
+        let mut tmp: Vec<L2Ebene<T>> = Vec::with_capacity(T::root_array_size());
         // Die L2Level-Elemente werden angelegt. Hierbei wird direkt in der new()-Funktion die perfekte Hashfunktion berechnet
         for i in 0..tmp.capacity() {
             if self.root_table[i].is_null() {
