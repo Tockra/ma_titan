@@ -1,5 +1,5 @@
 use crate::internal::{Splittable};
-use crate::default::immutable::{Level, L2Ebene, Int, LevelPointer};
+use crate::default::immutable::{LXKey, TopArray, Level, L2Ebene, Int, LevelPointer};
 
 type HashMap<K,T> = hashbrown::hash_map::HashMap<K,T>;
 
@@ -8,55 +8,42 @@ type HashMap<K,T> = hashbrown::hash_map::HashMap<K,T>;
 pub const GAMMA: f64 = 2.0;
 
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L2-Ebene hat.AsMut
-type L2EbeneBuilder = internal::Pointer<BuilderLevel<L3EbeneBuilder>,usize>;
+type L2EbeneBuilder<T> = internal::Pointer<BuilderLevel<L3EbeneBuilder<T>,T>,usize>;
 
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L3-Ebene hat.AsMut
-type L3EbeneBuilder = internal::Pointer<BuilderLevel<usize>,usize>;
+type L3EbeneBuilder<T> = internal::Pointer<BuilderLevel<usize,T>,usize>;
 
 /// Hilfsdatenstruktur zum Bauen eines STrees (nötig wegen der perfekten Hashfunktionen, die zum Erzeugungszeitpunkt alle Schlüssel kennen müssen).
-pub struct STreeBuilder {
+pub struct STreeBuilder<T: 'static > {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2EbeneBuilder je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
-    root_table: Box<[L2EbeneBuilder]>,
+    root_table: Box<[L2EbeneBuilder<T>]>,
 
     /// Root-Top-Array
-    root_top: Box<[Box<[u64]>]>,
+    root_top: Option<TopArray<T,usize>>,
 
     /// Eine Liste, die alle belegten Indizes von `root_table` speichert. 
     root_indexs: Vec<usize>,
 }
 
-impl STreeBuilder {
+impl<T: Int> STreeBuilder<T> {
     /// Gibt einen STreeBuilder mit den in `elements` enthaltenen Werten zurück. Dabei werden normale Hashfunktionen verwendet.
     ///
     /// # Arguments
     ///
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen! 
-    pub fn new<T: Int>(elements: Box<[T]>) -> Self {
+    pub fn new(elements: Box<[T]>) -> Self {
         let mut root_indexs = vec![];
-                
-        // root_top_deep verwenden um die richtige Tiefe von root_top zu bestimmen
-        let mut root_top_deep = 0;
-        while T::root_array_size()/(1<<root_top_deep*6) > 256 {
-            root_top_deep +=1;
-        }
-   
-        let mut root_top: Vec<Box<Vec<u64>>> = Vec::with_capacity(root_top_deep);
-
-        for i in 0..root_top.capacity() {
-            root_top.push(Box::new(vec![0;T::root_array_size()/(1<<i*6)]));
-        }
-
-        let mut root_top: Box<[Box<[u64]>]> = root_top.into_iter().map(|x| x.into_boxed_slice()).collect::<Vec<_>>().into_boxed_slice();
+        let mut root_top: TopArray<T,usize> = TopArray::new();
 
         // Hier wird ein root_array der Länge T::root_array_size() angelegt, was 2^i entspricht. Dabei entspricht bei einem u40 Integer i=40 .
-        let mut root_table: Box<[L2EbeneBuilder]> = vec![internal::Pointer::null(); T::root_array_size()].into_boxed_slice();
+        let mut root_table: Box<[L2EbeneBuilder<T>]> = vec![internal::Pointer::null(); T::root_array_size()].into_boxed_slice();
     
         for (index,element) in elements.iter().enumerate() {
             let (i,j,k) = Splittable::split_integer_down(element);
 
-            if !root_indexs_contains(&root_top, i) {
-                Self::build_root_top(&mut root_top, &i);
+            if !root_top.is_set(i as usize) {
+                root_top.set_bit(i as usize);
                 root_indexs.push(i);
             }
             
@@ -68,14 +55,14 @@ impl STreeBuilder {
                         let second_level = l;
                         second_level.maximum = index;
 
-                        if !second_level.contains(j) {
+                        if !second_level.lx_top.as_ref().unwrap().is_set(j as usize) {
                             second_level.keys.push(j);
 
                             let mut l3_level = internal::Pointer::null();
                             Self::insert_l3_level(&mut l3_level,index,k,&elements);
 
                             second_level.hash_map.insert(j,l3_level);
-                            Self::build_lx_top(&mut second_level.lx_top, j);
+                            second_level.lx_top.as_mut().unwrap().set_bit(j as usize);
                         }
                         else {
                             // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
@@ -85,10 +72,9 @@ impl STreeBuilder {
 
                     PointerEnum::Second(e) => {
                         let (_,j2,k2) = Splittable::split_integer_down(&elements[*e]);
-                        let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
-                        let mut second_level = BuilderLevel::new(lx_array_size/64);
+                        let mut second_level = BuilderLevel::new();
 
-                        Self::build_lx_top(&mut second_level.lx_top, j);
+                        second_level.lx_top.as_mut().unwrap().set_bit(j as usize);
                         // Minima- und Maximasetzung auf der ersten Ebene
                         second_level.minimum = *e;
                         second_level.maximum = index;
@@ -101,7 +87,8 @@ impl STreeBuilder {
 
                             second_level.keys.push(j2);
                             second_level.hash_map.insert(j2,l3_level);
-                            Self::build_lx_top(&mut second_level.lx_top, j2);
+                            second_level.lx_top.as_mut().unwrap().set_bit(j2 as usize)
+
                         } else {
                             Self::insert_l3_level(&mut l3_level,*e,k2,&elements);
                         }
@@ -117,12 +104,10 @@ impl STreeBuilder {
                 }
             }
         }
-        Self {root_table: root_table, root_top: root_top, root_indexs: root_indexs}
+        Self {root_table: root_table, root_top: Some(root_top), root_indexs: root_indexs}
     }
     #[inline]
-    fn insert_l3_level<T: Int + Into<u64>>(l3_level: &mut L3EbeneBuilder,index: usize, k: u16, elements: &[T]) {
-        let lx_array_size  = 1_usize<<(((std::mem::size_of::<T>()*8)/2)/2); 
-
+    fn insert_l3_level(l3_level: &mut L3EbeneBuilder<T>,index: usize, k: LXKey, elements: &[T]) {
         if l3_level.is_null() {
             *l3_level = internal::Pointer::from_second(Box::new(index));
         } else {
@@ -132,7 +117,7 @@ impl STreeBuilder {
 
                     debug_assert!(!l3_level.keys.contains(&k));
 
-                    Self::build_lx_top(&mut l3_level.lx_top, k);
+                    l3_level.lx_top.as_mut().unwrap().set_bit(k as usize);
                     l3_level.keys.push(k);
                 
                     //Maximasetzung auf der zweiten Ebene
@@ -143,7 +128,7 @@ impl STreeBuilder {
 
                 PointerEnum::Second(e) => {
                     let (_,_,k2) = Splittable::split_integer_down(&elements[*e]);
-                    let mut l3_level_n = BuilderLevel::new(lx_array_size/64);
+                    let mut l3_level_n = BuilderLevel::new();
                     l3_level_n.keys.push(k2);
                     l3_level_n.keys.push(k);
 
@@ -155,8 +140,10 @@ impl STreeBuilder {
 
                     l3_level_n.hash_map.insert(k2, *e);
                     l3_level_n.hash_map.insert(k, index);
-                    Self::build_lx_top(&mut l3_level_n.lx_top, k);
-                    Self::build_lx_top(&mut l3_level_n.lx_top, k2);
+
+                    l3_level_n.lx_top.as_mut().unwrap().set_bit(k as usize);
+                    l3_level_n.lx_top.as_mut().unwrap().set_bit(k2 as usize);
+
                     
                     *l3_level = internal::Pointer::from_first(Box::new(l3_level_n));
                 }
@@ -167,8 +154,8 @@ impl STreeBuilder {
     /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
     /// angelegt und miteinander verbunden. Nachdem die Struktur mit normalen Hashfunktionen gebaut wurde können nun perfekte Hashfunktionen berechnet 
     /// werden!
-    pub fn build<T: Int>(&mut self) -> Box<[L2Ebene]> {
-        let mut tmp: Vec<L2Ebene> = Vec::with_capacity(T::root_array_size());
+    pub fn build(&mut self) -> Box<[L2Ebene<T>]> {
+        let mut tmp: Vec<L2Ebene<T>> = Vec::with_capacity(T::root_array_size());
         // Die L2Level-Elemente werden angelegt. Hierbei wird direkt in der new()-Funktion die perfekte Hashfunktion berechnet
         for i in 0..tmp.capacity() {
             if self.root_table[i].is_null() {
@@ -177,7 +164,11 @@ impl STreeBuilder {
                 match self.root_table[i].get() {
                     PointerEnum::First(l) => {
                         let second_level = l;
-                        let val = Box::new(Level::new(std::mem::replace(&mut second_level.lx_top,Box::new([])),vec![LevelPointer::from_null(); second_level.keys.len()].into_boxed_slice(), second_level.keys.clone().into_boxed_slice(),second_level.minimum, second_level.maximum));
+                        let objects: Vec<LevelPointer<usize,T>> = vec![LevelPointer::from_null(); second_level.keys.len()];
+                        let val = Box::new(Level::new(second_level.lx_top.take().unwrap(),
+                                    objects.into_boxed_slice(),
+                                    second_level.keys.clone().into_boxed_slice(),
+                                    second_level.minimum, second_level.maximum) );
                         tmp.push(LevelPointer::from_level(val));
                     },
 
@@ -187,7 +178,7 @@ impl STreeBuilder {
                 }
             }
         }
-        let result: Box<[L2Ebene]> = tmp.into_boxed_slice();
+        let result: Box<[L2Ebene<T>]> = tmp.into_boxed_slice();
 
         for &i in &self.root_indexs {
             // L3-Level werden nur angelegt, falls mehr als 1 Wert in der DS existiert.
@@ -209,7 +200,7 @@ impl STreeBuilder {
                                         *pointered_data =  match l3_level.get() {
                                             PointerEnum::First(l2) => {
                                                 let l3_level = l2;
-                                                let mut level = Level::new(std::mem::replace(&mut l3_level.lx_top, Box::new([])), vec![0; l3_level.keys.len()].into_boxed_slice(), l3_level.keys.clone().into_boxed_slice(),l3_level.minimum,l3_level.maximum);
+                                                let mut level = Level::new(l3_level.lx_top.take().unwrap(), vec![0; l3_level.keys.len()].into_boxed_slice(), l3_level.keys.clone().into_boxed_slice(),l3_level.minimum,l3_level.maximum);
                                                 for k in &l3_level.keys {
                                                     let result = level.get(*k);
                                                     *result = *l3_level.hash_map.get(k).unwrap();
@@ -242,53 +233,25 @@ impl STreeBuilder {
         result
     }
 
-    /// Hilfsfunktion zum erzeugen der LX-Top-Arrays. 
-    /// Annahme: Größe des lx_top-Arrays 2^10 Elemente
-    /// 
-    /// # Arguments
-    ///
-    /// * `lx_top` - Mutable Referenz auf ein Array, das nach diesem Funktionsaufruf das Bit für `key` gesetzt hat. 
-    /// * `key` - Ein Schlüssel, dessen Index als Bit im LX-Top-Array gesetzt wird. 
-    #[inline]
-    fn build_lx_top(lx_top: &mut Box<[u64]>, key: u16) {
-        let key = u16::from(key);
-
-        let index = (key/64) as usize;
-        let in_index_mask = 1<<(63-(key % 64));
-        lx_top[index] = lx_top[index] | in_index_mask;
-    }
-
-    /// Baut das Root-Top-Array mit Hilfe der sich in der Datenstruktur befindenden Werte.
-    #[inline]
-    fn build_root_top(root_top: &mut Box<[Box<[u64]>]>, bit: &usize) {
-        // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
-        for i in 0..root_top.len() {
-            let curr_bit_repr = bit/(1<<(i*6));
-            let index = curr_bit_repr/64;
-            let bit_mask: u64  = 1<<(63-(curr_bit_repr%64));
-            root_top[i][index] = root_top[i][index] | bit_mask;
-        }
-    }
-
-    pub fn get_root_tops(&mut self) -> (Box<[Box<[u64]>]>) {
-        (std::mem::replace(&mut self.root_top,Box::new([])))
+    pub fn get_root_top(&mut self) -> TopArray<T, usize> {
+        self.root_top.take().unwrap()
     }
 }
 
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 #[derive(Clone)]
-pub struct BuilderLevel<T: 'static> {
+pub struct BuilderLevel<T: 'static,E: 'static> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
-    pub hash_map: BuildHM<u16,T>,
+    pub hash_map: BuildHM<LXKey,T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
     /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.
-    pub keys: Vec<u16>,
+    pub keys: Vec<LXKey>,
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     /// Dieses Array wird später an den `Level`-Struct weitergegeben
-    pub lx_top: Box<[u64]>,
+    lx_top: Option<TopArray<E, u16>>,
 
     /// Speichert das Maximum des Levels zwischen
     pub maximum: usize,
@@ -297,28 +260,21 @@ pub struct BuilderLevel<T: 'static> {
     pub minimum: usize,
 }
 
-impl<T> BuilderLevel<T> {
+impl<T,E> BuilderLevel<T,E> {
     /// Gibt ein BuilderLevel<T> zurück. 
     ///
     /// # Arguments
     ///
     /// * `lx_top_size` - Gibt die Länge des Arrays `lx_top_size` an. 
     #[inline]
-    pub fn new(lx_top_size: usize) -> BuilderLevel<T> {
+    pub fn new() -> BuilderLevel<T,E> {
         BuilderLevel {
             hash_map: BuildHM::new(),
             keys: vec![],
-            lx_top: vec![0;lx_top_size].into_boxed_slice(),
+            lx_top: Some(TopArray::new()),
             maximum: 0,
             minimum: 1
         }
-    }
-
-    pub fn contains(&self, key: u16) -> bool {
-        let index = (key/64) as usize;
-        let in_index_mask = 1<<(63-(key % 64));
-
-        (self.lx_top[index] & in_index_mask) != 0
     }
 }
 
@@ -348,7 +304,7 @@ impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
     fn insert(&mut self, key: K, val: T) {
         match self.pointer.get() {
             PointerEnum::Second((keys,values)) => {
-                if false {
+                if true {
                     keys.push(key);
                     values.push(val);
                 } else {
@@ -394,17 +350,6 @@ impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
             },
         }
     }
-}
-
-fn root_indexs_contains(root_top: &Box<[Box<[u64]>]>, bit: usize) -> bool {
-    let curr_bit_repr = bit/(1<<(0*6));
-    let index = curr_bit_repr/64;
-    let bit_mask: u64  = 1<<(63-(curr_bit_repr%64));
-    if root_top[0][index] & bit_mask == 0 {
-        return false;
-    }
-
-    true
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------
