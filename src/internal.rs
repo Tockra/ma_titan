@@ -73,9 +73,9 @@ impl Splittable for u64 {
     }
 } 
 
-pub enum PointerEnum<T: 'static, E: 'static> {
-    First(&'static mut T),
-    Second(&'static mut E)
+pub enum PointerEnum<'a,T: 'a, E: 'a> {
+    First(&'a mut T),
+    Second(&'a mut E)
 }
 
 /// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein T oder ein E Objekt zeigt. Wichtig ist hierbei, dass T mit einem Vielfachen von 2 alligned werden muss!
@@ -84,7 +84,7 @@ pub struct Pointer<T,E> {
     phantom: std::marker::PhantomData<E>,
 }
 
-impl<T:'static + Clone,E:'static + Clone> Clone for Pointer<T,E> {
+impl<T: Clone,E: Clone> Clone for Pointer<T,E> {
     fn clone(&self) -> Self {
         if self.pointer.is_null() {
             Self::null()

@@ -14,7 +14,7 @@ type L2EbeneBuilder<T> = internal::Pointer<BuilderLevel<L3EbeneBuilder<T>,T>,usi
 type L3EbeneBuilder<T> = internal::Pointer<BuilderLevel<usize,T>,usize>;
 
 /// Hilfsdatenstruktur zum Bauen eines STrees (nötig wegen der perfekten Hashfunktionen, die zum Erzeugungszeitpunkt alle Schlüssel kennen müssen).
-pub struct STreeBuilder<T: 'static > {
+pub struct STreeBuilder<T > {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2EbeneBuilder je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
     root_table: Box<[L2EbeneBuilder<T>]>,
@@ -240,7 +240,7 @@ impl<T: Int> STreeBuilder<T> {
 
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays. 
 #[derive(Clone)]
-pub struct BuilderLevel<T: 'static,E: 'static> {
+pub struct BuilderLevel<T,E> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
     pub hash_map: BuildHM<LXKey,T>,
 
@@ -285,7 +285,7 @@ pub struct BuildHM<K,T> {
     pointer: internal::Pointer<HashMap<K,T>,(Box<Vec<K>>,Box<Vec<T>>)>,
 }
 
-impl<K:'static + Clone,T:'static + Clone> Clone for BuildHM<K,T> {
+impl<K: Clone,T: Clone> Clone for BuildHM<K,T> {
     fn clone(&self) -> Self {
         Self {
             pointer: self.pointer.clone()
@@ -293,7 +293,7 @@ impl<K:'static + Clone,T:'static + Clone> Clone for BuildHM<K,T> {
     }
 }
 
-impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
+impl<K: Eq + Copy + Ord + std::hash::Hash,T> BuildHM<K,T> {
     fn new() -> Self{
         Self {
             pointer: internal::Pointer::from_second(Box::new((Box::new(vec![]),Box::new(vec![]))))
