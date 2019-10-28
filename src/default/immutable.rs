@@ -12,7 +12,7 @@ pub type L3Ebene<T> = LevelPointer<usize, T>;
 
 use crate::internal::{self, PointerEnum};
 
-type HashMap<T,V> = fnv::FnvHashMap<T,V>;
+type HashMap<T,V> = rustc_hash::FxHashMap<T,V>;
 
 /// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
 /// oder auf ein Levelobjekt
