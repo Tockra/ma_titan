@@ -1,7 +1,7 @@
 use uint::{u40, u48};
 
-use crate::default::build::STreeBuilder;
-use crate::internal::{MphfHashMap, Splittable};
+use crate::internal::{Splittable};
+use crate::default::build::insert_l3_level;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene<T> = LevelPointer<L3Ebene<T>, T>;
@@ -11,6 +11,8 @@ pub type L2Ebene<T> = LevelPointer<L3Ebene<T>, T>;
 pub type L3Ebene<T> = LevelPointer<usize, T>;
 
 use crate::internal::{self, PointerEnum};
+
+type HashMap<T,K> = fnv::FnvHashMap<T,K>;
 
 /// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
 /// oder auf ein Levelobjekt
@@ -361,11 +363,68 @@ impl<T: Int> STree<T> {
     /// * `elements` - Eine Liste mit sortierten u40-Werten, die in die statische Datenstruktur eingefügt werden sollten. Kein Wert darf doppelt vorkommen!
     #[inline]
     pub fn new(elements: Box<[T]>) -> Self {
-        let mut builder = STreeBuilder::<T>::new(elements.clone());
+        if elements.len() == 0 {
+            panic!("Ein statischer STree muss mindestens 1 Element beinhalten.");
+        }
+        let mut root_table: Box<[L2Ebene<T>]> = vec![LevelPointer::from_null(); T::root_array_size()].into_boxed_slice();
+        let mut root_top = TopArray::<T,usize>::new();
 
-        let root_top = builder.get_root_top();
+        for (index,elem) in elements.iter().enumerate() {
+            let (i,j,k) = Splittable::split_integer_down(elem);
+            root_top.set_bit(i as usize);
+ 
+            if root_table[i].is_null() {
+                root_table[i] = LevelPointer::from_usize(Box::new(index));
+            } else {
+                match root_table[i].get() {
+                    PointerEnum::First(l2_object) => {
+                        l2_object.maximum = index;
+
+                        if !l2_object.lx_top.is_set(j as usize) {
+                            let mut l3_level = L3Ebene::from_null();
+                            insert_l3_level(&mut l3_level,index,k,&elements);
+
+                            l2_object.hash_map.insert(j,l3_level);
+                            l2_object.lx_top.set_bit(j as usize);
+                        } else {
+                            // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
+                            insert_l3_level(l2_object.hash_map.get_mut(&j).unwrap(),index,k,&elements);
+                        }
+      
+                    },
+                    PointerEnum::Second(elem_index) => {
+                        let mut l2_object = Level::new();
+                        let elem2 = elements[*elem_index];
+                        let (_,j2,k2) = Splittable::split_integer_down(&elem2);
+                        
+                        // Da die Elemente sortiert sind
+                        l2_object.minimum = *elem_index;
+                        l2_object.maximum = index;
+
+                        l2_object.lx_top.set_bit(j as usize);
+
+                        let mut l3_level = L3Ebene::from_null();
+
+                        if j2 != j {
+                            let mut l3_level = L3Ebene::from_null();
+                            insert_l3_level(&mut l3_level,*elem_index,k2,&elements);
+
+                            l2_object.hash_map.insert(j2,l3_level);
+                            l2_object.lx_top.set_bit(j2 as usize)
+                        } else {
+                            insert_l3_level(&mut l3_level,*elem_index,k2,&elements);
+                        }
+ 
+                        insert_l3_level(&mut l3_level,index,k,&elements);
+                        l2_object.hash_map.insert(j,l3_level);
+
+                        root_table[i] = L2Ebene::from_level(Box::new(l2_object));
+                    },
+                }
+            }
+        }
         STree {
-            root_table: builder.build(),
+            root_table: root_table,
             root_top: root_top,
             element_list: elements,
         }
@@ -549,7 +608,7 @@ impl<T: Int> STree<T> {
 #[repr(align(4))]
 pub struct Level<T, E> {
     /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist.
-    pub hash_map: MphfHashMap<LXKey, T>,
+    pub hash_map: HashMap<LXKey, T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -559,7 +618,7 @@ pub struct Level<T, E> {
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64].
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
-    lx_top: TopArray<E, u16>,
+    pub lx_top: TopArray<E, u16>,
 }
 
 impl<T, E> Level<T, E> {
@@ -571,18 +630,12 @@ impl<T, E> Level<T, E> {
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden.
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
-    pub fn new(
-        lx_top: TopArray<E, u16>,
-        objects: Box<[T]>,
-        keys: Box<[LXKey]>,
-        minimum: usize,
-        maximum: usize,
-    ) -> Level<T, E> {
+    pub fn new() -> Level<T, E> {
         Level {
-            hash_map: MphfHashMap::new(keys, objects),
-            minimum: minimum,
-            maximum: maximum,
-            lx_top: lx_top,
+            hash_map: HashMap::default(),
+            minimum: 0,
+            maximum: 0,
+            lx_top: TopArray::new(),
         }
     }
 
@@ -595,7 +648,7 @@ impl<T, E> Level<T, E> {
     #[inline]
     pub fn try_get(&self, key: LXKey) -> Option<&T> {
         if self.lx_top.is_set(key as usize) {
-            Some(self.hash_map.get(&key))
+            self.hash_map.get(&key)
         } else {
             None
         }
@@ -609,6 +662,6 @@ impl<T, E> Level<T, E> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&mut self, key: LXKey) -> &mut T {
-        self.hash_map.get_mut(&key)
+        self.hash_map.get_mut(&key).unwrap()
     }
 }
