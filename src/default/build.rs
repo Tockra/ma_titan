@@ -1,3 +1,7 @@
+
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+
 use crate::default::immutable::{Int, L2Ebene, LXKey, Level, LevelPointer, TopArray};
 use crate::internal::Splittable;
 
@@ -67,7 +71,7 @@ impl<T: Int> STreeBuilder<T> {
                         } else {
                             // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
                             Self::insert_l3_level(
-                                second_level.hash_map.get_mut(&j).unwrap(),
+                                second_level.hash_map.get_mut(j).unwrap(),
                                 index,
                                 k,
                                 &elements,
@@ -204,7 +208,7 @@ impl<T: Int> STreeBuilder<T> {
 
                                 for &j in &l2_level.keys {
                                     // Die L2-Top-Tabellen werden gefüllt und die
-                                    let l3_level = l2_level.hash_map.get_mut(&j).unwrap();
+                                    let l3_level = l2_level.hash_map.get_mut(j).unwrap();
                                     // TODO
                                     if (*l).get(j).is_null() {
                                         let pointered_data = (*l).get(j);
@@ -221,7 +225,7 @@ impl<T: Int> STreeBuilder<T> {
                                                 );
                                                 for k in &l3_level.keys {
                                                     let result = level.get(*k);
-                                                    *result = *l3_level.hash_map.get(k).unwrap();
+                                                    *result = *l3_level.hash_map.get(*k).unwrap();
                                                 }
 
                                                 LevelPointer::from_level(Box::new(level))
@@ -253,7 +257,7 @@ impl<T: Int> STreeBuilder<T> {
 #[derive(Clone)]
 pub struct BuilderLevel<T: 'static, E: 'static> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
-    pub hash_map: BuildHM<LXKey, T>,
+    pub hash_map: DynamicLookup<T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
     /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.
@@ -271,7 +275,7 @@ pub struct BuilderLevel<T: 'static, E: 'static> {
     pub minimum: usize,
 }
 
-impl<T, E> BuilderLevel<T, E> {
+impl<T: Clone, E> BuilderLevel<T, E> {
     /// Gibt ein BuilderLevel<T> zurück.
     ///
     /// # Arguments
@@ -280,7 +284,7 @@ impl<T, E> BuilderLevel<T, E> {
     #[inline]
     pub fn new() -> BuilderLevel<T, E> {
         BuilderLevel {
-            hash_map: BuildHM::new(),
+            hash_map: DynamicLookup::new(),
             keys: vec![],
             lx_top: Some(TopArray::new()),
             maximum: 0,
@@ -312,7 +316,7 @@ impl<K: 'static + Eq + Copy + Ord + std::hash::Hash, T: 'static> BuildHM<K, T> {
     }
 
     /// Die eigentliche Updatemechanik der HashMaps, wird hier ignoriert, da keine Werte geupdatet werden müssen!
-    fn insert(&mut self, key: K, val: T) {
+    pub fn insert(&mut self, key: K, val: T) {
         match self.pointer.get() {
             PointerEnum::Second((keys, values)) => {
                 if true {
@@ -356,3 +360,181 @@ impl<K: 'static + Eq + Copy + Ord + std::hash::Hash, T: 'static> BuildHM<K, T> {
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+/// Diese Datenstruktur dient als naive Hashmap. Sie speichert eine Lookuptable und die Daten
+
+pub struct DynamicLookup<E> {
+    // table.len == 256
+    table: *mut u8,
+
+    // keys.len == objects.len
+    keys: *mut [u8;4],
+
+    objects: *mut [Option<E>;4],
+
+    shift_value: u8,
+
+    array_len: u16,
+
+    size: u8,
+}
+
+impl<E> Drop for DynamicLookup<E> {
+    fn drop(&mut self) {
+        unsafe {
+            Box::from_raw(std::slice::from_raw_parts_mut(self.table, 256));
+            Box::from_raw(std::slice::from_raw_parts_mut(self.keys, (self.array_len/4) as usize));
+            Box::from_raw(std::slice::from_raw_parts_mut(self.objects, (self.array_len/4) as usize));
+            
+        }
+    }
+}
+
+impl<E: Clone> Clone for DynamicLookup<E> {
+    fn clone(&self) -> Self {
+        unsafe {
+            let mut new_lookup = vec![];
+            for i in 0..256 {
+                new_lookup.push(*self.table.add(i));
+            }
+
+            let mut new_keys = vec![];
+            for i in 0..self.array_len/4 {
+                new_keys.push(*self.keys.add(i as usize));
+            }
+
+            let mut new_objects = vec![];
+            for i in 0..self.array_len/4 {
+                let mut tmp: [Option<E>; 4] = [None, None, None, None];
+                for j in 0..4 {
+                    tmp[j] = (*self.objects.add(i as usize))[j].clone();
+                }
+                new_objects.push(tmp);
+            }
+
+        
+            Self {
+                table: Box::into_raw(new_lookup.into_boxed_slice()) as *mut u8,
+                keys: Box::into_raw(new_keys.into_boxed_slice()) as *mut [u8;4],
+                objects: Box::into_raw(new_objects.into_boxed_slice()) as *mut [Option<E>;4],
+                shift_value: self.shift_value,
+                array_len: self.array_len,
+                size: self.size,
+            }
+        }
+    }
+}
+
+impl<E: Clone> DynamicLookup<E> {
+    /// Vorbindung: keys sind sortiert. Weiterhin gilt keys.len() == objects.len() und  keys.len() > 0
+    /// Nachbedingung : keys[i] -> objects[i]
+    pub fn new() -> Self {
+        // benötigt die Eigenschaft, dass die keys sortiert sind
+        let lookup_table = Self::init_hash_function();
+        let keys: Vec<[u8;4]> = vec![[0; 4]];
+        let objects: Vec<[Option<E>;4]> = vec![[None, None, None, None]];
+        
+        Self {
+            table: Box::into_raw(lookup_table) as *mut u8,
+            keys: Box::into_raw(keys.into_boxed_slice()) as *mut [u8;4],
+            objects: Box::into_raw(objects.into_boxed_slice()) as *mut [Option<E>;4],
+            array_len: 4,
+            size: 0,
+            shift_value: 6,
+        }
+    }
+
+    fn init_hash_function() -> Box<[u8]> {
+        let mut h = vec![0_u8;256].into_boxed_slice();
+        for i in 0..256 {
+            h[i] = i as u8;
+        }
+        
+        let mut rng = thread_rng();
+        h.shuffle(&mut rng);
+        h
+    }
+
+    pub fn get(&self, key: u8) -> Option<&E> {
+        let mut n = unsafe {*self.table.add(key as usize) >> self.shift_value};
+        let mut m = n >> 2;
+        let mut i = n & 3;
+        unsafe {
+            while !(*self.objects.add(m as usize))[i as usize].is_none() {
+                if (*self.keys.add(m as usize))[i as usize] == key {
+                    return (*self.objects.add(m as usize))[i as usize].as_ref();
+                }
+                n = (n+1) & ((self.array_len-1) as u8);
+                m = n >> 2;
+                i = n & 3;
+            }
+        }
+
+        return None;
+    }
+
+    pub fn get_mut(&self, key: u8) -> Option<&mut E> {
+        let mut n = unsafe {*self.table.add(key as usize) >> self.shift_value};
+        let mut m = n >> 2;
+        let mut i = n & 3;
+        unsafe {
+            while !(*self.objects.add(m as usize))[i as usize].is_none() {
+                if (*self.keys.add(m as usize))[i as usize] == key {
+                    return (*self.objects.add(m as usize))[i as usize].as_mut();
+                }
+                n = (n+1) & ((self.array_len-1) as u8);
+                m = n >> 2;
+                i = n & 3;
+            }
+        }
+
+        return None;
+    }
+
+    fn double_size(&mut self) {
+        unsafe {
+            debug_assert!(self.array_len <= 128);
+            self.shift_value -= 1;
+            self.array_len *= 2;
+            let new_keys = vec![[0;4]; (self.array_len/4) as usize];
+            let mut new_objects: Vec<[Option<E>;4]> = Vec::with_capacity((self.array_len/4) as usize);
+            for _ in 0..self.array_len/4 {
+                new_objects.push([None, None, None, None]);
+            }
+            let old_keys = Box::from_raw(std::slice::from_raw_parts_mut(std::mem::replace(&mut self.keys, Box::into_raw(new_keys.into_boxed_slice()) as *mut [u8;4]),(self.array_len/8) as usize));
+            let mut old_objects = Box::from_raw(std::slice::from_raw_parts_mut(std::mem::replace(&mut self.objects, Box::into_raw(new_objects.into_boxed_slice()) as *mut [Option<E>;4]),(self.array_len/8) as usize));
+            
+            self.size = 0;
+            for i in 0..self.array_len/2 {
+                let index = (i>>2) as usize;
+                let sub_index = (i&3) as usize;
+                let tmp_key = old_keys[index][sub_index];
+                let tmp_object = std::mem::replace(&mut old_objects[index][sub_index], None);
+                if !tmp_object.is_none() {
+                    self.insert(tmp_key, tmp_object.unwrap());
+                }
+            }
+        }
+    }
+
+    pub fn insert(&mut self, key: u8, elem: E) {
+        unsafe {
+            if (self.size as u16) < (self.array_len - ( self.array_len >> 2)) || self.array_len == 256 {
+                let mut n = (*self.table.add(key as usize) >> self.shift_value) as usize;
+                while !(*self.objects.add(n>>2))[n&3].is_none() {
+                    n = (n+1) & (self.array_len-1) as usize;
+                }
+
+                (*self.keys.add(n>>2))[n&3] = key;
+                (*self.objects.add(n>>2))[n&3] = Some(elem);
+
+                self.size += 1;
+            } else {
+                self.double_size();
+                self.insert(key,elem);
+            }
+        }
+        
+    }
+
+    
+}
