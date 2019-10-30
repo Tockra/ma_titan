@@ -167,7 +167,7 @@ impl<T, V> TopArray<T, V> {
         // Lege alle Rootarrays an
         let mut top_arrays = vec![];
         // Solange Länge / 64^i > 64
-        while length >= 64 {
+        while length >= 256 {
             length = length >> 6;
             top_arrays.push(Box::into_raw(vec![0_u64; length].into_boxed_slice()) as *mut u64);
         }
