@@ -2,6 +2,8 @@ use uint::{u40, u48};
 
 use crate::internal::{Splittable};
 use crate::default::build::insert_l3_level;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene<T> = LevelPointer<L3Ebene<T>, T>;
@@ -12,7 +14,7 @@ pub type L3Ebene<T> = LevelPointer<usize, T>;
 
 use crate::internal::{self, PointerEnum};
 
-type HashMap<T,V> = fnv::FnvHashMap<T,V>;
+type HashMap<V> = DynamicLookup<V>;
 
 /// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
 /// oder auf ein Levelobjekt
@@ -150,9 +152,9 @@ impl<T, V> TopArray<T, V> {
     #[inline]
     fn get_length() -> usize {
         if std::mem::size_of::<V>() == std::mem::size_of::<usize>() {
-            1 << std::mem::size_of::<T>() * 8 / 2
+            1 << std::mem::size_of::<T>() * 8 - 16
         } else if std::mem::size_of::<V>() == std::mem::size_of::<LXKey>() {
-            1 << std::mem::size_of::<T>() * 8 / 4
+            1 << 8
         } else {
             panic!("Ungültige Parameterkombination vom TopArray!")
         }
@@ -344,7 +346,7 @@ pub trait Int: Ord + PartialOrd + From<u64> + Into<u64> + Copy + Splittable {
         Self::from(k)
     }
     fn root_array_size() -> usize {
-        1 << (std::mem::size_of::<Self>() * 8 / 2)
+        1 << (std::mem::size_of::<Self>() * 8 - 16)
     }
 }
 
@@ -354,7 +356,7 @@ impl Int for u48 {}
 
 impl Int for u64 {}
 
-pub type LXKey = u16;
+pub type LXKey = u8;
 impl<T: Int> STree<T> {
     /// Gibt einen STree mit den in `elements` enthaltenen Werten zurück.
     ///
@@ -388,7 +390,7 @@ impl<T: Int> STree<T> {
                             l2_object.lx_top.set_bit(j as usize);
                         } else {
                             // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
-                            insert_l3_level(l2_object.hash_map.get_mut(&j).unwrap(),index,k,&elements);
+                            insert_l3_level(l2_object.hash_map.get_mut(j).unwrap(),index,k,&elements);
                         }
       
                     },
@@ -608,7 +610,7 @@ impl<T: Int> STree<T> {
 #[repr(align(4))]
 pub struct Level<T, E> {
     /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist.
-    pub hash_map: HashMap<LXKey, T>,
+    pub hash_map: HashMap<T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -618,10 +620,10 @@ pub struct Level<T, E> {
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64].
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
-    pub lx_top: TopArray<E, u16>,
+    pub lx_top: TopArray<E, u8>,
 }
 
-impl<T, E> Level<T, E> {
+impl<T: Clone, E> Level<T, E> {
     /// Gibt ein Level<T> mit Origin-Key j zurück. Optional kann eine Schlüsselliste übergeben werden, für welche dann
     /// eine perfekte Hashfunktion generiert wird.
     ///
@@ -632,7 +634,7 @@ impl<T, E> Level<T, E> {
     #[inline]
     pub fn new() -> Level<T, E> {
         Level {
-            hash_map: HashMap::default(),
+            hash_map: HashMap::new(),
             minimum: 0,
             maximum: 0,
             lx_top: TopArray::new(),
@@ -648,7 +650,7 @@ impl<T, E> Level<T, E> {
     #[inline]
     pub fn try_get(&self, key: LXKey) -> Option<&T> {
         if self.lx_top.is_set(key as usize) {
-            self.hash_map.get(&key)
+            self.hash_map.get(key)
         } else {
             None
         }
@@ -662,6 +664,183 @@ impl<T, E> Level<T, E> {
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&mut self, key: LXKey) -> &mut T {
-        self.hash_map.get_mut(&key).unwrap()
+        self.hash_map.get_mut(key).unwrap()
     }
+}
+
+pub struct DynamicLookup<E> {
+    // table.len == 256
+    table: *mut u8,
+
+    // keys.len == objects.len
+    keys: *mut [u8;4],
+
+    objects: *mut [Option<E>;4],
+
+    shift_value: u8,
+
+    array_len: u16,
+
+    size: u8,
+}
+
+impl<E> Drop for DynamicLookup<E> {
+    fn drop(&mut self) {
+        unsafe {
+            Box::from_raw(std::slice::from_raw_parts_mut(self.table, 256));
+            Box::from_raw(std::slice::from_raw_parts_mut(self.keys, (self.array_len/4) as usize));
+            Box::from_raw(std::slice::from_raw_parts_mut(self.objects, (self.array_len/4) as usize));
+            
+        }
+    }
+}
+
+impl<E: Clone> Clone for DynamicLookup<E> {
+    fn clone(&self) -> Self {
+        unsafe {
+            let mut new_lookup = vec![];
+            for i in 0..256 {
+                new_lookup.push(*self.table.add(i));
+            }
+
+            let mut new_keys = vec![];
+            for i in 0..self.array_len/4 {
+                new_keys.push(*self.keys.add(i as usize));
+            }
+
+            let mut new_objects = vec![];
+            for i in 0..self.array_len/4 {
+                let mut tmp: [Option<E>; 4] = [None, None, None, None];
+                for j in 0..4 {
+                    tmp[j] = (*self.objects.add(i as usize))[j].clone();
+                }
+                new_objects.push(tmp);
+            }
+
+        
+            Self {
+                table: Box::into_raw(new_lookup.into_boxed_slice()) as *mut u8,
+                keys: Box::into_raw(new_keys.into_boxed_slice()) as *mut [u8;4],
+                objects: Box::into_raw(new_objects.into_boxed_slice()) as *mut [Option<E>;4],
+                shift_value: self.shift_value,
+                array_len: self.array_len,
+                size: self.size,
+            }
+        }
+    }
+}
+
+impl<E: Clone> DynamicLookup<E> {
+    /// Vorbindung: keys sind sortiert. Weiterhin gilt keys.len() == objects.len() und  keys.len() > 0
+    /// Nachbedingung : keys[i] -> objects[i]
+    pub fn new() -> Self {
+        // benötigt die Eigenschaft, dass die keys sortiert sind
+        let lookup_table = Self::init_hash_function();
+        let keys: Vec<[u8;4]> = vec![[0; 4]];
+        let objects: Vec<[Option<E>;4]> = vec![[None, None, None, None]];
+        
+        Self {
+            table: Box::into_raw(lookup_table) as *mut u8,
+            keys: Box::into_raw(keys.into_boxed_slice()) as *mut [u8;4],
+            objects: Box::into_raw(objects.into_boxed_slice()) as *mut [Option<E>;4],
+            array_len: 4,
+            size: 0,
+            shift_value: 6,
+        }
+    }
+
+    fn init_hash_function() -> Box<[u8]> {
+        let mut h = vec![0_u8;256].into_boxed_slice();
+        for i in 0..256 {
+            h[i] = i as u8;
+        }
+        
+        let mut rng = thread_rng();
+        h.shuffle(&mut rng);
+        h
+    }
+
+    pub fn get(&self, key: u8) -> Option<&E> {
+        let mut n = unsafe {*self.table.add(key as usize) >> self.shift_value};
+        let mut m = n >> 2;
+        let mut i = n & 3;
+        unsafe {
+            while !(*self.objects.add(m as usize))[i as usize].is_none() {
+                if (*self.keys.add(m as usize))[i as usize] == key {
+                    return (*self.objects.add(m as usize))[i as usize].as_ref();
+                }
+                n = (n+1) & ((self.array_len-1) as u8);
+                m = n >> 2;
+                i = n & 3;
+            }
+        }
+
+        return None;
+    }
+
+    pub fn get_mut(&self, key: u8) -> Option<&mut E> {
+        let mut n = unsafe {*self.table.add(key as usize) >> self.shift_value};
+        let mut m = n >> 2;
+        let mut i = n & 3;
+        unsafe {
+            while !(*self.objects.add(m as usize))[i as usize].is_none() {
+                if (*self.keys.add(m as usize))[i as usize] == key {
+                    return (*self.objects.add(m as usize))[i as usize].as_mut();
+                }
+                n = (n+1) & ((self.array_len-1) as u8);
+                m = n >> 2;
+                i = n & 3;
+            }
+        }
+
+        return None;
+    }
+
+    fn double_size(&mut self) {
+        unsafe {
+            debug_assert!(self.array_len <= 128);
+            self.shift_value -= 1;
+            self.array_len *= 2;
+            let new_keys = vec![[0;4]; (self.array_len/4) as usize];
+            let mut new_objects: Vec<[Option<E>;4]> = Vec::with_capacity((self.array_len/4) as usize);
+            for _ in 0..self.array_len/4 {
+                new_objects.push([None, None, None, None]);
+            }
+            let old_keys = Box::from_raw(std::slice::from_raw_parts_mut(std::mem::replace(&mut self.keys, Box::into_raw(new_keys.into_boxed_slice()) as *mut [u8;4]),(self.array_len/8) as usize));
+            let mut old_objects = Box::from_raw(std::slice::from_raw_parts_mut(std::mem::replace(&mut self.objects, Box::into_raw(new_objects.into_boxed_slice()) as *mut [Option<E>;4]),(self.array_len/8) as usize));
+            
+            self.size = 0;
+            for i in 0..self.array_len/2 {
+                let index = (i>>2) as usize;
+                let sub_index = (i&3) as usize;
+                let tmp_key = old_keys[index][sub_index];
+                let tmp_object = std::mem::replace(&mut old_objects[index][sub_index], None);
+                if !tmp_object.is_none() {
+                    self.insert(tmp_key, tmp_object.unwrap());
+                }
+            }
+        }
+    }
+
+    pub fn insert(&mut self, key: u8, elem: E) {
+        unsafe {
+            if (self.size as u16) < (self.array_len - ( self.array_len >> 2)) || self.array_len == 256 {
+                let mut n = (*self.table.add(key as usize) >> self.shift_value) as usize;
+                while !(*self.objects.add(n>>2))[n&3].is_none() {
+                    n = (n+1) & (self.array_len-1) as usize;
+                }
+
+                (*self.keys.add(n>>2))[n&3] = key;
+                (*self.objects.add(n>>2))[n&3] = Some(elem);
+
+                self.size += 1;
+            } else {
+                self.double_size();
+                self.insert(key,elem);
+            }
+        }
+        
+    }
+
+    
 }
