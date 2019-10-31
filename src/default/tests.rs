@@ -25,7 +25,7 @@ fn test_u40_new_hashfunctions() {
 
     let check = data.clone();
     let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
-
+    
     assert_eq!(data_structure.len(), check.len());
     assert_eq!(data_structure.minimum().unwrap(), u40::new(0));
     assert_eq!(

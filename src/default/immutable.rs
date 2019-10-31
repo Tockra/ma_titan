@@ -677,7 +677,9 @@ pub struct DynamicLookup<E> {
 
     array_len: u16,
 
-    size: u8,
+    // size overflowed bei voller Hashmap. Das ist kein Problem, da get size nicht benötigt 
+    // und nach 2^16 Einfügeoperationen keine weitere mehr stattfindet (dann würde ein Fehler entstehen)
+    size: u16,
 }
 
 impl<E> Drop for DynamicLookup<E> {
@@ -731,7 +733,7 @@ impl<E: Clone> DynamicLookup<E> {
         Self {
             keys: Box::into_raw(keys.into_boxed_slice()) as *mut [u16;4],
             objects: Box::into_raw(objects.into_boxed_slice()) as *mut [Option<E>;4],
-            array_len: 4,
+            array_len: 3,
             size: 0,
             shift_value: 14,
         }
@@ -746,7 +748,7 @@ impl<E: Clone> DynamicLookup<E> {
                 if (*self.keys.add(m as usize))[i as usize] == key {
                     return (*self.objects.add(m as usize))[i as usize].as_ref();
                 }
-                n = (n+1) & ((self.array_len-1) as u16);
+                n = (n+1) & ((self.array_len) as u16);
                 m = n >> 2;
                 i = n & 3;
             }
@@ -764,7 +766,7 @@ impl<E: Clone> DynamicLookup<E> {
                 if (*self.keys.add(m as usize))[i as usize] == key {
                     return (*self.objects.add(m as usize))[i as usize].as_mut();
                 }
-                n = (n+1) & ((self.array_len-1) as u16);
+                n = (n+1) & ((self.array_len) as u16);
                 m = n >> 2;
                 i = n & 3;
             }
@@ -775,19 +777,19 @@ impl<E: Clone> DynamicLookup<E> {
 
     fn double_size(&mut self) {
         unsafe {
-            debug_assert!(self.array_len <= 128);
+            debug_assert!(self.array_len <= 32768);
             self.shift_value -= 1;
-            self.array_len *= 2;
-            let new_keys = vec![[0;4]; (self.array_len/4) as usize];
+            self.array_len = ((self.array_len as u32+1)*2 - 1) as u16;
+            let new_keys = vec![[0;4]; ((self.array_len as u32+1)/4) as usize];
             let mut new_objects: Vec<[Option<E>;4]> = Vec::with_capacity((self.array_len/4) as usize);
-            for _ in 0..self.array_len/4 {
+            for _ in 0..(self.array_len as usize +1)/4 {
                 new_objects.push([None, None, None, None]);
             }
-            let old_keys = Box::from_raw(std::slice::from_raw_parts_mut(std::mem::replace(&mut self.keys, Box::into_raw(new_keys.into_boxed_slice()) as *mut [u16;4]),(self.array_len/8) as usize));
-            let mut old_objects = Box::from_raw(std::slice::from_raw_parts_mut(std::mem::replace(&mut self.objects, Box::into_raw(new_objects.into_boxed_slice()) as *mut [Option<E>;4]),(self.array_len/8) as usize));
+            let old_keys = Box::from_raw(std::slice::from_raw_parts_mut(std::mem::replace(&mut self.keys, Box::into_raw(new_keys.into_boxed_slice()) as *mut [u16;4]),((self.array_len as u32 + 1)/8) as usize));
+            let mut old_objects = Box::from_raw(std::slice::from_raw_parts_mut(std::mem::replace(&mut self.objects, Box::into_raw(new_objects.into_boxed_slice()) as *mut [Option<E>;4]),((self.array_len as u32 + 1)/8) as usize));
             
             self.size = 0;
-            for i in 0..self.array_len/2 {
+            for i in 0..(self.array_len as u32+1)/2 {
                 let index = (i>>2) as usize;
                 let sub_index = (i&3) as usize;
                 let tmp_key = old_keys[index][sub_index];
@@ -801,10 +803,10 @@ impl<E: Clone> DynamicLookup<E> {
 
     pub fn insert(&mut self, key: u16, elem: E) {
         unsafe {
-            if (self.size as u16) < (self.array_len - ( self.array_len >> 2)) || self.array_len == 256 {
+            if (self.size as u32) < (self.array_len as u32 + 1 - ( (self.array_len as u32 +1) >> 2)) || (self.array_len as u32 +1) == 65536 {
                 let mut n = (Self::HASHMAP[key as usize] >> self.shift_value) as usize;
                 while !(*self.objects.add(n>>2))[n&3].is_none() {
-                    n = (n+1) & (self.array_len-1) as usize;
+                    n = (n+1) & (self.array_len) as usize;
                 }
 
                 (*self.keys.add(n>>2))[n&3] = key;
