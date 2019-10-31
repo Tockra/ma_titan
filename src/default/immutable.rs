@@ -2,8 +2,6 @@ use uint::{u40, u48};
 
 use crate::internal::{Splittable};
 use crate::default::build::insert_l3_level;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene<T> = LevelPointer<L3Ebene<T>, T>;
@@ -669,8 +667,6 @@ impl<T: Clone, E> Level<T, E> {
 }
 
 pub struct DynamicLookup<E> {
-    // table.len == 256
-    table: *mut u8,
 
     // keys.len == objects.len
     keys: *mut [u8;4],
@@ -687,10 +683,8 @@ pub struct DynamicLookup<E> {
 impl<E> Drop for DynamicLookup<E> {
     fn drop(&mut self) {
         unsafe {
-            Box::from_raw(std::slice::from_raw_parts_mut(self.table, 256));
             Box::from_raw(std::slice::from_raw_parts_mut(self.keys, (self.array_len/4) as usize));
-            Box::from_raw(std::slice::from_raw_parts_mut(self.objects, (self.array_len/4) as usize));
-            
+            Box::from_raw(std::slice::from_raw_parts_mut(self.objects, (self.array_len/4) as usize));   
         }
     }
 }
@@ -698,10 +692,6 @@ impl<E> Drop for DynamicLookup<E> {
 impl<E: Clone> Clone for DynamicLookup<E> {
     fn clone(&self) -> Self {
         unsafe {
-            let mut new_lookup = vec![];
-            for i in 0..256 {
-                new_lookup.push(*self.table.add(i));
-            }
 
             let mut new_keys = vec![];
             for i in 0..self.array_len/4 {
@@ -719,7 +709,6 @@ impl<E: Clone> Clone for DynamicLookup<E> {
 
         
             Self {
-                table: Box::into_raw(new_lookup.into_boxed_slice()) as *mut u8,
                 keys: Box::into_raw(new_keys.into_boxed_slice()) as *mut [u8;4],
                 objects: Box::into_raw(new_objects.into_boxed_slice()) as *mut [Option<E>;4],
                 shift_value: self.shift_value,
@@ -731,16 +720,15 @@ impl<E: Clone> Clone for DynamicLookup<E> {
 }
 
 impl<E: Clone> DynamicLookup<E> {
+    const HASHMAP: [u8;256] = [127, 254, 59, 44, 146, 151, 118, 112, 137, 47, 164, 4, 1, 86, 14, 37, 100, 45, 189, 194, 169, 89, 144, 188, 12, 236, 84, 34, 219, 65, 72, 131, 78, 222, 29, 19, 225, 130, 2, 42, 179, 193, 197, 54, 10, 35, 232, 175, 145, 174, 227, 135, 87, 167, 150, 125, 3, 214, 204, 119, 171, 5, 241, 66, 11, 109, 26, 160, 41, 191, 96, 196, 234, 183, 198, 80, 170, 157, 163, 57, 148, 83, 21, 233, 147, 195, 9, 50, 153, 156, 158, 190, 32, 143, 120, 103, 82, 230, 46, 52, 13, 200, 18, 218, 165, 149, 95, 106, 94, 242, 20, 60, 51, 6, 250, 104, 152, 63, 0, 129, 223, 88, 154, 173, 75, 177, 73, 110, 226, 244, 255, 33, 134, 8, 166, 211, 159, 252, 36, 98, 39, 56, 247, 77, 215, 43, 25, 181, 162, 115, 48, 64, 209, 101, 216, 220, 202, 107, 212, 132, 184, 138, 31, 199, 186, 176, 245, 117, 133, 58, 185, 205, 85, 187, 207, 231, 201, 246, 237, 23, 93, 105, 49, 61, 240, 203, 81, 210, 67, 238, 99, 217, 180, 141, 192, 71, 228, 239, 16, 126, 124, 224, 22, 172, 182, 235, 111, 38, 249, 243, 128, 251, 55, 28, 53, 24, 161, 139, 102, 76, 114, 123, 17, 30, 178, 136, 90, 206, 248, 229, 168, 121, 122, 79, 40, 116, 221, 213, 91, 70, 108, 7, 69, 113, 97, 142, 68, 155, 15, 140, 62, 208, 27, 92, 253, 74];
     /// Vorbindung: keys sind sortiert. Weiterhin gilt keys.len() == objects.len() und  keys.len() > 0
     /// Nachbedingung : keys[i] -> objects[i]
     pub fn new() -> Self {
         // benötigt die Eigenschaft, dass die keys sortiert sind
-        let lookup_table = Self::init_hash_function();
         let keys: Vec<[u8;4]> = vec![[0; 4]];
         let objects: Vec<[Option<E>;4]> = vec![[None, None, None, None]];
         
         Self {
-            table: Box::into_raw(lookup_table) as *mut u8,
             keys: Box::into_raw(keys.into_boxed_slice()) as *mut [u8;4],
             objects: Box::into_raw(objects.into_boxed_slice()) as *mut [Option<E>;4],
             array_len: 4,
@@ -749,19 +737,8 @@ impl<E: Clone> DynamicLookup<E> {
         }
     }
 
-    fn init_hash_function() -> Box<[u8]> {
-        let mut h = vec![0_u8;256].into_boxed_slice();
-        for i in 0..256 {
-            h[i] = i as u8;
-        }
-        
-        let mut rng = thread_rng();
-        h.shuffle(&mut rng);
-        h
-    }
-
     pub fn get(&self, key: u8) -> Option<&E> {
-        let mut n = unsafe {*self.table.add(key as usize) >> self.shift_value};
+        let mut n = Self::HASHMAP[key as usize] >> self.shift_value;
         let mut m = n >> 2;
         let mut i = n & 3;
         unsafe {
@@ -779,7 +756,7 @@ impl<E: Clone> DynamicLookup<E> {
     }
 
     pub fn get_mut(&self, key: u8) -> Option<&mut E> {
-        let mut n = unsafe {*self.table.add(key as usize) >> self.shift_value};
+        let mut n = Self::HASHMAP[key as usize] >> self.shift_value;
         let mut m = n >> 2;
         let mut i = n & 3;
         unsafe {
@@ -825,7 +802,7 @@ impl<E: Clone> DynamicLookup<E> {
     pub fn insert(&mut self, key: u8, elem: E) {
         unsafe {
             if (self.size as u16) < (self.array_len - ( self.array_len >> 2)) || self.array_len == 256 {
-                let mut n = (*self.table.add(key as usize) >> self.shift_value) as usize;
+                let mut n = (Self::HASHMAP[key as usize] >> self.shift_value) as usize;
                 while !(*self.objects.add(n>>2))[n&3].is_none() {
                     n = (n+1) & (self.array_len-1) as usize;
                 }
