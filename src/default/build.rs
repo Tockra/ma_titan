@@ -2,7 +2,7 @@ use crate::default::immutable::Int;
 use crate::default::immutable::{Level,L3Ebene};
 use crate::internal::{Splittable,PointerEnum};
 #[inline]
-pub fn insert_l3_level<T: Int + Into<u64>>(l3_level: &mut L3Ebene<T>,index: usize, k: u8, elements: &[T]) {
+pub fn insert_l3_level<T: Int + Into<u64>>(l3_level: &mut L3Ebene<T>,index: usize, k: u16, elements: &[T]) {
     if l3_level.is_null() {
         *l3_level = L3Ebene::from_usize(Box::new(index));
     } else {
