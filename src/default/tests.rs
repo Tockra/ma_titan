@@ -33,12 +33,21 @@ fn test_u40_new_hashfunctions() {
         u40::new(check.len() as u64 - 1)
     );
     for val in check {
-        let (i, j, k) = Splittable::split_integer_down(&val);
+        let (i, l, j, k) = Splittable::split_integer_down(&val);
         match data_structure.root_table[i].get() {
-            PointerEnum::First(l) => {
-                let second_level = l.get(j);
+            PointerEnum::First(level) => {
+                let second_level = level.get(l);
                 let saved_val = match second_level.get() {
-                    PointerEnum::First(l) => *(*l).get(k),
+                    PointerEnum::First(l) => {
+                        let l2_level = l.get(j);
+                        match l2_level.get() {
+                            PointerEnum::First(l) => {
+                                *(*l).get(k)
+                            }
+                            PointerEnum::Second(e) => *e,
+                        }
+
+                    }
                     PointerEnum::Second(e) => *e,
                 };
                 assert_eq!(data_structure.element_list[saved_val], val);
@@ -72,12 +81,21 @@ fn test_u48_new_hashfunctions() {
         u48::new(check.len() as u64 - 1)
     );
     for val in check {
-        let (i, j, k) = Splittable::split_integer_down(&val);
+        let (i, l, j, k) = Splittable::split_integer_down(&val);
         match data_structure.root_table[i].get() {
-            PointerEnum::First(l) => {
-                let second_level = l.get(j);
+            PointerEnum::First(level) => {
+                let second_level = level.get(l);
                 let saved_val = match second_level.get() {
-                    PointerEnum::First(l) => *(*l).get(k),
+                    PointerEnum::First(l) => {
+                        let l2_level = l.get(j);
+                        match l2_level.get() {
+                            PointerEnum::First(l) => {
+                                *(*l).get(k)
+                            }
+                            PointerEnum::Second(e) => *e,
+                        }
+
+                    }
                     PointerEnum::Second(e) => *e,
                 };
                 assert_eq!(data_structure.element_list[saved_val], val);
@@ -87,108 +105,6 @@ fn test_u48_new_hashfunctions() {
                 assert_eq!(data_structure.element_list[*e], val);
             }
         };
-    }
-}
-
-/// Die Top-Arrays werden geprüft. Dabei wird nur grob überprüft, ob sinnvolle Werte gesetzt wurden.
-/// Dieser Test ist ein Kandidat zum Entfernen oder Erweitern.
-#[test]
-fn test_u40_top_arrays() {
-    let data: Vec<u40> = vec![
-        u40::new(0b00000000000000000000_1010010010_0101010101),
-        u40::new(0b00000000000000000000_1010010010_0101010111),
-        u40::new(0b11111111111111111111_1010010010_0101010101_u64),
-    ];
-    let check = data.clone();
-    let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
-
-    assert_eq!(data_structure.len(), check.len());
-    assert_eq!(
-        data_structure.minimum().unwrap(),
-        u40::new(0b00000000000000000000_1010010010_0101010101)
-    );
-    assert_eq!(
-        data_structure.maximum().unwrap(),
-        u40::new(0b11111111111111111111_1010010010_0101010101_u64)
-    );
-
-    for val in check {
-        let (i, j, k) = Splittable::split_integer_down(&val);
-        if data_structure.root_table[i].minimum() != data_structure.root_table[i].maximum() {
-            let second_level = match data_structure.root_table[i].get() {
-                PointerEnum::First(l) => l.get(j),
-                _ => {
-                    panic!("Das sollte nicht geschehen");
-                }
-            };
-            if second_level.minimum() != second_level.maximum() {
-                let saved_val = match second_level.get() {
-                    PointerEnum::First(l) => l.get(k),
-                    _ => {
-                        panic!("Das sollte nicht geschehen");
-                    }
-                };
-                assert_eq!(data_structure.element_list[*saved_val], val);
-            } else {
-                assert_eq!(data_structure.element_list[second_level.minimum()], val);
-            }
-        } else {
-            assert_eq!(
-                data_structure.element_list[data_structure.root_table[i].minimum()],
-                val
-            );
-        }
-    }
-}
-
-/// Die Top-Arrays werden geprüft. Dabei wird nur grob überprüft, ob sinnvolle Werte gesetzt wurden.
-/// Dieser Test ist ein Kandidat zum Entfernen oder Erweitern.
-#[test]
-fn test_u48_top_arrays() {
-    let data: Vec<u48> = vec![
-        u48::new(0b10010010_00000000000000000000_1010010010_0101010101_u64),
-        u48::new(0b10010010_00000000000000000000_1010010010_0101010111_u64),
-        u48::new(0b11111111_11111111111111111111_1010010010_0101010101_u64),
-    ];
-    let check = data.clone();
-    let data_structure: STree<u48> = STree::new(data.into_boxed_slice());
-
-    assert_eq!(data_structure.len(), check.len());
-    assert_eq!(
-        data_structure.minimum().unwrap(),
-        u48::new(0b10010010_00000000000000000000_1010010010_0101010101_u64)
-    );
-    assert_eq!(
-        data_structure.maximum().unwrap(),
-        u48::new(0b11111111_11111111111111111111_1010010010_0101010101_u64)
-    );
-
-    for val in check {
-        let (i, j, k) = Splittable::split_integer_down(&val);
-        if data_structure.root_table[i].minimum() != data_structure.root_table[i].maximum() {
-            let second_level = match data_structure.root_table[i].get() {
-                PointerEnum::First(l) => l.get(j),
-                _ => {
-                    panic!("Das sollte nicht geschehen");
-                }
-            };
-            if second_level.minimum() != second_level.maximum() {
-                let saved_val = match second_level.get() {
-                    PointerEnum::First(l) => l.get(k),
-                    _ => {
-                        panic!("Das sollte nicht geschehen");
-                    }
-                };
-                assert_eq!(data_structure.element_list[*saved_val], val);
-            } else {
-                assert_eq!(data_structure.element_list[second_level.minimum()], val);
-            }
-        } else {
-            assert_eq!(
-                data_structure.element_list[data_structure.root_table[i].minimum()],
-                val
-            );
-        }
     }
 }
 
