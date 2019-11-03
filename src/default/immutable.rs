@@ -1,7 +1,9 @@
 use uint::{u40, u48};
 
 use crate::internal::{Splittable};
-use crate::default::build::insert_l3_level;
+use crate::default::build::{insert_l2_level};
+
+pub type L1Ebene<T> = LevelPointer<L2Ebene<T>, T>;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene<T> = LevelPointer<L3Ebene<T>, T>;
@@ -75,7 +77,7 @@ impl<T, E> LevelPointer<T, E> {
 pub struct STree<T> {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^20]`
-    pub root_table: Box<[L2Ebene<T>]>,
+    pub root_table: Box<[L1Ebene<T>]>,
 
     /// Das Root-Top-Array speichert für jeden Eintrag `root_table[i][x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
     /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert.
@@ -150,7 +152,7 @@ impl<T, V> TopArray<T, V> {
     #[inline]
     fn get_length() -> usize {
         if std::mem::size_of::<V>() == std::mem::size_of::<usize>() {
-            1 << std::mem::size_of::<T>() * 8 - 16
+            1 << std::mem::size_of::<T>() * 8 - 24
         } else if std::mem::size_of::<V>() == std::mem::size_of::<LXKey>() {
             1 << 8
         } else {
@@ -344,7 +346,7 @@ pub trait Int: Ord + PartialOrd + From<u64> + Into<u64> + Copy + Splittable {
         Self::from(k)
     }
     fn root_array_size() -> usize {
-        1 << (std::mem::size_of::<Self>() * 8 - 16)
+        1 << (std::mem::size_of::<Self>() * 8 - 24)
     }
 }
 
@@ -366,59 +368,59 @@ impl<T: Int> STree<T> {
         if elements.len() == 0 {
             panic!("Ein statischer STree muss mindestens 1 Element beinhalten.");
         }
-        let mut root_table: Box<[L2Ebene<T>]> = vec![LevelPointer::from_null(); T::root_array_size()].into_boxed_slice();
+        let mut root_table: Box<[L1Ebene<T>]> = vec![LevelPointer::from_null(); T::root_array_size()].into_boxed_slice();
         let mut root_top = TopArray::<T,usize>::new();
 
         for (index,elem) in elements.iter().enumerate() {
-            let (i,j,k) = Splittable::split_integer_down(elem);
+            let (i,l,_,_) = Splittable::split_integer_down(elem);
             root_top.set_bit(i as usize);
  
             if root_table[i].is_null() {
                 root_table[i] = LevelPointer::from_usize(Box::new(index));
             } else {
                 match root_table[i].get() {
-                    PointerEnum::First(l2_object) => {
-                        l2_object.maximum = index;
+                    PointerEnum::First(l1_object) => {
+                        l1_object.maximum = index;
 
-                        if !l2_object.lx_top.is_set(j as usize) {
-                            let mut l3_level = L3Ebene::from_null();
-                            insert_l3_level(&mut l3_level,index,k,&elements);
+                        if !l1_object.lx_top.is_set(l as usize) {
+                            let mut l2_level = L2Ebene::from_null();
+                            insert_l2_level(&mut l2_level,index,&elements);
 
-                            l2_object.hash_map.insert(j,l3_level);
-                            l2_object.lx_top.set_bit(j as usize);
+                            l1_object.hash_map.insert(l,l2_level);
+                            l1_object.lx_top.set_bit(l as usize);
                         } else {
                             // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
-                            insert_l3_level(l2_object.hash_map.get_mut(&j).unwrap(),index,k,&elements);
+                            insert_l2_level(l1_object.hash_map.get_mut(&l).unwrap(),index, &elements);
                         }
       
                     },
                     PointerEnum::Second(elem_index) => {
-                        let mut l2_object = Level::new();
+                        let mut l1_object = Level::new();
                         let elem2 = elements[*elem_index];
-                        let (_,j2,k2) = Splittable::split_integer_down(&elem2);
+                        let (_,l2,_,_) = Splittable::split_integer_down(&elem2);
                         
                         // Da die Elemente sortiert sind
-                        l2_object.minimum = *elem_index;
-                        l2_object.maximum = index;
+                        l1_object.minimum = *elem_index;
+                        l1_object.maximum = index;
 
-                        l2_object.lx_top.set_bit(j as usize);
+                        l1_object.lx_top.set_bit(l as usize);
 
-                        let mut l3_level = L3Ebene::from_null();
+                        let mut l2_level = L2Ebene::from_null();
 
-                        if j2 != j {
-                            let mut l3_level = L3Ebene::from_null();
-                            insert_l3_level(&mut l3_level,*elem_index,k2,&elements);
+                        if l2 != l {
+                            let mut l2_level = L2Ebene::from_null();
+                            insert_l2_level(&mut l2_level,*elem_index,&elements);
 
-                            l2_object.hash_map.insert(j2,l3_level);
-                            l2_object.lx_top.set_bit(j2 as usize)
+                            l1_object.hash_map.insert(l2,l2_level);
+                            l1_object.lx_top.set_bit(l2 as usize)
                         } else {
-                            insert_l3_level(&mut l3_level,*elem_index,k2,&elements);
+                            insert_l2_level(&mut l2_level,*elem_index,&elements);
                         }
  
-                        insert_l3_level(&mut l3_level,index,k,&elements);
-                        l2_object.hash_map.insert(j,l3_level);
+                        insert_l2_level(&mut l2_level,index,&elements);
+                        l1_object.hash_map.insert(l,l2_level);
 
-                        root_table[i] = L2Ebene::from_level(Box::new(l2_object));
+                        root_table[i] = L1Ebene::from_level(Box::new(l1_object));
                     },
                 }
             }
@@ -483,12 +485,15 @@ impl<T: Int> STree<T> {
     /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Vorgängers von `element` zurückgegeben.
     #[inline]
     pub fn locate_or_pred(&self, element: T) -> Option<usize> {
+        // Eine Ebene mehr als in der standartvariante!
+
         // Paper z.1
         if element < self.minimum().unwrap() {
             return None;
         }
+    
 
-        let (i, j, k) = Splittable::split_integer_down(&element);
+        let (i, l, j, k) = Splittable::split_integer_down(&element);
 
         // Paper z.3
         if self.root_table[i].is_null() || element < self.element_list[self.root_table[i].minimum()]
@@ -501,28 +506,45 @@ impl<T: Int> STree<T> {
 
         // Paper z. 4 (durch die Match-Arme)
         match self.root_table[i].get() {
-            PointerEnum::First(l) => {
-                let second_level = l;
-                let third_level = second_level.try_get(j);
+            PointerEnum::First(l1_object) => {
+                let l2_object = l1_object.try_get(l);
                 // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
-                if third_level.is_none()
-                    || element < self.element_list[third_level.unwrap().minimum()]
+                if l2_object.is_none()
+                    || element < self.element_list[l2_object.unwrap().minimum()]
                 {
-                    let new_j = second_level.lx_top.get_prev_set_bit(j as usize);
-                    return new_j
-                        .and_then(|x| second_level.try_get(x as LXKey))
+                    let new_l = l1_object.lx_top.get_prev_set_bit(l as usize);
+                    return new_l
+                        .and_then(|x| l1_object.try_get(x as LXKey))
                         .map(|x| x.maximum());
                 }
 
                 // Paper z.7
-                match third_level.unwrap().get() {
-                    PointerEnum::First(l) => {
-                        if l.lx_top.is_set(k as usize) {
-                            return Some(*l.get(k));
-                        } else {
-                            // Paper z.8
-                            let new_k = (*l).lx_top.get_prev_set_bit(k as usize);
-                            return new_k.map(|x| *(*l).try_get(x as LXKey).unwrap());
+                match l2_object.unwrap().get() {
+                    PointerEnum::First(l2_object) => {
+                        let l3_object = l2_object.try_get(j);
+                        if l3_object.is_none()
+                            || element < self.element_list[l3_object.unwrap().minimum()]
+                        {
+                            let new_j = l2_object.lx_top.get_prev_set_bit(j as usize);
+                            return new_j
+                                .and_then(|x| l2_object.try_get(x as LXKey))
+                                .map(|x| x.maximum());
+                        }
+
+                        match l3_object.unwrap().get() {
+                            PointerEnum::First(l3_object) => {
+                                if l3_object.lx_top.is_set(k as usize) {
+                                    return Some(*l3_object.get(k));
+                                } else {
+                                    // Paper z.8
+                                    let new_k = l3_object.lx_top.get_prev_set_bit(k as usize);
+                                    return new_k.map(|x| *l3_object.try_get(x as LXKey).unwrap());
+                                }
+                            }
+                            // Paper z.7
+                            PointerEnum::Second(e) => {
+                                return Some(*e);
+                            }
                         }
                     }
                     // Paper z.7
@@ -531,7 +553,6 @@ impl<T: Int> STree<T> {
                     }
                 }
             }
-
             PointerEnum::Second(e) => {
                 return Some(*e);
             }
@@ -552,7 +573,7 @@ impl<T: Int> STree<T> {
             return None;
         }
 
-        let (i, j, k) = Splittable::split_integer_down(&element);
+        let (i, l, j, k) = Splittable::split_integer_down(&element);
 
         // Paper z.3
         if self.root_table[i].is_null() || self.element_list[self.root_table[i].maximum()] < element
@@ -565,31 +586,49 @@ impl<T: Int> STree<T> {
 
         // Paper z. 4 (durch die Match-Arme)
         match self.root_table[i].get() {
-            PointerEnum::First(l) => {
-                let second_level = l;
-                let third_level = second_level.try_get(j);
+            PointerEnum::First(l1_object) => {
+                let l2_object = l1_object.try_get(l);
                 // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
-                if third_level.is_none()
-                    || self.element_list[third_level.unwrap().maximum()] < element
+                if l2_object.is_none()
+                    || self.element_list[l2_object.unwrap().maximum()] < element
                 {
-                    let new_j = second_level.lx_top.get_next_set_bit(j as usize);
-                    return new_j
-                        .and_then(|x| second_level.try_get(x as LXKey))
+                    let new_l = l1_object.lx_top.get_next_set_bit(l as usize);
+                    return new_l
+                        .and_then(|x| l1_object.try_get(x as LXKey))
                         .map(|x| x.minimum());
                 }
 
                 // Paper z.7
-                match third_level.unwrap().get() {
-                    PointerEnum::First(l) => {
-                        if l.lx_top.is_set(k as usize) {
-                            return Some(*l.get(k));
-                        } else {
-                            // Paper z.8
-                            let new_k = (*l).lx_top.get_next_set_bit(k as usize);
-                            return new_k.map(|x| *(*l).try_get(x as LXKey).unwrap());
-                        };
+                match l2_object.unwrap().get() {
+                    PointerEnum::First(l2_object) => {
+                        let l3_object = l2_object.try_get(j);
+
+                        if l3_object.is_none()
+                            || self.element_list[l3_object.unwrap().maximum()] < element
+                        {
+                            let new_j = l2_object.lx_top.get_next_set_bit(j as usize);
+                            return new_j
+                                .and_then(|x| l2_object.try_get(x as LXKey))
+                                .map(|x| x.minimum());
+                        }
+
+                        match l3_object.unwrap().get() {
+                            PointerEnum::First(l3_object) => {
+                                if l3_object.lx_top.is_set(k as usize) {
+                                    return Some(*l3_object.get(k));
+                                } else {
+                                    // Paper z.8
+                                    let new_k = l3_object.lx_top.get_next_set_bit(k as usize);
+                                    return new_k.map(|x| *l3_object.try_get(x as LXKey).unwrap());
+                                };
+                            }
+                            // Paper z.7
+                            PointerEnum::Second(e) => {
+                                return Some(*e);
+                            }
+                        }
+
                     }
-                    // Paper z.7
                     PointerEnum::Second(e) => {
                         return Some(*e);
                     }
