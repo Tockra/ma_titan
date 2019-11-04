@@ -12,66 +12,60 @@ pub trait PredecessorSet<T> {
 }
 
 pub trait Splittable {
-    fn split_integer_down(&self) -> (usize, u8, u8);
+    fn split_integer_down(&self) -> (usize, u8, u8, u8);
 }
 
 impl Splittable for u40 {
     #[inline]
-    fn split_integer_down(&self) -> (usize, u8, u8) {
+    fn split_integer_down(&self) -> (usize, u8, u8, u8) {
         // Achtung funktioniert nicht korrekt mit negativen Zahlen
-        let i: usize = u64::from(*self >> 16) as usize;
+        let i: usize = u64::from(*self >> 24) as usize;
         // Die niedrigwertigsten 24 Bits element[16..39]
-        let low = u64::from(*self) & 0xFFFF;
+        let low = u64::from(*self) & 0xFFFFFF;
         // Bits 16 bis 23 element[8..15]
-        let j: u8 = (low >> 8) as u8;
+        let l: u8 = (low >> 16) as u8;
         // Die niedrigwertigsten 8 Bits element[0..7]
+        let low = low & 0xFFFF;
+        let j: u8 = (low >> 8) as u8;
         let k: u8 = (u64::from(*self) & 0xFF) as u8;
-        (i, j, k)
+        (i, l, j, k)
     }
 }
 
 impl Splittable for u48 {
     #[inline]
-    fn split_integer_down(&self) -> (usize, u8, u8) {
-        // TODO: Achtung funktioniert nicht korrekt mit negativen Zahlen
-        let i: usize = u64::from(*self >> 16) as usize;
-        // Die niedrigwertigsten 16 Bits element[16..31]
-        let low = u64::from(*self) & 0xFFFF;
+    fn split_integer_down(&self) -> (usize, u8, u8, u8)  {
+        // Achtung funktioniert nicht korrekt mit negativen Zahlen
+        let i: usize = u64::from(*self >> 24) as usize;
+        // Die niedrigwertigsten 24 Bits element[16..39]
+        let low = u64::from(*self) & 0xFFFFFF;
         // Bits 16 bis 23 element[8..15]
-        let j: u8 = (low >> 8) as u8;
+        let l: u8 = (low >> 16) as u8;
         // Die niedrigwertigsten 8 Bits element[0..7]
+        let low = low & 0xFFFF;
+        let j: u8 = (low >> 8) as u8;
         let k: u8 = (u64::from(*self) & 0xFF) as u8;
-        (i, j, k)
-    }
-}
-
-impl Splittable for u32 {
-    #[inline]
-    fn split_integer_down(&self) -> (usize, u8, u8) {
-        let i: usize = (*self >> 16) as usize;
-        // Die niedrigwertigsten 16 Bits element[16..31]
-        let low = *self & 0xFFFF;
-        // Bits u8 bis 23 element[8..15]
-        let j: u8 = (low >> 8) as u8;
-        // Die niedrigwertigsten 8 Bits element[0..7]
-        let k: u8 = (*self & 255) as u8;
-        (i, j, k)
+        (i, l, j, k)
     }
 }
 
 impl Splittable for u64 {
     #[inline]
-    fn split_integer_down(&self) -> (usize, u8, u8) {
-        let i: usize = (*self >> 16) as usize;
-        // Die niedrigwertigsten 32 Bits element[32..63]
-        let low = *self & 0xFFFF;
-        // Bits 16 bis 32
-        let j: u8 = (low >> 16) as u8;
-        // Die niedrigwertigsten 16 Bits element[0..15]
-        let k: u8 = (*self & 0xFF) as u8;
-        (i, j, k)
+    fn split_integer_down(&self) -> (usize, u8, u8, u8)  {
+        // Achtung funktioniert nicht korrekt mit negativen Zahlen
+        let i: usize = u64::from(*self >> 24) as usize;
+        // Die niedrigwertigsten 24 Bits element[16..39]
+        let low = u64::from(*self) & 0xFFFFFF;
+        // Bits 16 bis 23 element[8..15]
+        let l: u8 = (low >> 16) as u8;
+        // Die niedrigwertigsten 8 Bits element[0..7]
+        let low = low & 0xFFFF;
+        let j: u8 = (low >> 8) as u8;
+        let k: u8 = (u64::from(*self) & 0xFF) as u8;
+        (i, l, j, k)
     }
 }
+
 
 pub enum PointerEnum<T: 'static, E: 'static> {
     First(&'static mut T),
