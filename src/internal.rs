@@ -1,5 +1,5 @@
 use uint::{u40, u48};
-
+use crate::default::immutable::LXKey;
 
 pub trait PredecessorSet<T> {
     fn insert(&mut self,element: T);
@@ -171,16 +171,14 @@ use boomphf::Mphf;
 
 #[derive(Clone)]
 pub struct MphfHashMap<K,V> {
-    hash_function: Mphf<K>,
-    objects: Box<[V]>,
+    hash_function: (Box<[K]>,Box<[V]>),
 }
 
-impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Clone,V> MphfHashMap<K,V> {
+impl<K: Into<u16> + std::cmp::Ord + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Clone,V> MphfHashMap<K,V> {
     #[inline]
     pub fn new(keys: Box<[K]>, objects: Box<[V]>) -> Self {
         Self {
-            hash_function: Mphf::new_parallel(GAMMA,&keys.to_vec(),None),
-            objects: objects
+            hash_function: (keys.to_vec().into_boxed_slice(),objects),
         }
     }
 
@@ -192,9 +190,9 @@ impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + st
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&self, key: &K) -> &V {
-        let hash = self.hash_function.try_hash(key).unwrap() as usize;
-        unsafe {
-            self.objects.get_unchecked(hash)
+        match self.hash_function.0.binary_search(key) {
+            Ok(x) => unsafe { self.hash_function.1.get_unchecked(x)},
+            _ => panic!("get in internal wurde mit ungültigem Schlüssel aufgerufen."),
         }
     }
 
@@ -206,10 +204,9 @@ impl<K: Into<u16> + std::marker::Send + std::marker::Sync + std::hash::Hash + st
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get_mut(&mut self, key: &K) -> &mut V {
-        let hash = self.hash_function.try_hash(key).unwrap() as usize;
-
-        unsafe {
-            self.objects.get_unchecked_mut(hash)
+        match self.hash_function.0.binary_search(key) {
+            Ok(x) => unsafe { self.hash_function.1.get_unchecked_mut(x)},
+            _ => panic!("get in internal wurde mit ungültigem Schlüssel aufgerufen."),
         }
     }
 
