@@ -304,11 +304,11 @@ impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
     fn insert(&mut self, key: K, val: T) {
         match self.pointer.get() {
             PointerEnum::Second((keys,values)) => {
-                if true {
+                if false {
                     keys.push(key);
                     values.push(val);
                 } else {
-                    let mut hm = HashMap::<K,T>::with_capacity(1025);
+                    let mut hm = HashMap::<K,T>::with_capacity(4);
                     let values = std::mem::replace(values, Box::new(vec![]));
                     for (i,val) in values.into_iter().enumerate() {
                         hm.insert(keys[i], val);
