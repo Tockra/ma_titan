@@ -4,6 +4,7 @@ use crate::default::immutable::{LXKey, TopArray, Level, L2Ebene, Int, LevelPoint
 use std::alloc::System;
 use stats_alloc::{StatsAlloc};
 type HashMap<K,T> = hashbrown::hash_map::HashMap<K,T>;
+use crate::internal::{self, PointerEnum};
 
 /// Gamma=2 wegen Empfehlung aus dem Paper. Wenn Hashen schneller werden soll, dann kann man bis gegen 5 gehen, 
 /// Wenn die Struktur kleiner werden soll, kann man mal gamme=1 ausprobieren.
@@ -246,7 +247,7 @@ impl<T: Int> STreeBuilder<T> {
 #[derive(Clone)]
 pub struct BuilderLevel<T: 'static,E: 'static> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
-    pub hash_map: BuildHM<LXKey,T>,
+    pub hash_map: HashMap<LXKey,T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
     /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.
@@ -273,7 +274,7 @@ impl<T,E> BuilderLevel<T,E> {
     #[inline]
     pub fn new() -> BuilderLevel<T,E> {
         BuilderLevel {
-            hash_map: BuildHM::new(),
+            hash_map: HashMap::new(),
             keys: vec![],
             lx_top: Some(TopArray::new()),
             maximum: 0,
@@ -281,79 +282,3 @@ impl<T,E> BuilderLevel<T,E> {
         }
     }
 }
-
-// ------------------------- Pointer Magie, zum Verhindern der Nutzung von HashMaps für kleine Datenmengen ----------------------------------
-
-use crate::internal::{self, PointerEnum};
-pub struct BuildHM<K,T> {
-    pointer: internal::Pointer<HashMap<K,T>,(Box<Vec<K>>,Box<Vec<T>>)>,
-}
-
-impl<K:'static + Clone,T:'static + Clone> Clone for BuildHM<K,T> {
-    fn clone(&self) -> Self {
-        Self {
-            pointer: self.pointer.clone()
-        }
-    }
-}
-
-impl<K:'static + Eq + Copy + Ord + std::hash::Hash,T: 'static> BuildHM<K,T> {
-    fn new() -> Self{
-        Self {
-            pointer: internal::Pointer::from_second(Box::new((Box::new(vec![]),Box::new(vec![]))))
-        }
-    }
-
-    /// Die eigentliche Updatemechanik der HashMaps, wird hier ignoriert, da keine Werte geupdatet werden müssen!
-    fn insert(&mut self, key: K, val: T) {
-        match self.pointer.get() {
-            PointerEnum::Second((keys,values)) => {
-                if true {
-                    keys.push(key);
-                    values.push(val);
-                } else {
-                    let mut hm = HashMap::<K,T>::with_capacity(1025);
-                    let values = std::mem::replace(values, Box::new(vec![]));
-                    for (i,val) in values.into_iter().enumerate() {
-                        hm.insert(keys[i], val);
-                    }
-                    hm.insert(key, val);
-                    self.pointer = internal::Pointer::from_first(Box::new(hm));
-                }
-            },
-            PointerEnum::First(x) => {
-                x.insert(key, val);
-            },
-        }
-    }
-
-    fn get_mut(&mut self, k: &K) -> Option<&mut T> {
-        match self.pointer.get() {
-            PointerEnum::Second((keys,values)) => {
-                match keys.binary_search(k) {
-                    Ok(x) => values.get_mut(x),
-                    Err(_) => None,
-                }
-            },
-            PointerEnum::First(x) => {
-                x.get_mut(k)
-            },
-        }
-    }
-
-    fn get(&mut self, k: &K) -> Option<&T> {
-        match self.pointer.get() {
-            PointerEnum::Second((keys,values)) => {
-                match keys.binary_search(k) {
-                    Ok(x) => values.get(x),
-                    Err(_) => None,
-                }
-            },
-            PointerEnum::First(x) => {
-                x.get(k)
-            },
-        }
-    }
-}
-
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------
