@@ -1,7 +1,7 @@
 use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
-use crate::internal::{MphfHashMap, Splittable};
+use crate::internal::Splittable;
 
 /// Zusätzliche Ebene um 8-Bit außer in Wurzel zu gewährleisten
 pub type L1Ebene<T> = LevelPointer<L2Ebene<T>, T>;
