@@ -1,9 +1,7 @@
-use uint::{u40, u48};
-
+use crate::internal::{Splittable};
 use crate::default::build::STreeBuilder;
-use crate::internal::Splittable;
 
-/// Zusätzliche Ebene um 8-Bit außer in Wurzel zu gewährleisten
+
 pub type L1Ebene<T> = LevelPointer<L2Ebene<T>, T>;
 
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
@@ -152,9 +150,9 @@ impl<T, V> TopArray<T, V> {
     #[inline]
     fn get_length() -> usize {
         if std::mem::size_of::<V>() == std::mem::size_of::<usize>() {
-            1 << std::mem::size_of::<T>() * 8 - 24
+            1 << 16
         } else if std::mem::size_of::<V>() == std::mem::size_of::<LXKey>() {
-            1 << 8
+            1 << 16
         } else {
             panic!("Ungültige Parameterkombination vom TopArray!")
         }
@@ -346,17 +344,13 @@ pub trait Int: Ord + PartialOrd + From<u64> + Into<u64> + Copy + Splittable {
         Self::from(k)
     }
     fn root_array_size() -> usize {
-        1 << (std::mem::size_of::<Self>() * 8 - 24)
+        1 << (16)
     }
 }
 
-impl Int for u40 {}
-
-impl Int for u48 {}
-
 impl Int for u64 {}
 
-pub type LXKey = u8;
+pub type LXKey = u16;
 impl<T: Int> STree<T> {
     /// Gibt einen STree mit den in `elements` enthaltenen Werten zurück.
     ///
@@ -588,7 +582,7 @@ impl<T: Int> STree<T> {
 /// Diese Datenstruktur dient als naive Hashmap. Sie speichert eine Lookuptable und die Daten
 pub struct LookupTable<E> {
     /// (ehemaliges Array mit len= objects.len())
-    table: *mut u8,
+    table: *mut u16,
     objects: Box<[E]>,
 }
 
@@ -596,7 +590,7 @@ impl<E> Drop for LookupTable<E> {
     fn drop(&mut self) {
         unsafe {
             let mut len = 0_usize;
-            let max_index = self.objects.len() - 1;
+            let max_index = self.objects.len()-1;
             let mut curr_value = self.table;
             while *curr_value as usize != max_index {
                 curr_value = curr_value.offset(1);
@@ -607,10 +601,11 @@ impl<E> Drop for LookupTable<E> {
     }
 }
 
+
 impl<E: Clone> Clone for LookupTable<E> {
     fn clone(&self) -> Self {
         let mut new_lookup = vec![];
-        let max_index = self.objects.len() - 1;
+        let max_index = self.objects.len()-1;
         let mut curr_value = self.table;
         unsafe {
             while *curr_value as usize != max_index {
@@ -620,40 +615,38 @@ impl<E: Clone> Clone for LookupTable<E> {
         }
 
         Self {
-            table: Box::into_raw(new_lookup.into_boxed_slice()) as *mut u8,
-            objects: self.objects.clone(),
+            table: Box::into_raw(new_lookup.into_boxed_slice()) as *mut u16,
+            objects: self.objects.clone()
         }
     }
 }
 
+
 impl<E> LookupTable<E> {
     /// Vorbindung: keys sind sortiert. Weiterhin gilt keys.len() == objects.len() und  keys.len() > 0
     /// Nachbedingung : keys[i] -> objects[i]
-    pub fn new(keys: &[u8], objects: Box<[E]>) -> Self {
-        debug_assert!(keys.len() == objects.len());
+    pub fn new(keys: &[u16], objects: Box<[E]>) -> Self {
 
         // benötigt die Eigenschaft, dass die keys sortiert sind
-        let mut lookup_table = vec![0_u8; keys[keys.len() - 1] as usize + 1];
-        for (i, &k) in keys.into_iter().enumerate() {
-            lookup_table[k as usize] = i as u8;
+        let mut lookup_table = vec![0_u16;keys[keys.len()-1] as usize + 1];
+        for (i,&k) in keys.into_iter().enumerate() {
+            lookup_table[k as usize] = i as u16;
         }
         Self {
-            table: Box::into_raw(lookup_table.into_boxed_slice()) as *mut u8,
+            table: Box::into_raw(lookup_table.into_boxed_slice()) as *mut u16,
             objects: objects,
         }
     }
 
-    pub fn get(&self, key: &u8) -> &E {
+    pub fn get(&self, key: &u16) -> &E {
         unsafe {
-            self.objects
-                .get_unchecked(*self.table.offset(*key as isize) as usize)
+            self.objects.get_unchecked(*self.table.offset(*key as isize) as usize)
         }
     }
 
-    pub fn get_mut(&mut self, key: &u8) -> &mut E {
+    pub fn get_mut(&mut self, key: &u16) -> &mut E {
         unsafe {
-            self.objects
-                .get_unchecked_mut(*self.table.offset(*key as isize) as usize)
+            self.objects.get_unchecked_mut(*self.table.offset(*key as isize) as usize)
         }
     }
 }
