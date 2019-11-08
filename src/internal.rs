@@ -1,4 +1,4 @@
-use uint::{u40, u48};
+use crate::default::immutable::LXKey;
 
 pub trait PredecessorSet<T> {
     fn insert(&mut self, element: T);
@@ -11,56 +11,22 @@ pub trait PredecessorSet<T> {
 }
 
 pub trait Splittable {
-    fn split_integer_down(&self) -> (usize, u8, u8, u8);
-}
-
-impl Splittable for u40 {
-    #[inline]
-    fn split_integer_down(&self) -> (usize, u8, u8, u8) {
-        // Achtung funktioniert nicht korrekt mit negativen Zahlen
-        let i: usize = u64::from(*self >> 24) as usize;
-        // Die niedrigwertigsten 24 Bits element[16..39]
-        let low = u64::from(*self) & 0xFFFFFF;
-        // Bits 16 bis 23 element[8..15]
-        let l: u8 = (low >> 16) as u8;
-        // Die niedrigwertigsten 8 Bits element[0..7]
-        let low = low & 0xFFFF;
-        let j: u8 = (low >> 8) as u8;
-        let k: u8 = (u64::from(*self) & 0xFF) as u8;
-        (i, l, j, k)
-    }
-}
-
-impl Splittable for u48 {
-    #[inline]
-    fn split_integer_down(&self) -> (usize, u8, u8, u8)  {
-        // Achtung funktioniert nicht korrekt mit negativen Zahlen
-        let i: usize = u64::from(*self >> 24) as usize;
-        // Die niedrigwertigsten 24 Bits element[16..39]
-        let low = u64::from(*self) & 0xFFFFFF;
-        // Bits 16 bis 23 element[8..15]
-        let l: u8 = (low >> 16) as u8;
-        // Die niedrigwertigsten 8 Bits element[0..7]
-        let low = low & 0xFFFF;
-        let j: u8 = (low >> 8) as u8;
-        let k: u8 = (u64::from(*self) & 0xFF) as u8;
-        (i, l, j, k)
-    }
+    fn split_integer_down(&self) -> (usize, u16, u16, u16);
 }
 
 impl Splittable for u64 {
     #[inline]
-    fn split_integer_down(&self) -> (usize, u8, u8, u8)  {
+    fn split_integer_down(&self) -> (usize, u16, u16, u16)  {
         // Achtung funktioniert nicht korrekt mit negativen Zahlen
-        let i: usize = u64::from(*self >> 24) as usize;
+        let i: usize = u64::from(*self >> 48) as usize;
         // Die niedrigwertigsten 24 Bits element[16..39]
-        let low = u64::from(*self) & 0xFFFFFF;
+        let low = u64::from(*self) & 0xFFFFFFFFFFFF;
         // Bits 16 bis 23 element[8..15]
-        let l: u8 = (low >> 16) as u8;
+        let l: u16 = (low >> 32) as u16;
         // Die niedrigwertigsten 8 Bits element[0..7]
-        let low = low & 0xFFFF;
-        let j: u8 = (low >> 8) as u8;
-        let k: u8 = (u64::from(*self) & 0xFF) as u8;
+        let low = low & 0xFFFFFFFF;
+        let j: u16 = (low >> 16) as u16;
+        let k: u16 = (low & 0xFFFF) as u16;
         (i, l, j, k)
     }
 }
