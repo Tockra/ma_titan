@@ -1,7 +1,6 @@
-use uint::{u40, u48};
-
 use crate::internal::{Splittable};
 use crate::default::build::{insert_l2_level};
+
 
 pub type L1Ebene<T> = LevelPointer<L2Ebene<T>, T>;
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
@@ -152,9 +151,9 @@ impl<T, V> TopArray<T, V> {
     #[inline]
     fn get_length() -> usize {
         if std::mem::size_of::<V>() == std::mem::size_of::<usize>() {
-            1 << std::mem::size_of::<T>() * 8 - 24
+            1 << 16
         } else if std::mem::size_of::<V>() == std::mem::size_of::<LXKey>() {
-            1 << 8
+            1 << 16
         } else {
             panic!("Ungültige Parameterkombination vom TopArray!")
         }
@@ -346,17 +345,13 @@ pub trait Int: Ord + PartialOrd + From<u64> + Into<u64> + Copy + Splittable {
         Self::from(k)
     }
     fn root_array_size() -> usize {
-        1 << (std::mem::size_of::<Self>() * 8 - 24)
+        1 << (16)
     }
 }
 
-impl Int for u40 {}
-
-impl Int for u48 {}
-
 impl Int for u64 {}
 
-pub type LXKey = u8;
+pub type LXKey = u16;
 impl<T: Int> STree<T> {
     /// Gibt einen STree mit den in `elements` enthaltenen Werten zurück.
     ///
@@ -657,7 +652,7 @@ pub struct Level<T, E> {
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64].
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
-    pub lx_top: TopArray<E, u8>,
+    pub lx_top: TopArray<E, LXKey>,
 }
 
 impl<T, E> Level<T, E> {
