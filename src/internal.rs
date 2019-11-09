@@ -128,7 +128,7 @@ use boomphf::Mphf;
 
 #[derive(Clone)]
 pub struct MphfHashMap<K, V> {
-    hash_function: Mphf<K>,
+    hash_function: Option<Mphf<K>>,
     objects: Box<[V]>,
 }
 
@@ -144,10 +144,18 @@ impl<
 {
     #[inline]
     pub fn new(keys: Box<[K]>, objects: Box<[V]>) -> Self {
-        Self {
-            hash_function: Mphf::new_parallel(GAMMA, &keys.to_vec(), None),
-            objects: objects,
+        if objects.len() > 1 {
+            Self {
+                hash_function: Some(Mphf::new_parallel(GAMMA, &keys.to_vec(), None)),
+                objects: objects,
+            }
+        } else {
+            Self {
+                hash_function: None,
+                objects: objects,
+            }
         }
+
     }
 
     /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
@@ -158,8 +166,13 @@ impl<
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&self, key: &K) -> &V {
-        let hash = self.hash_function.try_hash(key).unwrap() as usize;
-        unsafe { self.objects.get_unchecked(hash) }
+        if !self.hash_function.is_none() {
+            let hash = self.hash_function.as_ref().unwrap().try_hash(key).unwrap() as usize;
+            unsafe { self.objects.get_unchecked(hash) }
+        } else {
+            unsafe { self.objects.get_unchecked(0) }
+        }
+
     }
 
     /// Der zum `key` gehörende gehashte Wert wird aus der Datenstruktur ermittelt. Hierbei muss sichergestellt sein
@@ -170,8 +183,11 @@ impl<
     /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get_mut(&mut self, key: &K) -> &mut V {
-        let hash = self.hash_function.try_hash(key).unwrap() as usize;
-
-        unsafe { self.objects.get_unchecked_mut(hash) }
+        if !self.hash_function.is_none() {
+            let hash = self.hash_function.as_ref().unwrap().try_hash(key).unwrap() as usize;
+            unsafe { self.objects.get_unchecked_mut(hash) }
+        } else {
+            unsafe { self.objects.get_unchecked_mut(0) }
+        }
     }
 }
