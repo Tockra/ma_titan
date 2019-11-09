@@ -347,10 +347,6 @@ pub trait Int: Ord + PartialOrd + From<u64> + Into<u64> + Copy + Splittable {
     }
 }
 
-impl Int for u64 {}
-
-}
-
 impl Int for u64 {
 
 }
