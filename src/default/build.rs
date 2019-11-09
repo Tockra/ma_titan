@@ -1,5 +1,6 @@
 use crate::default::immutable::{Int, L2Ebene, LXKey, Level, LevelPointer, TopArray};
 use crate::internal::Splittable;
+use crate::internal::{self, PointerEnum};
 
 type HashMap<K, T> = hashbrown::hash_map::HashMap<K, T>;
 
@@ -175,7 +176,7 @@ impl<T: Int> STreeBuilder<T> {
                         let val = Box::new(Level::new(
                             second_level.lx_top.take().unwrap(),
                             objects.into_boxed_slice(),
-                            second_level.keys.clone().into_boxed_slice(),
+                            std::mem::replace(&mut second_level.keys, vec![]).into_boxed_slice(),
                             second_level.minimum,
                             second_level.maximum,
                         ));
@@ -201,11 +202,8 @@ impl<T: Int> STreeBuilder<T> {
                         {
                             PointerEnum::First(l2) => {
                                 let l2_level = l2;
-
-                                for &j in &l2_level.keys {
-                                    // Die L2-Top-Tabellen werden gefüllt und die
-                                    let l3_level = l2_level.hash_map.get_mut(&j).unwrap();
-                                    // TODO
+                                let hm = std::mem::replace(&mut l2_level.hash_map, HashMap::new());
+                                for (j, l3_level) in hm.into_iter() {
                                     if (*l).get(j).is_null() {
                                         let pointered_data = (*l).get(j);
 
@@ -215,13 +213,14 @@ impl<T: Int> STreeBuilder<T> {
                                                 let mut level = Level::new(
                                                     l3_level.lx_top.take().unwrap(),
                                                     vec![0; l3_level.keys.len()].into_boxed_slice(),
-                                                    l3_level.keys.clone().into_boxed_slice(),
+                                                    std::mem::replace(&mut l3_level.keys, vec![]).into_boxed_slice(),
                                                     l3_level.minimum,
                                                     l3_level.maximum,
                                                 );
-                                                for k in &l3_level.keys {
-                                                    let result = level.get(*k);
-                                                    *result = *l3_level.hash_map.get(k).unwrap();
+                                                let hm = std::mem::replace(&mut l3_level.hash_map, HashMap::new());
+                                                for (k,val) in hm.into_iter() {
+                                                    let result = level.get(k);
+                                                    *result = val;
                                                 }
 
                                                 LevelPointer::from_level(Box::new(level))
@@ -253,7 +252,7 @@ impl<T: Int> STreeBuilder<T> {
 #[derive(Clone)]
 pub struct BuilderLevel<T, E> {
     /// Klassische HashMap zum aufbauen der perfekten Hashmap
-    pub hash_map: BuildHM<LXKey, T>,
+    pub hash_map: HashMap<LXKey, T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
     /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.
@@ -280,7 +279,7 @@ impl<T, E> BuilderLevel<T, E> {
     #[inline]
     pub fn new() -> BuilderLevel<T, E> {
         BuilderLevel {
-            hash_map: BuildHM::new(),
+            hash_map: HashMap::new(),
             keys: vec![],
             lx_top: Some(TopArray::new()),
             maximum: 0,
@@ -288,71 +287,3 @@ impl<T, E> BuilderLevel<T, E> {
         }
     }
 }
-
-// ------------------------- Pointer Magie, zum Verhindern der Nutzung von HashMaps für kleine Datenmengen ----------------------------------
-
-use crate::internal::{self, PointerEnum};
-pub struct BuildHM<K, T> {
-    pointer: internal::Pointer<HashMap<K, T>, (Box<Vec<K>>, Box<Vec<T>>)>,
-}
-
-impl<K: Clone, T: Clone> Clone for BuildHM<K, T> {
-    fn clone(&self) -> Self {
-        Self {
-            pointer: self.pointer.clone(),
-        }
-    }
-}
-
-impl<K: Eq + Copy + Ord + std::hash::Hash, T> BuildHM<K, T> {
-    fn new() -> Self {
-        Self {
-            pointer: internal::Pointer::from_second(Box::new((Box::new(vec![]), Box::new(vec![])))),
-        }
-    }
-
-    /// Die eigentliche Updatemechanik der HashMaps, wird hier ignoriert, da keine Werte geupdatet werden müssen!
-    fn insert(&mut self, key: K, val: T) {
-        match self.pointer.get() {
-            PointerEnum::Second((keys, values)) => {
-                if true {
-                    keys.push(key);
-                    values.push(val);
-                } else {
-                    let mut hm = HashMap::<K, T>::with_capacity(1025);
-                    let values = std::mem::replace(values, Box::new(vec![]));
-                    for (i, val) in values.into_iter().enumerate() {
-                        hm.insert(keys[i], val);
-                    }
-                    hm.insert(key, val);
-                    self.pointer = internal::Pointer::from_first(Box::new(hm));
-                }
-            }
-            PointerEnum::First(x) => {
-                x.insert(key, val);
-            }
-        }
-    }
-
-    fn get_mut(&mut self, k: &K) -> Option<&mut T> {
-        match self.pointer.get() {
-            PointerEnum::Second((keys, values)) => match keys.binary_search(k) {
-                Ok(x) => values.get_mut(x),
-                Err(_) => None,
-            },
-            PointerEnum::First(x) => x.get_mut(k),
-        }
-    }
-
-    fn get(&mut self, k: &K) -> Option<&T> {
-        match self.pointer.get() {
-            PointerEnum::Second((keys, values)) => match keys.binary_search(k) {
-                Ok(x) => values.get(x),
-                Err(_) => None,
-            },
-            PointerEnum::First(x) => x.get(k),
-        }
-    }
-}
-
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------
