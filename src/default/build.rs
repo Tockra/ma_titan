@@ -230,7 +230,7 @@ impl<T: Int> STreeBuilder<T> {
                         let val = Box::new(Level::new(
                             l1_object.lx_top.take().unwrap(),
                             objects.into_boxed_slice(),
-                            l1_object.keys.clone().into_boxed_slice(),
+                            std::mem::replace(&mut l1_object.keys, vec![]).into_boxed_slice(),
                             l1_object.minimum,
                             l1_object.maximum,
                         ));
@@ -255,10 +255,9 @@ impl<T: Int> STreeBuilder<T> {
                             .get()
                         {
                             PointerEnum::First(l1_object_builder) => {
+                                let hm = std::mem::replace(&mut l1_object_builder.hash_map, HashMap::new());
+                                for (l,l2_object) in hm.into_iter() {
 
-                                for &l in &l1_object_builder.keys {
-                                    // Die L2-Top-Tabellen werden gefüllt und die
-                                    let l2_object = l1_object_builder.hash_map.get_mut(&l).unwrap();
                                     if l1_object.get(l).is_null() {
                                         let pointered_data = l1_object.get(l);
 
@@ -267,13 +266,13 @@ impl<T: Int> STreeBuilder<T> {
                                                 let mut l2_object = Level::new(
                                                     l2_object_builder.lx_top.take().unwrap(),
                                                     vec![L3Ebene::from_null(); l2_object_builder.keys.len()].into_boxed_slice(),
-                                                    l2_object_builder.keys.clone().into_boxed_slice(),
+                                                    std::mem::replace(&mut l2_object_builder.keys, vec![]).into_boxed_slice(),
                                                     l2_object_builder.minimum,
                                                     l2_object_builder.maximum,
                                                 );
                                                 
-                                                for &j in &l2_object_builder.keys {
-                                                    let l3_object = l2_object_builder.hash_map.get_mut(&j).unwrap();
+                                                let hm = std::mem::replace(&mut l2_object_builder.hash_map, HashMap::new());
+                                                for (j,l3_object) in hm.into_iter() {
                                                     let pointered_data = l2_object.get(j);
 
                                                     *pointered_data = match l3_object.get() {
@@ -281,13 +280,14 @@ impl<T: Int> STreeBuilder<T> {
                                                             let mut level = Level::new(
                                                                 l3_object.lx_top.take().unwrap(),
                                                                 vec![0; l3_object.keys.len()].into_boxed_slice(),
-                                                                l3_object.keys.clone().into_boxed_slice(),
+                                                                std::mem::replace(&mut l3_object.keys, vec![]).into_boxed_slice(),
                                                                 l3_object.minimum,
                                                                 l3_object.maximum,
                                                             );
-                                                            for k in &l3_object.keys {
-                                                                let result = level.get(*k);
-                                                                *result = *l3_object.hash_map.get(k).unwrap();
+                                                            let hm = std::mem::replace(&mut l3_object.hash_map, HashMap::new());
+                                                            for (k, val) in hm.into_iter() {
+                                                                let result = level.get(k);
+                                                                *result = val;
                                                             }
 
                                                             LevelPointer::from_level(Box::new(level))
