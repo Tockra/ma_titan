@@ -18,15 +18,15 @@ impl Splittable for u64 {
     #[inline]
     fn split_integer_down(&self) -> (usize, u16, u16, u16)  {
         // Achtung funktioniert nicht korrekt mit negativen Zahlen
-        let i: usize = u64::from(*self >> 48) as usize;
+        let i: usize = u64::from(*self >> 42) as usize;
         // Die niedrigwertigsten 24 Bits element[16..39]
-        let low = u64::from(*self) & 0xFFFFFFFFFFFF;
+        let low = u64::from(*self) & 4398046511103;
         // Bits 16 bis 23 element[8..15]
-        let l: u16 = (low >> 32) as u16;
+        let l: u16 = (low >> 28) as u16;
         // Die niedrigwertigsten 8 Bits element[0..7]
-        let low = low & 0xFFFFFFFF;
-        let j: u16 = (low >> 16) as u16;
-        let k: u16 = (low & 0xFFFF) as u16;
+        let low = low & 268435455;
+        let j: u16 = (low >> 14) as u16;
+        let k: u16 = (low & 16383) as u16;
         (i, l, j, k)
     }
 }
