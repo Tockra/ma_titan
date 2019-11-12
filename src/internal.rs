@@ -232,3 +232,58 @@ impl<
         }
     }
 }
+
+pub struct MphfHashMapThres<K,T> {
+    pointer: Pointer<MphfHashMap<K,T>,(Box<[K]>,Box<[T]>)>,
+}
+
+impl<K: Clone,T: Clone> Clone for MphfHashMapThres<K,T> {
+    fn clone(&self) -> Self {
+        Self {
+            pointer: self.pointer.clone()
+        }
+    }
+}
+
+impl<K: Eq + std::fmt::Display + std::marker::Send + std::marker::Sync + std::hash::Hash + std::fmt::Debug + Into<u16> + Ord + Copy + std::hash::Hash,T> MphfHashMapThres<K,T> {
+    pub fn new(keys: Box<[K]>, objects: Box<[T]>) -> Self {
+        if keys.len() < 170 {
+            Self {
+                pointer: Pointer::from_second(Box::new((keys.to_vec().into_boxed_slice(),objects))),
+            }
+        } else {
+            Self {
+                pointer: Pointer::from_first(Box::new(MphfHashMap::new(keys, objects))),
+            }
+        }
+
+    }
+
+    pub fn get_mut(&mut self, k: &K) -> &mut T {
+        match self.pointer.get() {
+            PointerEnum::Second((keys,values)) => {
+                match keys.binary_search(k) {
+                    Ok(x) => unsafe { values.get_unchecked_mut(x)},
+                    _ => panic!("get in internal wurde mit ungültigem Schlüssel {} aufgerufen.", k),
+                }
+            },
+            PointerEnum::First(x) => {
+                x.get_mut(k)
+            },
+        }
+    }
+
+    pub fn get(&self, k: &K) -> &T {
+        match self.pointer.get() {
+            PointerEnum::Second((keys,values)) => {
+                match keys.binary_search(k) {
+                    Ok(x) => unsafe { values.get_unchecked(x)},
+                    _ => panic!("get in internal wurde mit ungültigem Schlüssel {} aufgerufen.", k),
+                }
+            },
+            PointerEnum::First(x) => {
+                x.get(k)
+            },
+        }
+    }
+}
