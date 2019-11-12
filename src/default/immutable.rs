@@ -1,9 +1,7 @@
 use crate::default::build::STreeBuilder;
-use crate::internal::{MphfHashMap, Splittable};
-
-/// Zusätzliche Ebene um 8-Bit außer in Wurzel zu gewährleisten
+use crate::internal::{MphfHashMapThres, Splittable};
 pub type L1Ebene<T> = LevelPointer<L2Ebene<T>, T>;
-
+/// Zusätzliche Ebene um 8-Bit außer in Wurzel zu gewährleisten
 /// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene<T> = LevelPointer<LXEbene<T>, T>;
@@ -663,7 +661,7 @@ impl<T: Int> STree<T> {
 #[repr(align(4))]
 pub struct Level<T, E> {
     /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist.
-    pub hash_map: MphfHashMap<LXKey, T>,
+    pub hash_map: MphfHashMapThres<LXKey, T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
     pub maximum: usize,
@@ -693,7 +691,7 @@ impl<T, E> Level<T, E> {
         maximum: usize,
     ) -> Level<T, E> {
         Level {
-            hash_map: MphfHashMap::new(keys, objects),
+            hash_map: MphfHashMapThres::new(keys, objects),
             minimum: minimum,
             maximum: maximum,
             lx_top: lx_top,
