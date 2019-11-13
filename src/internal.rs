@@ -51,7 +51,7 @@ impl<T: Clone,E: Clone> Clone for Pointer<T,E> {
         } else {
             match self.get() {
                 PointerEnum::First(x) => Self::from_first(Box::new(x.clone())),
-                PointerEnum::Second(x) => Self::from_second(Box::new(x.clone())),
+                PointerEnum::Second(x) => Self::from_second(x as *const E),
             }
         }
     }
@@ -68,7 +68,7 @@ impl<T,E> Drop for Pointer<T,E> {
         } else {
             debug_assert!((self.pointer as usize % 2) == 1);
 
-            unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
+            //unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
         }
     }
 }
@@ -85,8 +85,8 @@ impl<T,E> Pointer<T,E> {
         }
     }
 
-    pub fn from_second(b: Box<E>) -> Self {
-        let pointer = Box::into_raw(b);
+    pub fn from_second(b: *const E) -> Self {
+        let pointer = b;
         assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
         assert!((pointer as usize % 2) == 0);
 
