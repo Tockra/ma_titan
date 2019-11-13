@@ -38,14 +38,14 @@ fn test_u40_new_hashfunctions() {
             PointerEnum::First(l) => {
                 let second_level = l.get(j);
                 let saved_val = match second_level.get() {
-                    PointerEnum::First(l) => unsafe { **l.get(k) },
+                    PointerEnum::First(l) => *(*l).get(k),
                     PointerEnum::Second(e) => *e,
                 };
-                assert_eq!(saved_val, val);
+                assert_eq!(data_structure.element_list[saved_val], val);
             }
 
             PointerEnum::Second(e) => {
-                assert_eq!(*e, val);
+                assert_eq!(data_structure.element_list[*e], val);
             }
         };
     }
@@ -77,14 +77,14 @@ fn test_u48_new_hashfunctions() {
             PointerEnum::First(l) => {
                 let second_level = l.get(j);
                 let saved_val = match second_level.get() {
-                    PointerEnum::First(l) => unsafe { **l.get(k) },
+                    PointerEnum::First(l) => *(*l).get(k),
                     PointerEnum::Second(e) => *e,
                 };
-                assert_eq!(saved_val, val);
+                assert_eq!(data_structure.element_list[saved_val], val);
             }
 
             PointerEnum::Second(e) => {
-                assert_eq!(*e, val);
+                assert_eq!(data_structure.element_list[*e], val);
             }
         };
     }
@@ -128,13 +128,13 @@ fn test_u40_top_arrays() {
                         panic!("Das sollte nicht geschehen");
                     }
                 };
-                assert_eq!(unsafe {**saved_val}, val);
+                assert_eq!(data_structure.element_list[*saved_val], val);
             } else {
-                assert_eq!(*second_level.minimum(), val);
+                assert_eq!(data_structure.element_list[second_level.minimum()], val);
             }
         } else {
             assert_eq!(
-                *data_structure.root_table[i].minimum(),
+                data_structure.element_list[data_structure.root_table[i].minimum()],
                 val
             );
         }
@@ -174,18 +174,18 @@ fn test_u48_top_arrays() {
             };
             if second_level.minimum() != second_level.maximum() {
                 let saved_val = match second_level.get() {
-                    PointerEnum::First(l) => *l.get(k),
+                    PointerEnum::First(l) => l.get(k),
                     _ => {
                         panic!("Das sollte nicht geschehen");
                     }
                 };
-                assert_eq!(unsafe {*saved_val}, val);
+                assert_eq!(data_structure.element_list[*saved_val], val);
             } else {
-                assert_eq!(*second_level.minimum(), val);
+                assert_eq!(data_structure.element_list[second_level.minimum()], val);
             }
         } else {
             assert_eq!(
-                *data_structure.root_table[i].minimum(),
+                data_structure.element_list[data_structure.root_table[i].minimum()],
                 val
             );
         }
@@ -210,7 +210,7 @@ fn test_u40_locate_or_succ_bruteforce() {
             for i in data_v1[index] + 1..data_v1[index + 1] + 1 {
                 let locate = data_structure.locate_or_succ(u40::new(i)).unwrap();
                 assert_eq!(
-                    *locate,
+                    data_structure.element_list[locate],
                     u40::new(data_v1[index + 1])
                 );
             }
@@ -236,7 +236,7 @@ fn test_u48_locate_or_succ_bruteforce() {
             for i in data_v1[index] + 1..data_v1[index + 1] + 1 {
                 let locate = data_structure.locate_or_succ(u48::new(i)).unwrap();
                 assert_eq!(
-                    *locate,
+                    data_structure.element_list[locate],
                     u48::new(data_v1[index + 1])
                 );
             }
@@ -295,7 +295,8 @@ fn test_u40_locate_or_succ_eqc_bruteforce_test() {
                     let index = elem - u40::new(j);
                     if index > data_structure.element_list[i - 1] {
                         assert_eq!(
-                            *data_structure.locate_or_succ(index).unwrap(),
+                            data_structure.element_list
+                                [data_structure.locate_or_succ(index).unwrap() as usize],
                             elem
                         );
                     }
@@ -303,11 +304,12 @@ fn test_u40_locate_or_succ_eqc_bruteforce_test() {
             }
         } else {
             assert_eq!(
-                *data_structure.locate_or_succ(elem).unwrap(),
+                data_structure.element_list[data_structure.locate_or_succ(elem).unwrap() as usize],
                 elem
             );
             assert_eq!(
-                *data_structure.locate_or_succ(elem - u40::new(1)).unwrap(),
+                data_structure.element_list
+                    [data_structure.locate_or_succ(elem - u40::new(1)).unwrap() as usize],
                 elem
             );
         }
@@ -365,7 +367,8 @@ fn test_u48_locate_or_succ_eqc_bruteforce_test() {
                     let index = elem - u48::new(j);
                     if index > data_structure.element_list[i - 1] {
                         assert_eq!(
-                            *data_structure.locate_or_succ(index).unwrap(),
+                            data_structure.element_list
+                                [data_structure.locate_or_succ(index).unwrap() as usize],
                             elem
                         );
                     }
@@ -373,11 +376,12 @@ fn test_u48_locate_or_succ_eqc_bruteforce_test() {
             }
         } else {
             assert_eq!(
-                *data_structure.locate_or_succ(elem).unwrap(),
+                data_structure.element_list[data_structure.locate_or_succ(elem).unwrap() as usize],
                 elem
             );
             assert_eq!(
-                *data_structure.locate_or_succ(elem - u48::new(1)).unwrap(),
+                data_structure.element_list
+                    [data_structure.locate_or_succ(elem - u48::new(1)).unwrap() as usize],
                 elem
             );
         }
@@ -399,7 +403,7 @@ fn test_u40_locate_or_pred_bruteforce() {
     let data_structure: STree<u40> = STree::new(data.into_boxed_slice());
     assert_eq!(
         u40::new(1065983),
-        *data_structure.locate_or_pred(u40::new(1065983)).unwrap()
+        data_structure.element_list[data_structure.locate_or_pred(u40::new(1065983)).unwrap()]
     );
     for (index, _) in data_v1.iter().enumerate().rev() {
         if index > 0 {
@@ -407,7 +411,7 @@ fn test_u40_locate_or_pred_bruteforce() {
                 let locate = data_structure.locate_or_pred(u40::new(i)).unwrap();
                 assert_eq!(
                     u40::new(data_v1[index - 1]),
-                    *locate
+                    data_structure.element_list[locate]
                 );
             }
         }
@@ -429,7 +433,7 @@ fn test_u48_locate_or_pred_bruteforce() {
     let data_structure: STree<u48> = STree::new(data.into_boxed_slice());
     assert_eq!(
         u48::new(1065983),
-        *data_structure.locate_or_pred(u48::new(1065983)).unwrap()
+        data_structure.element_list[data_structure.locate_or_pred(u48::new(1065983)).unwrap()]
     );
     for (index, _) in data_v1.iter().enumerate().rev() {
         if index > 0 {
@@ -437,7 +441,7 @@ fn test_u48_locate_or_pred_bruteforce() {
                 let locate = data_structure.locate_or_pred(u48::new(i)).unwrap();
                 assert_eq!(
                     u48::new(data_v1[index - 1]),
-                    *locate
+                    data_structure.element_list[locate]
                 );
             }
         }
@@ -493,7 +497,8 @@ fn test_u40_locate_or_pred_eqc_bruteforce_test() {
                     let index = elem + u40::new(j);
                     if index < data_structure.element_list[i + 1] {
                         assert_eq!(
-                            *data_structure.locate_or_pred(index).unwrap(),
+                            data_structure.element_list
+                                [data_structure.locate_or_pred(index).unwrap() as usize],
                             elem
                         );
                     }
@@ -501,11 +506,12 @@ fn test_u40_locate_or_pred_eqc_bruteforce_test() {
             }
         } else {
             assert_eq!(
-                *data_structure.locate_or_pred(elem).unwrap(),
+                data_structure.element_list[data_structure.locate_or_pred(elem).unwrap() as usize],
                 elem
             );
             assert_eq!(
-                *data_structure.locate_or_pred(elem + u40::new(1)).unwrap(),
+                data_structure.element_list
+                    [data_structure.locate_or_pred(elem + u40::new(1)).unwrap() as usize],
                 elem
             );
         }
@@ -558,7 +564,8 @@ fn test_u48_locate_or_pred_eqc_bruteforce_test() {
                     let index = elem + u48::new(j);
                     if index < data_structure.element_list[i + 1] {
                         assert_eq!(
-                            *data_structure.locate_or_pred(index).unwrap(),
+                            data_structure.element_list
+                                [data_structure.locate_or_pred(index).unwrap() as usize],
                             elem
                         );
                     }
@@ -566,11 +573,12 @@ fn test_u48_locate_or_pred_eqc_bruteforce_test() {
             }
         } else {
             assert_eq!(
-                *data_structure.locate_or_pred(elem).unwrap(),
+                data_structure.element_list[data_structure.locate_or_pred(elem).unwrap() as usize],
                 elem
             );
             assert_eq!(
-                *data_structure.locate_or_pred(elem + u48::new(1)).unwrap(),
+                data_structure.element_list
+                    [data_structure.locate_or_pred(elem + u48::new(1)).unwrap() as usize],
                 elem
             );
         }
