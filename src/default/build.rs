@@ -4,7 +4,7 @@ use crate::internal::{Splittable,PointerEnum};
 #[inline]
 pub fn insert_l3_level<T: Int + Into<u64>>(l3_level: &mut L3Ebene<T>,elem: &T, k: u16, elements: &[T]) {
     if l3_level.is_null() {
-        *l3_level = L3Ebene::from_usize(elem);
+        *l3_level = L3Ebene::from_usize(elem as *const T);
     } else {
         match l3_level.get() {
             PointerEnum::First(l3_level) => {
