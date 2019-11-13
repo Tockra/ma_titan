@@ -369,8 +369,8 @@ impl<T: Int> STree<T> {
         let mut root_table: Box<[L2Ebene<T>]> = vec![LevelPointer::from_null(); T::root_array_size()].into_boxed_slice();
         let mut root_top = TopArray::<T,usize>::new();
 
-        for (index,elem) in elements.iter().enumerate() {
-            let (i,j,k) = Splittable::split_integer_down(elem);
+        for (index,_) in elements.iter().enumerate() {
+            let (i,j,k) = Splittable::split_integer_down(&elements[index]);
             root_top.set_bit(i as usize);
  
             if root_table[i].is_null() {

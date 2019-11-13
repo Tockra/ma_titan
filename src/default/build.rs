@@ -19,7 +19,7 @@ pub fn insert_l3_level<T: Int + Into<u64>>(l3_level: &mut L3Ebene<T>,elem: &T, k
             },
 
             PointerEnum::Second(e) => {
-                let (_,_,k2) = Splittable::split_integer_down(elem);
+                let (_,_,k2) = Splittable::split_integer_down(e);
                 let mut l3_level_n = Level::new();
 
                 debug_assert!(k2!=k);
