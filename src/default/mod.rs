@@ -3,4 +3,4 @@ pub mod immutable;
 pub mod build;
 
 #[cfg(test)]
-mod tests;
+pub mod tests;
