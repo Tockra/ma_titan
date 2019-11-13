@@ -670,7 +670,7 @@ impl<T, E> Level<T, E> {
         Level {
             minimum: std::ptr::null(),
             maximum: std::ptr::null(),
-            hash_map: HashMap::new(),
+            hash_map: HashMap::default(),
             lx_top: TopArray::new(),
         }
     }
