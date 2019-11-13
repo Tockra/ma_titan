@@ -110,7 +110,7 @@ impl<T,E> Drop for Pointer<T,E> {
         } else {
             debug_assert!((self.pointer as usize % 2) == 1);
 
-            unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
+            //unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
         }
     }
 }
