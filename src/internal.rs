@@ -1,5 +1,3 @@
-use crate::default::immutable::LXKey;
-
 pub trait PredecessorSet<T> {
     fn insert(&mut self,element: T);
     fn delete(&mut self,element: T);
@@ -31,10 +29,9 @@ impl Splittable for u64 {
     }
 }
 
-
-pub enum PointerEnum<T: 'static, E: 'static> {
-    First(&'static mut T),
-    Second(&'static mut E)
+pub enum PointerEnum<'a, T: 'a, E: 'a> {
+    First(&'a mut T),
+    Second(&'a mut E)
 }
 
 /// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein T oder ein E Objekt zeigt. Wichtig ist hierbei, dass T mit einem Vielfachen von 2 alligned werden muss!
@@ -43,14 +40,14 @@ pub struct Pointer<T,E> {
     phantom: std::marker::PhantomData<E>,
 }
 
-impl<T:'static + Clone,E:'static + Clone> Clone for Pointer<T,E> {
+impl<T: Clone,E: Clone> Clone for Pointer<T,E> {
     fn clone(&self) -> Self {
         if self.pointer.is_null() {
             Self::null()
         } else {
             match self.get() {
                 PointerEnum::First(x) => Self::from_first(Box::new(x.clone())),
-                PointerEnum::Second(x) => Self::from_second(Box::new(x.clone())),
+                PointerEnum::Second(x) => Self::from_second(x as *const E),
             }
         }
     }
@@ -67,7 +64,7 @@ impl<T,E> Drop for Pointer<T,E> {
         } else {
             debug_assert!((self.pointer as usize % 2) == 1);
 
-            unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
+            //unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
         }
     }
 }
@@ -84,10 +81,10 @@ impl<T,E> Pointer<T,E> {
         }
     }
 
-    pub fn from_second(b: Box<E>) -> Self {
-        let pointer = Box::into_raw(b);
-        debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
-        debug_assert!((pointer as usize % 2) == 0);
+    pub fn from_second(b: *const E) -> Self {
+        let pointer = b;
+        assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        assert!((pointer as usize % 2) == 0);
 
         let pointer = (pointer as usize + 1) as *mut T;
         Self {
@@ -123,10 +120,6 @@ impl<T,E> Pointer<T,E> {
     }
 }
 
-/// Dies ist ein Wrapper um die Mphf-Hashfunktion. Es wird nicht die interne Implementierung verwendet, da 
-/// bei dieser das Gamma nicht beeinflusst werden kann. 
-use crate::default::build::GAMMA;
-use boomphf::Mphf;
 
 #[derive(Clone)]
 pub struct MphfHashMap<K,V> {
