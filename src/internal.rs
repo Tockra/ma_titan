@@ -74,16 +74,15 @@ impl Splittable for u64 {
 
 pub enum PointerEnum<'a, T: 'a, E: 'a> {
     First(&'a mut T),
-    Second(&'a mut E),
+    Second(&'a mut E)
 }
 
-/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein T oder ein E Objekt zeigt. Wichtig ist hierbei, dass T mit einem Vielfachen von 2 alligned werden muss!
-pub struct Pointer<T, E> {
+pub struct Pointer2<T, E> {
     pointer: *mut T,
     phantom: std::marker::PhantomData<E>,
 }
 
-impl<T: Clone, E: Clone> Clone for Pointer<T, E> {
+impl<T: Clone,E: Clone> Clone for Pointer2<T,E> {
     fn clone(&self) -> Self {
         if self.pointer.is_null() {
             Self::null()
@@ -96,7 +95,7 @@ impl<T: Clone, E: Clone> Clone for Pointer<T, E> {
     }
 }
 
-impl<T, E> Drop for Pointer<T, E> {
+impl<T, E> Drop for Pointer2<T, E> {
     fn drop(&mut self) {
         if self.pointer.is_null() {
             return;
@@ -107,12 +106,12 @@ impl<T, E> Drop for Pointer<T, E> {
         } else {
             debug_assert!((self.pointer as usize % 2) == 1);
 
-            unsafe { Box::from_raw((self.pointer as usize - 1) as *mut E) };
+            unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
         }
     }
 }
 
-impl<T, E> Pointer<T, E> {
+impl<T, E> Pointer2<T, E> {
     pub fn from_first(b: Box<T>) -> Self {
         let pointer = Box::into_raw(b);
         debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
@@ -126,8 +125,8 @@ impl<T, E> Pointer<T, E> {
 
     pub fn from_second(b: Box<E>) -> Self {
         let pointer = Box::into_raw(b);
-        debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
-        debug_assert!((pointer as usize % 2) == 0);
+        assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        assert!((pointer as usize % 2) == 0);
 
         let pointer = (pointer as usize + 1) as *mut T;
         Self {
@@ -162,11 +161,93 @@ impl<T, E> Pointer<T, E> {
     }
 }
 
-/// Dies ist ein Wrapper um die Mphf-Hashfunktion. Es wird nicht die interne Implementierung verwendet, da
-/// bei dieser das Gamma nicht beeinflusst werden kann.
-use crate::default::build::GAMMA;
-use boomphf::Mphf;
+/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein T oder ein E Objekt zeigt. Wichtig ist hierbei, dass T mit einem Vielfachen von 2 alligned werden muss!
+pub struct Pointer<T, E> {
+    pointer: *mut T,
+    phantom: std::marker::PhantomData<E>,
+}
 
+impl<T: Clone,E: Clone> Clone for Pointer<T,E> {
+    fn clone(&self) -> Self {
+        if self.pointer.is_null() {
+            Self::null()
+        } else {
+            match self.get() {
+                PointerEnum::First(x) => Self::from_first(Box::new(x.clone())),
+                PointerEnum::Second(x) => Self::from_second(x as *const E),
+            }
+        }
+    }
+}
+
+impl<T, E> Drop for Pointer<T, E> {
+    fn drop(&mut self) {
+        if self.pointer.is_null() {
+            return;
+        }
+
+        if (self.pointer as usize % 2) == 0 {
+            unsafe { Box::from_raw(self.pointer) };
+        } else {
+            debug_assert!((self.pointer as usize % 2) == 1);
+
+            //unsafe { Box::from_raw((self.pointer as usize -1) as *mut E) };
+        }
+    }
+}
+
+impl<T, E> Pointer<T, E> {
+    pub fn from_first(b: Box<T>) -> Self {
+        let pointer = Box::into_raw(b);
+        debug_assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        debug_assert!((pointer as usize % 2) == 0);
+
+        Self {
+            pointer: pointer,
+            phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn from_second(b: *const E) -> Self {
+        let pointer = b;
+        assert!(std::mem::align_of::<T>() % 2 == 0 && std::mem::align_of::<E>() % 2 == 0);
+        assert!((pointer as usize % 2) == 0);
+
+        let pointer = (pointer as usize + 1) as *mut T;
+        Self {
+            pointer: pointer,
+            phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn get(&self) -> PointerEnum<T, E> {
+        if self.pointer.is_null() {
+            panic!("Pointer<T> is null!");
+        }
+
+        if (self.pointer as usize % 2) == 0 {
+            unsafe { PointerEnum::First(&mut (*self.pointer)) }
+        } else {
+            debug_assert!((self.pointer as usize % 2) == 1);
+
+            unsafe { PointerEnum::Second(&mut *((self.pointer as usize - 1) as *mut E)) }
+        }
+    }
+
+    pub fn null() -> Self {
+        Self {
+            pointer: std::ptr::null_mut(),
+            phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.pointer.is_null()
+    }
+}
+
+use boomphf::Mphf;
+use crate::default::build::GAMMA;
 #[derive(Clone)]
 pub struct MphfHashMap<K, V> {
     hash_function: Option<Mphf<K>>,
@@ -234,7 +315,7 @@ impl<
 }
 
 pub struct MphfHashMapThres<K,T> {
-    pointer: Pointer<MphfHashMap<K,T>,(Box<[K]>,Box<[T]>)>,
+    pointer: Pointer2<MphfHashMap<K,T>,(Box<[K]>,Box<[T]>)>,
 }
 
 impl<K: Clone,T: Clone> Clone for MphfHashMapThres<K,T> {
@@ -249,11 +330,11 @@ impl<K: Eq + std::fmt::Display + std::marker::Send + std::marker::Sync + std::ha
     pub fn new(keys: Box<[K]>, objects: Box<[T]>) -> Self {
         if keys.len() < 170 {
             Self {
-                pointer: Pointer::from_second(Box::new((keys.to_vec().into_boxed_slice(),objects))),
+                pointer: Pointer2::from_second(Box::new((keys.to_vec().into_boxed_slice(),objects))),
             }
         } else {
             Self {
-                pointer: Pointer::from_first(Box::new(MphfHashMap::new(keys, objects))),
+                pointer: Pointer2::from_first(Box::new(MphfHashMap::new(keys, objects))),
             }
         }
 
