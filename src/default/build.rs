@@ -9,13 +9,13 @@ type HashMap<K, T> = hashbrown::hash_map::HashMap<K, T>;
 pub const GAMMA: f64 = 2.0;
 
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L1-Ebene hat.AsMut
-type L1EbeneBuilder<T> = internal::Pointer<BuilderLevel<L2EbeneBuilder<T>, T>, usize>;
+type L1EbeneBuilder<T> = internal::Pointer<BuilderLevel<L2EbeneBuilder<T>, T>, T>;
 
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L2-Ebene hat.AsMut
-type L2EbeneBuilder<T> = internal::Pointer<BuilderLevel<L3EbeneBuilder<T>, T>, usize>;
+type L2EbeneBuilder<T> = internal::Pointer<BuilderLevel<L3EbeneBuilder<T>,T>,T>;
 
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L3-Ebene hat.AsMut
-type L3EbeneBuilder<T> = internal::Pointer<BuilderLevel<usize, T>, usize>;
+type L3EbeneBuilder<T> = internal::Pointer<BuilderLevel<*const T,T>,T>;
 
 /// Hilfsdatenstruktur zum Bauen eines STrees (nötig wegen der perfekten Hashfunktionen, die zum Erzeugungszeitpunkt alle Schlüssel kennen müssen).
 pub struct STreeBuilder<T> {
@@ -28,6 +28,7 @@ pub struct STreeBuilder<T> {
 
     /// Eine Liste, die alle belegten Indizes von `root_table` speichert.
     root_indexs: Vec<usize>,
+    pub elements: Box<[T]>,
 }
 
 impl<T: Int> STreeBuilder<T> {
@@ -53,17 +54,17 @@ impl<T: Int> STreeBuilder<T> {
             }
 
             if root_table[i].is_null() {
-                root_table[i] = internal::Pointer::from_second(Box::new(index));
+                root_table[i] = internal::Pointer::from_second(&elements[index] as *const T);
             } else {
                 match root_table[i].get() {
                     PointerEnum::First(l1_object) => {
-                        l1_object.maximum = index;
+                        l1_object.maximum = &elements[index] as *const T;
 
                         if !l1_object.lx_top.as_ref().unwrap().is_set(l as usize) {
                             l1_object.keys.push(l);
 
                             let mut l2_object = internal::Pointer::null();
-                            Self::insert_l2_level(&mut l2_object, index, &elements);
+                            Self::insert_l2_level(&mut l2_object, &elements[index], &elements);
 
                             l1_object.hash_map.insert(l, l2_object);
                             l1_object.lx_top.as_mut().unwrap().set_bit(l as usize);
@@ -71,37 +72,37 @@ impl<T: Int> STreeBuilder<T> {
                             // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
                             Self::insert_l2_level(
                                 l1_object.hash_map.get_mut(&l).unwrap(),
-                                index,
+                                &elements[index],
                                 &elements,
                             );
                         }
                     }
 
                     PointerEnum::Second(e) => {
-                        let (_, l2, _, _) = Splittable::split_integer_down(&elements[*e]);
+                        let (_, l2, _, _) = Splittable::split_integer_down(e);
                         let mut l1_object = BuilderLevel::new();
 
                         l1_object.lx_top.as_mut().unwrap().set_bit(l as usize);
                         // Minima- und Maximasetzung auf der ersten Ebene
-                        l1_object.minimum = *e;
-                        l1_object.maximum = index;
+                        l1_object.minimum = e as *const T;
+                        l1_object.maximum = &elements[index] as *const T;
 
                         let mut l2_object = internal::Pointer::null();
 
                         if l2 != l {
                             let mut l2_object = internal::Pointer::null();
-                            Self::insert_l2_level(&mut l2_object, *e, &elements);
+                            Self::insert_l2_level(&mut l2_object, e, &elements);
 
                             l1_object.keys.push(l2);
                             l1_object.hash_map.insert(l2, l2_object);
                             l1_object.lx_top.as_mut().unwrap().set_bit(l2 as usize)
                         } else {
-                            Self::insert_l2_level(&mut l2_object, *e, &elements);
+                            Self::insert_l2_level(&mut l2_object, e, &elements);
                         }
 
                         // Reihenfolge der keys ist relevant!
                         l1_object.keys.push(l);
-                        Self::insert_l2_level(&mut l2_object, index, &elements);
+                        Self::insert_l2_level(&mut l2_object, &elements[index], &elements);
                         l1_object.hash_map.insert(l, l2_object);
 
                         root_table[i] = internal::Pointer::from_first(Box::new(l1_object));
@@ -109,16 +110,12 @@ impl<T: Int> STreeBuilder<T> {
                 }
             }
         }
-        Self {
-            root_table: root_table,
-            root_top: Some(root_top),
-            root_indexs: root_indexs,
-        }
+        Self {root_table: root_table, root_top: Some(root_top), root_indexs: root_indexs, elements: elements}
     }
     #[inline]
-    fn insert_l3_level(l3_level: &mut L3EbeneBuilder<T>, index: usize, k: LXKey, elements: &[T]) {
+    fn insert_l3_level(l3_level: &mut L3EbeneBuilder<T>,elem: &T, k: LXKey, elements: &[T]) {
         if l3_level.is_null() {
-            *l3_level = internal::Pointer::from_second(Box::new(index));
+            *l3_level = internal::Pointer::from_second(elem as *const T);
         } else {
             match l3_level.get() {
                 PointerEnum::First(l) => {
@@ -130,25 +127,25 @@ impl<T: Int> STreeBuilder<T> {
                     l3_level.keys.push(k);
 
                     //Maximasetzung auf der zweiten Ebene
-                    l3_level.maximum = index;
+                    l3_level.maximum = elem as *const T;
 
-                    l3_level.hash_map.insert(k, index);
-                }
+                    l3_level.hash_map.insert(k, elem as *const T);
+                },
 
                 PointerEnum::Second(e) => {
-                    let (_, _, _, k2) = Splittable::split_integer_down(&elements[*e]);
+                    let (_, _, _, k2) = Splittable::split_integer_down(e);
                     let mut l3_level_n = BuilderLevel::new();
                     l3_level_n.keys.push(k2);
                     l3_level_n.keys.push(k);
 
                     debug_assert!(k2 != k);
 
-                    // Minima- und Maximasetzung auf der zweiten Ebene
-                    l3_level_n.minimum = *e;
-                    l3_level_n.maximum = index;
+                     // Minima- und Maximasetzung auf der zweiten Ebene
+                    l3_level_n.minimum = e as *const T;
+                    l3_level_n.maximum = elem as *const T;
 
-                    l3_level_n.hash_map.insert(k2, *e);
-                    l3_level_n.hash_map.insert(k, index);
+                    l3_level_n.hash_map.insert(k2, e as *const T);
+                    l3_level_n.hash_map.insert(k, elem as *const T);
 
                     l3_level_n.lx_top.as_mut().unwrap().set_bit(k as usize);
                     l3_level_n.lx_top.as_mut().unwrap().set_bit(k2 as usize);
@@ -159,35 +156,35 @@ impl<T: Int> STreeBuilder<T> {
         }
     }
 
-    pub fn insert_l2_level(l2_level: &mut L2EbeneBuilder<T>,index: usize, elements: &[T]) {
-        let (_,_,j,k) = Splittable::split_integer_down(&elements[index]);
+    pub fn insert_l2_level(l2_level: &mut L2EbeneBuilder<T>,elem: &T, elements: &[T]) {
+        let (_,_,j,k) = Splittable::split_integer_down(elem);
         if l2_level.is_null() {
-            *l2_level = L2EbeneBuilder::from_second(Box::new(index));
+            *l2_level = L2EbeneBuilder::from_second(elem as *const T);
         } else {
             match l2_level.get() {
                 PointerEnum::First(l2_object) => {
-                    l2_object.maximum = index;
+                    l2_object.maximum = elem as *const T;
                     if !l2_object.lx_top.as_mut().unwrap().is_set(j as usize) {
                         let mut l3_level = L3EbeneBuilder::null();
-                        Self::insert_l3_level(&mut l3_level,index,k,elements);
+                        Self::insert_l3_level(&mut l3_level,elem,k,elements);
 
                         l2_object.hash_map.insert(j,l3_level);
                         l2_object.keys.push(j);
                         l2_object.lx_top.as_mut().unwrap().set_bit(j as usize);
                     } else {
                         // Hier fängt das unwrap() Implementierungsfehler ab, die den keys-Vektor nicht äquivalent zur Hashmap befüllen *outdated*
-                        Self::insert_l3_level(l2_object.hash_map.get_mut(&j).unwrap(),index,k,&elements);
+                        Self::insert_l3_level(l2_object.hash_map.get_mut(&j).unwrap(),elem,k,&elements);
                     }
                 },
 
                 PointerEnum::Second(elem_index) => {
                     let mut l2_object = BuilderLevel::new();
-                    let elem2 = elements[*elem_index];
+                    let elem2 = *elem_index;
                     let (_,_,j2,k2) = Splittable::split_integer_down(&elem2);
      
                     // Da die Elemente sortiert sind
-                    l2_object.minimum = *elem_index;
-                    l2_object.maximum = index;
+                    l2_object.minimum = elem_index as *const T;
+                    l2_object.maximum = elem as *const T;
 
 
 
@@ -195,15 +192,15 @@ impl<T: Int> STreeBuilder<T> {
 
                     if j2 != j {
                         let mut l3_level = L3EbeneBuilder::null();
-                        Self::insert_l3_level(&mut l3_level,*elem_index,k2,&elements);
+                        Self::insert_l3_level(&mut l3_level,elem_index,k2,&elements);
                         l2_object.hash_map.insert(j2,l3_level);
                         l2_object.keys.push(j2);
                         l2_object.lx_top.as_mut().unwrap().set_bit(j2 as usize)
                     } else {
-                        Self::insert_l3_level(&mut l3_level,*elem_index,k2,&elements);
+                        Self::insert_l3_level(&mut l3_level,elem_index,k2,&elements);
                     }
 
-                    Self::insert_l3_level(&mut l3_level,index,k,&elements);
+                    Self::insert_l3_level(&mut l3_level,elem,k,&elements);
                     l2_object.hash_map.insert(j,l3_level);
                     l2_object.keys.push(j);
                     l2_object.lx_top.as_mut().unwrap().set_bit(j as usize);
@@ -238,7 +235,7 @@ impl<T: Int> STreeBuilder<T> {
                     }
 
                     PointerEnum::Second(e) => {
-                        tmp.push(LevelPointer::from_usize(Box::new(*e)));
+                        tmp.push(LevelPointer::from_usize(e as *const T));
                     }
                 }
             }
@@ -279,7 +276,7 @@ impl<T: Int> STreeBuilder<T> {
                                                         PointerEnum::First(l3_object) => {
                                                             let mut level = Level::new(
                                                                 l3_object.lx_top.take().unwrap(),
-                                                                vec![0; l3_object.keys.len()].into_boxed_slice(),
+                                                                vec![std::ptr::null(); l3_object.keys.len()].into_boxed_slice(),
                                                                 std::mem::replace(&mut l3_object.keys, vec![]).into_boxed_slice(),
                                                                 l3_object.minimum,
                                                                 l3_object.maximum,
@@ -293,7 +290,7 @@ impl<T: Int> STreeBuilder<T> {
                                                             LevelPointer::from_level(Box::new(level))
                                                         }
                                                         PointerEnum::Second(e) => {
-                                                            LevelPointer::from_usize(Box::new(*e))
+                                                            LevelPointer::from_usize(e as *const T)
                                                         }
                                                     };
                                                 }
@@ -302,7 +299,7 @@ impl<T: Int> STreeBuilder<T> {
                         
                                             }
                                             PointerEnum::Second(e) => {
-                                                LevelPointer::from_usize(Box::new(*e))
+                                                LevelPointer::from_usize(e as *const T)
                                             }
                                        }
                                     }
@@ -340,10 +337,10 @@ pub struct BuilderLevel<T, E> {
     lx_top: Option<TopArray<E, LXKey>>,
 
     /// Speichert das Maximum des Levels zwischen
-    pub maximum: usize,
+    pub maximum: *const E,
 
     /// Speichert das Minimum des Levels zwischen
-    pub minimum: usize,
+    pub minimum: *const E,
 }
 
 impl<T, E> BuilderLevel<T, E> {
@@ -358,8 +355,8 @@ impl<T, E> BuilderLevel<T, E> {
             hash_map: HashMap::new(),
             keys: vec![],
             lx_top: Some(TopArray::new()),
-            maximum: 0,
-            minimum: 1,
+            maximum: std::ptr::null(),
+            minimum: std::ptr::null()
         }
     }
 }
