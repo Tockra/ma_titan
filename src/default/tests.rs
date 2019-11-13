@@ -15,7 +15,7 @@ fn test_u64_locate_or_succ_bruteforce() {
             for i in data_v1[index] + 1..data_v1[index + 1] + 1 {
                 let locate = data_structure.locate_or_succ(i as u64).unwrap();
                 assert_eq!(
-                    data_structure.element_list[locate],
+                    *locate,
                     data_v1[index + 1]
                 );
             }
@@ -773,8 +773,7 @@ fn test_u64_locate_or_succ_eqc_bruteforce_test() {
                     let index = elem - j;
                     if index > data_structure.element_list[i - 1] {
                         assert_eq!(
-                            data_structure.element_list
-                                [data_structure.locate_or_succ(index).unwrap() as usize],
+                            *data_structure.locate_or_succ(index).unwrap(),
                             elem
                         );
                     }
@@ -782,12 +781,11 @@ fn test_u64_locate_or_succ_eqc_bruteforce_test() {
             }
         } else {
             assert_eq!(
-                data_structure.element_list[data_structure.locate_or_succ(elem).unwrap() as usize],
+                *data_structure.locate_or_succ(elem).unwrap(),
                 elem
             );
             assert_eq!(
-                data_structure.element_list
-                    [data_structure.locate_or_succ(elem - 1).unwrap() as usize],
+                *data_structure.locate_or_succ(elem - 1).unwrap(),
                 elem
             );
         }
@@ -805,7 +803,7 @@ fn test_u64_locate_or_pred_bruteforce() {
     let data_structure: STree<u64> = STree::new(data.clone().into_boxed_slice());
     assert_eq!(
         1065983_u64,
-        data_structure.element_list[data_structure.locate_or_pred(1065983).unwrap()]
+        *data_structure.locate_or_pred(1065983).unwrap()
     );
     for (index, _) in data.iter().enumerate().rev() {
         if index > 0 {
@@ -813,7 +811,7 @@ fn test_u64_locate_or_pred_bruteforce() {
                 let locate = data_structure.locate_or_pred(i).unwrap();
                 assert_eq!(
                     data[index - 1],
-                    data_structure.element_list[locate]
+                    *locate
                 );
             }
         }
@@ -834,8 +832,7 @@ fn test_u64_locate_or_pred_eqc_bruteforce_test() {
                     let index = elem + j;
                     if index < data_structure.element_list[i + 1] {
                         assert_eq!(
-                            data_structure.element_list
-                                [data_structure.locate_or_pred(index).unwrap() as usize],
+                            *data_structure.locate_or_pred(index).unwrap(),
                             elem
                         );
                     }
@@ -843,12 +840,11 @@ fn test_u64_locate_or_pred_eqc_bruteforce_test() {
             }
         } else {
             assert_eq!(
-                data_structure.element_list[data_structure.locate_or_pred(elem).unwrap() as usize],
+                *data_structure.locate_or_pred(elem).unwrap(),
                 elem
             );
             assert_eq!(
-                data_structure.element_list
-                    [data_structure.locate_or_pred(elem + 1).unwrap() as usize],
+                *data_structure.locate_or_pred(elem + 1).unwrap(),
                 elem
             );
         }
