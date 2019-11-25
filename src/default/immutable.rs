@@ -2,11 +2,11 @@ use uint::{u40, u48};
 
 use crate::internal::{Splittable};
 use crate::default::build::insert_l3_level;
-/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
+/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer originale STree Hashtabelle auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene<T> = LevelPointer<L3Ebene<T>, T>;
 
-/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf
+/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer originale STree Hashtabelle auf
 /// ein Indize der STree.element_list zeigt.
 pub type L3Ebene<T> = LevelPointer<usize, T>;
 
@@ -69,7 +69,7 @@ impl<T, E> LevelPointer<T, E> {
     }
 }
 
-/// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
+/// Statische Predecessor-Datenstruktur. Sie verwendet originale STree Hashtabelle und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 #[derive(Clone)]
 pub struct STree<T> {
@@ -617,18 +617,18 @@ pub struct Level<T, E> {
     pub minimum: usize,
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64].
-    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
+    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die originale STree Hashtabelle ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     pub lx_top: TopArray<E, u16>,
 }
 
 impl<T: Clone, E> Level<T, E> {
     /// Gibt ein Level<T> mit Origin-Key j zurück. Optional kann eine Schlüsselliste übergeben werden, für welche dann
-    /// eine perfekte Hashfunktion generiert wird.
+    /// eine originale STree Hashtabelle generiert wird.
     ///
     /// # Arguments
     ///
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden.
-    /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
+    /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels originale STree Hashtabelle auf die nächste Ebene zeigen.
     #[inline]
     pub fn new() -> Level<T, E> {
         Level {
@@ -639,7 +639,7 @@ impl<T: Clone, E> Level<T, E> {
         }
     }
 
-    /// Mit Hilfe dieser Funktion kann die perfekte Hashfunktion verwendet werden.
+    /// Mit Hilfe dieser Funktion kann die originale STree Hashtabelle verwendet werden.
     /// Es muss beachtet werden, dass sichergestellt werden muss, dass der verwendete Key auch existiert!
     ///
     /// # Arguments
