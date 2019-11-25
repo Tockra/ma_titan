@@ -14,10 +14,10 @@ type L2EbeneBuilder<T> = internal::Pointer<BuilderLevel<L3EbeneBuilder<T>, T>, u
 /// Hilfsebene, die eine sehr starke Ähnlichkeit zur L3-Ebene hat.AsMut
 type L3EbeneBuilder<T> = internal::Pointer<BuilderLevel<usize, T>, usize>;
 
-/// Hilfsdatenstruktur zum Bauen eines STrees (nötig wegen der perfekten Hashfunktionen, die zum Erzeugungszeitpunkt alle Schlüssel kennen müssen).
+/// Hilfsdatenstruktur zum Bauen eines STrees (nötig wegen der Lookup-Hashtabelle, die zum Erzeugungszeitpunkt alle Schlüssel kennen müssen).
 pub struct STreeBuilder<T: 'static> {
-    /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2EbeneBuilder je Eintrag abgelegt.
-    /// Dabei gilt `root_table: [L2Ebene;2^20]`
+    /// Mit Hilfe der ersten 24-Bits des zu speichernden Wortes wird in `root_table` eine L2EbeneBuilder je Eintrag abgelegt.
+    /// Dabei gilt `root_table: [L2Ebene;2^24]`
     root_table: Box<[L2EbeneBuilder<T>]>,
 
     /// Root-Top-Array
@@ -158,12 +158,12 @@ impl<T: Int> STreeBuilder<T> {
         }
     }
 
-    /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer perfekter Hashfunktionen
-    /// angelegt und miteinander verbunden. Nachdem die Struktur mit normalen Hashfunktionen gebaut wurde können nun perfekte Hashfunktionen berechnet
+    /// Baut ein Array `root_table` für den STree-Struct. Dabei werden zuerst die `Level`-Structs korrekt mittels neuer Lookup-Hashtabelle
+    /// angelegt und miteinander verbunden. Nachdem die Struktur mit normalen Hashfunktionen gebaut wurde können nun Lookup-Hashtabelle berechnet
     /// werden!
     pub fn build(&mut self) -> Box<[L2Ebene<T>]> {
         let mut tmp: Vec<L2Ebene<T>> = Vec::with_capacity(T::root_array_size());
-        // Die L2Level-Elemente werden angelegt. Hierbei wird direkt in der new()-Funktion die perfekte Hashfunktion berechnet
+        // Die L2Level-Elemente werden angelegt. Hierbei wird direkt in der new()-Funktion die Lookup-Hashtabelle berechnet
         for i in 0..tmp.capacity() {
             if self.root_table[i].is_null() {
                 tmp.push(LevelPointer::from_null());
@@ -251,15 +251,15 @@ impl<T: Int> STreeBuilder<T> {
 /// Zwischenschicht zwischen dem Root-Array und des Element-Arrays.
 #[derive(Clone)]
 pub struct BuilderLevel<T: 'static, E: 'static> {
-    /// Klassische HashMap zum aufbauen der perfekten Hashmap
+    /// Klassische HashMap zum aufbauen der Lookup-Hashtabelle
     pub hash_map: HashMap<LXKey, T>,
 
     /// Eine Liste aller bisher gesammelter Schlüssel, die später auf die nächste Ebene zeigen.
-    /// Diese werden zur Erzeugung der perfekten Hashfunktion benötigt.
+    /// Diese werden zur Erzeugung der Lookup-Hashtabelle benötigt.
     pub keys: Vec<LXKey>,
 
-    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64].
-    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
+    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^8 (Bits) besitzt. Also [u64;2^8/64].
+    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die Lookup-Hashtabelle ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     /// Dieses Array wird später an den `Level`-Struct weitergegeben
     lx_top: Option<TopArray<E, LXKey>>,
 

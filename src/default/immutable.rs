@@ -2,11 +2,11 @@ use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
 use crate::internal::Splittable;
-/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
+/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u8-Integers und einer Lookup-Hashtabelle auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene<T> = LevelPointer<L3Ebene<T>, T>;
 
-/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf
+/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u8-Integers und einer Lookup-Hashtabelle auf
 /// ein Indize der STree.element_list zeigt.
 pub type L3Ebene<T> = LevelPointer<usize, T>;
 
@@ -67,16 +67,16 @@ impl<T, E> LevelPointer<T, E> {
     }
 }
 
-/// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
+/// Statische Predecessor-Datenstruktur. Sie verwendet Lookup-Hashtabelle und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 #[derive(Clone)]
 pub struct STree<T: 'static> {
     /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
-    /// Dabei gilt `root_table: [L2Ebene;2^20]`
+    /// Dabei gilt `root_table: [L2Ebene;2^24]`
     pub root_table: Box<[L2Ebene<T>]>,
 
     /// Das Root-Top-Array speichert für jeden Eintrag `root_table[i][x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
-    /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert.
+    /// Auch hier werden nicht 2^24 Einträge, sondern lediglich [u64;2^24/64] gespeichert.
     /// i steht dabei für die Ebene der root_tabelle. Ebene i+1 beinhaltet an Index [x] immer 64 Veroderungen aus Ebene i.
     /// Somit gilt |root_table[i+1]| = |root_table[i]|/64  
     pub root_top: TopArray<T, usize>,
@@ -630,19 +630,19 @@ pub struct Level<T, E> {
     /// Speichert einen Zeiger auf den Index des Minimums dieses Levels
     pub minimum: usize,
 
-    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64].
-    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
+    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^8 (Bits) besitzt. Also [u64;2^8/64].
+    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die Lookup-Hashtabelle ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     lx_top: TopArray<E, LXKey>,
 }
 
 impl<T, E> Level<T, E> {
     /// Gibt ein Level<T> mit Origin-Key j zurück. Optional kann eine Schlüsselliste übergeben werden, für welche dann
-    /// eine perfekte Hashfunktion generiert wird.
+    /// eine Lookup-Hashtabelle generiert wird.
     ///
     /// # Arguments
     ///
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden.
-    /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
+    /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels Lookup-Hashtabelle auf die nächste Ebene zeigen.
     #[inline]
     pub fn new(
         lx_top: TopArray<E, LXKey>,
@@ -659,12 +659,12 @@ impl<T, E> Level<T, E> {
         }
     }
 
-    /// Mit Hilfe dieser Funktion kann die perfekte Hashfunktion verwendet werden.
+    /// Mit Hilfe dieser Funktion kann die Lookup-Hashtabelle verwendet werden.
     /// Es muss beachtet werden, dass sichergestellt werden muss, dass der verwendete Key auch existiert!
     ///
     /// # Arguments
     ///
-    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    /// * `key` - u8-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn try_get(&self, key: LXKey) -> Option<&T> {
         if self.lx_top.is_set(key as usize) {
@@ -679,7 +679,7 @@ impl<T, E> Level<T, E> {
     ///
     /// # Arguments
     ///
-    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    /// * `key` - u8-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&mut self, key: LXKey) -> &mut T {
         self.hash_map.get_mut(&key)
