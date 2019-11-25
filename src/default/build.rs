@@ -16,8 +16,8 @@ type L3EbeneBuilder<T> = internal::Pointer<BuilderLevel<usize,T>,usize>;
 
 /// Hilfsdatenstruktur zum Bauen eines STrees (nötig wegen der Hashtabelle, die zum Erzeugungszeitpunkt alle Schlüssel kennen müssen).
 pub struct STreeBuilder<T: 'static > {
-    /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2EbeneBuilder je Eintrag abgelegt.
-    /// Dabei gilt `root_table: [L2Ebene;2^20]`
+    /// Mit Hilfe der ersten 24-Bits des zu speichernden Wortes wird in `root_table` eine L2EbeneBuilder je Eintrag abgelegt.
+    /// Dabei gilt `root_table: [L2Ebene;2^24]`
     root_table: Box<[L2EbeneBuilder<T>]>,
 
     /// Root-Top-Array
@@ -257,7 +257,7 @@ pub struct BuilderLevel<T: 'static,E: 'static> {
     /// Diese werden zur Erzeugung der Hashtabelle benötigt.
     pub keys: Vec<LXKey>,
 
-    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
+    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^8 (Bits) besitzt. Also [u64;2^8/64]. 
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die Hashtabelle ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     /// Dieses Array wird später an den `Level`-Struct weitergegeben
     lx_top: Option<TopArray<E, u8>>,

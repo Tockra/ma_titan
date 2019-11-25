@@ -81,7 +81,7 @@ impl<T,E> LevelPointer<T,E> {
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 #[derive(Clone)]
 pub struct STree<T: 'static> {
-    /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
+    /// Mit Hilfe der ersten 24-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
     /// Dabei gilt `root_table: [L2Ebene;2^24]`
     pub root_table: Box<[L2Ebene<T>]>,
     
