@@ -148,9 +148,9 @@ impl<T, V> TopArray<T, V> {
     #[inline]
     fn get_length() -> usize {
         if std::mem::size_of::<V>() == std::mem::size_of::<usize>() {
-            1 << std::mem::size_of::<T>() * 8 / 2
+            1 << std::mem::size_of::<T>() * 8 - 16
         } else if std::mem::size_of::<V>() == std::mem::size_of::<LXKey>() {
-            1 << std::mem::size_of::<T>() * 8 / 4
+            1 << 8
         } else {
             panic!("Ungültige Parameterkombination vom TopArray!")
         }
@@ -342,7 +342,7 @@ pub trait Int: Ord + PartialOrd + From<u64> + Into<u64> + Copy + Splittable {
         Self::from(k)
     }
     fn root_array_size() -> usize {
-        1 << (std::mem::size_of::<Self>() * 8 / 2)
+        1 << (std::mem::size_of::<Self>() * 8 -16)
     }
 }
 
@@ -352,7 +352,7 @@ impl Int for u48 {}
 
 impl Int for u64 {}
 
-pub type LXKey = u16;
+pub type LXKey = u8;
 impl<T: Int> STree<T> {
     /// Gibt einen STree mit den in `elements` enthaltenen Werten zurück.
     ///
@@ -559,7 +559,7 @@ pub struct Level<T, E> {
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64].
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
-    lx_top: TopArray<E, u16>,
+    lx_top: TopArray<E, u8>,
 }
 
 impl<T, E> Level<T, E> {
@@ -572,7 +572,7 @@ impl<T, E> Level<T, E> {
     /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
     #[inline]
     pub fn new(
-        lx_top: TopArray<E, u16>,
+        lx_top: TopArray<E, u8>,
         objects: Box<[T]>,
         keys: Box<[LXKey]>,
         minimum: usize,

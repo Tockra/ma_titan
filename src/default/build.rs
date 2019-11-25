@@ -261,7 +261,7 @@ pub struct BuilderLevel<T, E> {
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64].
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     /// Dieses Array wird später an den `Level`-Struct weitergegeben
-    lx_top: Option<TopArray<E, u16>>,
+    lx_top: Option<TopArray<E, u8>>,
 
     /// Speichert das Maximum des Levels zwischen
     pub maximum: usize,
