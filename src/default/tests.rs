@@ -12,7 +12,7 @@ const LX_ARRAY_SIZE_U48: usize = 1 << 12;
 // u64 Tests werden ausgespart, da der STree (leer) nach Initialisierung 2^32 * 8 Byte = 34 Gbyte RAM benötigt
 // Diese Tests sind nicht auf gängigen Laptop ausführbar. (Zukunft, ich rede von 2019 :p).
 
-/// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
+/// Die internen Swiss-Tables werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
 #[test]
 fn test_u40_new_hashfunctions() {
     // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
@@ -51,7 +51,7 @@ fn test_u40_new_hashfunctions() {
     }
 }
 
-/// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
+/// Die internen Swiss-Tables werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
 #[test]
 fn test_u48_new_hashfunctions() {
     // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
