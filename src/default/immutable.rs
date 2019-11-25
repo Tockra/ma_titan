@@ -2,11 +2,11 @@ use uint::{u40, u48};
 
 use crate::internal::{Splittable};
 use crate::default::build::insert_l3_level;
-/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
+/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u8-Integers und einer Swiss-Tables auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene<T> = LevelPointer<L3Ebene<T>, T>;
 
-/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf
+/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u8-Integers und einer Swiss-Tables auf
 /// ein Indize der STree.element_list zeigt.
 pub type L3Ebene<T> = LevelPointer<usize, T>;
 
@@ -69,7 +69,7 @@ impl<T, E> LevelPointer<T, E> {
     }
 }
 
-/// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
+/// Statische Predecessor-Datenstruktur. Sie verwendet Swiss-Tables und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 #[derive(Clone)]
 pub struct STree<T> {
@@ -504,7 +504,7 @@ impl<T: Int> STree<T> {
             PointerEnum::First(l) => {
                 let second_level = l;
                 let third_level = second_level.try_get(j);
-                // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
+                // Paper z. 6 mit kleiner Anpassung wegen "Swiss-Tables"
                 if third_level.is_none()
                     || element < self.element_list[third_level.unwrap().minimum()]
                 {
@@ -568,7 +568,7 @@ impl<T: Int> STree<T> {
             PointerEnum::First(l) => {
                 let second_level = l;
                 let third_level = second_level.try_get(j);
-                // Paper z. 6 mit kleiner Anpassung wegen "Perfekten-Hashings"
+                // Paper z. 6 mit kleiner Anpassung wegen "Swiss-Tables"
                 if third_level.is_none()
                     || self.element_list[third_level.unwrap().maximum()] < element
                 {
@@ -607,7 +607,7 @@ impl<T: Int> STree<T> {
 #[derive(Clone)]
 #[repr(align(4))]
 pub struct Level<T, E> {
-    /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist.
+    /// Swiss-Tables, die immer (außer zur Inialisierung) gesetzt ist.
     pub hash_map: HashMap<LXKey, T>,
 
     /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
@@ -616,19 +616,19 @@ pub struct Level<T, E> {
     /// Speichert einen Zeiger auf den Index des Minimums dieses Levels
     pub minimum: usize,
 
-    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64].
-    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
+    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^8 (Bits) besitzt. Also [u64;2^8/64].
+    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die Swiss-Tables ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     pub lx_top: TopArray<E, u8>,
 }
 
 impl<T, E> Level<T, E> {
     /// Gibt ein Level<T> mit Origin-Key j zurück. Optional kann eine Schlüsselliste übergeben werden, für welche dann
-    /// eine perfekte Hashfunktion generiert wird.
+    /// eine Swiss-Tables generiert wird.
     ///
     /// # Arguments
     ///
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden.
-    /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
+    /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels Swiss-Tables auf die nächste Ebene zeigen.
     #[inline]
     pub fn new() -> Level<T, E> {
         Level {
@@ -639,12 +639,12 @@ impl<T, E> Level<T, E> {
         }
     }
 
-    /// Mit Hilfe dieser Funktion kann die perfekte Hashfunktion verwendet werden.
+    /// Mit Hilfe dieser Funktion kann die Swiss-Tables verwendet werden.
     /// Es muss beachtet werden, dass sichergestellt werden muss, dass der verwendete Key auch existiert!
     ///
     /// # Arguments
     ///
-    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    /// * `key` - u8-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn try_get(&self, key: LXKey) -> Option<&T> {
         if self.lx_top.is_set(key as usize) {
@@ -659,7 +659,7 @@ impl<T, E> Level<T, E> {
     ///
     /// # Arguments
     ///
-    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    /// * `key` - u8-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&mut self, key: LXKey) -> &mut T {
         self.hash_map.get_mut(&key).unwrap()
