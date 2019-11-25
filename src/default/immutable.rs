@@ -4,21 +4,18 @@ use crate::internal::{MphfHashMap,Splittable};
 /// Zusätzliche Ebene um 8-Bit außer in Wurzel zu gewährleisten
 pub type L1Ebene<T> = LevelPointer<L2Ebene<T>, T>;
 
-/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
-/// L3-Ebene zeigt.
+/// LX-Ebenen. Diese werden in der Arbeit in der Definition von S_{64}(24,8,8,8,8,8) beschrieben
 pub type L2Ebene<T> = LevelPointer<LXEbene<T>, T>;
 
 pub type LXEbene<T> = LevelPointer<LYEbene<T>, T>;
 
 pub type LYEbene<T> = LevelPointer<L3Ebene<T>, T>;
 
-/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf
-/// ein Indize der STree.element_list zeigt.
 pub type L3Ebene<T> = LevelPointer<*const T, T>;
 
 use crate::internal::{self, PointerEnum};
 
-/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein usize-Objekt zeigt (Index aus Elementliste),
+/// Dieser Struct beinhaltet einen RAW-Pointer, der entweder auf ein T-Objekt zeigt (Zeiger auf Elementliste),
 /// oder auf ein Levelobjekt
 #[derive(Clone)]
 pub struct LevelPointer<T, E> {
@@ -73,18 +70,15 @@ impl<T, E> LevelPointer<T, E> {
     }
 }
 
-/// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
+/// Statische Predecessor-Datenstruktur. Sie verwendet binäre Suche und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 #[derive(Clone)]
 pub struct STree<T: 'static> {
-    /// Mit Hilfe der ersten 20-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
-    /// Dabei gilt `root_table: [L2Ebene;2^20]`
+    /// Mit Hilfe der ersten 24-Bits des zu speichernden Wortes wird in `root_table` eine L2-Ebene je Eintrag abgelegt.
+    /// Dabei gilt `root_table: [L1Ebene;2^24]`
     pub root_table: Box<[L1Ebene<T>]>,
     
-    /// Das Root-Top-Array speichert für jeden Eintrag `root_table[i][x]`, der belegt ist, ein 1-Bit, sonst einen 0-Bit.
-    /// Auch hier werden nicht 2^20 Einträge, sondern lediglich [u64;2^20/64] gespeichert.
-    /// i steht dabei für die Ebene der root_tabelle. Ebene i+1 beinhaltet an Index [x] immer 64 Veroderungen aus Ebene i. 
-    /// Somit gilt |root_table[i+1]| = |root_table[i]|/64  
+    /// TopArray als RootTopArray
     pub root_top: TopArray<T,usize>,
 
     /// Die Elementliste beinhaltet einen Vektor konstanter Länge mit jeweils allen gespeicherten Elementen in sortierter Reihenfolge.
@@ -94,7 +88,7 @@ pub struct STree<T: 'static> {
 /// Liste von Bitarrays zur Speicherung der LX-Top-Datenstrukturen
 /// Zur Speicherplatzreduzierung werden die Längen der Arrays weggeworfen und zum Drop-Zeitpunkt erneut berechnet 
 pub struct TopArray<T,V> {
-    /// 2-dimensionales Array mit 
+    /// Beinhaltet mehrere Ebenenen von Bitvektoren 
     data: Box<[*mut u64]>,
     
     // Länge der untersten Ebene. Kleiner Tradeoff zwischen Länge aller Ebenen Speichern und Level der tiefsten Ebene Speichern...
@@ -172,7 +166,7 @@ impl<T,V> TopArray<T,V> {
 
         // Lege alle Rootarrays an
         let mut top_arrays = vec![];
-        // Solange Länge / 64^i > 64
+      
         while length >= 64 {
             length = length>>6;
             top_arrays.push(Box::into_raw(vec![0_u64;length].into_boxed_slice()) as *mut u64);
@@ -234,7 +228,7 @@ impl<T,V> TopArray<T,V> {
         index
     }
 
-    /// Diese Funktion as nächste Bit zurück, dass hinter `bit` gesetzt ist.
+    /// Diese Funktion gibt das nächste Bit zurück, dass hinter `bit` gesetzt ist.
     #[inline]
     pub fn get_next_set_bit(&self, bit: usize) -> Option<usize> {
         let mut index = bit/64;
@@ -284,7 +278,7 @@ impl<T,V> TopArray<T,V> {
         index
     }
 
-    /// Diese Funktion as nächste Bit zurück, dass vor `bit` gesetzt ist.
+    /// Diese Funktion gibt das nächste Bit zurück, dass vor `bit` gesetzt ist.
     #[inline]
     pub fn get_prev_set_bit(&self, bit: usize) -> Option<usize> {
         let mut index = bit/64;
@@ -409,13 +403,13 @@ impl<T: Int> STree<T> {
 
 
 
-    /// Diese Methode gibt den Index INDEX des größten Elements zurück für das gilt element_list[INDEX]<=element>.
-    /// Somit kann mit dieser Methode geprüft werden, ob ein Element in der Datenstruktur enthalten ist. Dann wird der Index dieses Elements zurückgegeben.
+    /// Diese Methode gibt eine Referenz auf das größte Element zurück.
+    /// Somit kann mit dieser Methode geprüft werden, ob ein Element in der Datenstruktur enthalten ist. Dann wird eien Referenz auf dieses Element zurückgegeben.
     /// Ist das Element nicht enthalten, wird der "Nachfolger" dieses Elements zurückgegeben.
     /// 
     /// # Arguments
     ///
-    /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Vorgängers von `element` zurückgegeben.
+    /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Referenz zurückgegeben wird. Anderenfalls wird eien Referenz auf den Vorgänger von `element` zurückgegeben.
     #[inline]
     pub fn locate_or_pred(&self, element: T) -> Option<&T> {
         // Paper z.1
@@ -527,13 +521,13 @@ impl<T: Int> STree<T> {
     }
 
 
-    /// Diese Methode gibt den Index INDEX des kleinsten Elements zurück für das gilt element<=element_list[INDEX].
-    /// Somit kann mit dieser Methode geprüft werden, ob ein Element in der Datenstruktur enthalten ist. Dann wird der Index dieses Elements zurückgegeben.
+    /// Diese Methode gibt eine Referenz auf das kleinste Elements zurück.
+    /// Somit kann mit dieser Methode geprüft werden, ob ein Element in der Datenstruktur enthalten ist. Dann wird der eine Referenz auf dieses Elements zurückgegeben.
     /// Ist das Element nicht enthalten, wird der "Nachfolger" dieses Elements zurückgegeben.
     /// 
     /// # Arguments
     ///
-    /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Index zurückgegeben wird. Anderenfalls wird der Index des Nachfolgers von element zurückgegeben.
+    /// * `element` - Evtl. in der Datenstruktur enthaltener Wert, dessen Referenz zurückgegeben wird. Anderenfalls wird eine Referenz auf den Nachfolger von element zurückgegeben.
     #[inline]
     pub fn locate_or_succ(&self, element: T) -> Option<&T> {
         // Paper z.1
@@ -653,16 +647,16 @@ impl<T: Int> STree<T> {
 #[derive(Clone)]
 #[repr(align(4))]
 pub struct Level<T, E> {
-    /// Perfekte Hashmap, die immer (außer zur Inialisierung) gesetzt ist. 
+    /// Hashtabelle, die binäre Suche verwendet, die immer (außer zur Inialisierung) gesetzt ist. 
     pub hash_map: MphfHashMap<LXKey,T>,
 
-    /// Speichert einen Zeiger auf den Index des Maximum dieses Levels
+    /// Speichert einen Zeiger das Maximum dieses Levels
     pub maximum: *const E,
 
-    /// Speichert einen Zeiger auf den Index des Minimums dieses Levels
+    /// Speichert einen Zeiger auf das Minimums dieses Levels
     pub minimum: *const E,
 
-    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
+    /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^8/64]. 
     /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     lx_top: TopArray<E,u8>,
 }
@@ -696,7 +690,7 @@ impl<T,E> Level<T,E> {
     /// 
     /// # Arguments
     ///
-    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    /// * `key` - u8-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn try_get(&self, key: LXKey) -> Option<&T> {
         if self.lx_top.is_set(key as usize) {
@@ -711,7 +705,7 @@ impl<T,E> Level<T,E> {
     /// 
     /// # Arguments
     ///
-    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    /// * `key` - u8-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get(&mut self, key: LXKey) -> &mut T {
         self.hash_map.get_mut(&key)

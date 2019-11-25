@@ -15,13 +15,13 @@ pub trait Splittable {
 impl Splittable for u64 {
     #[inline]
     fn split_integer_down(&self) -> (usize, u8, u8, u8, u8, u8)  {
-        // Achtung funktioniert nicht korrekt mit negativen Zahlen
+
         let i: usize = u64::from(*self >> 40) as usize;
-        // Die niedrigwertigsten 24 Bits element[16..39]
+
         let low = u64::from(*self) & 0xFFFFFFFFFF;
-        // Bits 16 bis 23 element[8..15]
+
         let l: u8 = (low >> 32) as u8;
-        // Die niedrigwertigsten 8 Bits element[0..7]
+
         let low = low & 0xFFFFFFFF;
         let j: u8 = (low >> 24) as u8;
         let low = low & 0xFFFFFF;
@@ -157,7 +157,7 @@ impl<K: Into<u16> + std::cmp::Ord + std::marker::Send + std::marker::Sync + std:
     /// 
     /// # Arguments
     ///
-    /// * `key` - u10-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
+    /// * `key` - u8-Wert mit dessen Hilfe das zu `key` gehörende Objekt aus dem Array `objects` bestimmt werden kann.
     #[inline]
     pub fn get_mut(&mut self, key: &K) -> &mut V {
         match self.hash_function.0.binary_search(key) {
