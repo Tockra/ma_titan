@@ -18,7 +18,7 @@ type FirstLevel = Level<SecondLevel,Int>;
 
 pub struct STree {
     pub root_table: [FirstLevel; root_size::<Int>()],
-    // Da die Größe in in Bytes von size_of zurückgegeben wird, mal 8. Durch 64, da 64 Bits in einen u64 passen.
+
     pub root_top: [u64; root_size::<Int>()/64],
     pub root_top_sub: [u64; root_size::<Int>()/64/64], //Hier nur ein Element, da 2^16/64/64 nur noch 16 Bit sind, die alle in ein u64 passen!
     pub element_list: List<Int>,
@@ -46,8 +46,8 @@ impl<T,V> Level<T,V> {
         }
     }
 
-    // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 8 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
-    // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^8 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
+    // Die Hashtabelle beinhaltet viele Werte, die abhängig der nächsten 10 Bits der Binärdarstellung der zu lokalisierenden Zahl sind
+    // Der lx_top-Vektor hält die Information, ob im Wert 0 bis 2^10 ein Wert steht. Da 64 Bit in einen u64 passen, hat der Vektor nur 4 Einträge mit jeweils 64 Bit (u64)
     #[inline]
     pub fn locate_top_level(&mut self, bit: u16) -> Option<u16> {
         let index = bit as usize/64;
