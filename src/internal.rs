@@ -20,13 +20,13 @@ pub trait Splittable {
 impl Splittable for u40 {
     #[inline]
     fn split_integer_down(&self) -> (usize,u16,u16) {
-        // TODO: Achtung funktioniert nicht korrekt mit negativen Zahlen
+        // Achtung funktioniert nicht korrekt mit negativen Zahlen
         let i: usize = u64::from(*self >> 20) as usize;
-        // Die niedrigwertigsten 16 Bits element[16..31]
+        // Die niedrigwertigsten 16 Bits element[20..40]
         let low = u64::from(*self) & 0xFFFFF;
-        // Bits 16 bis 23 element[8..15]
+        // Bits 16 bis 23 element[10..20]
         let j: u16 = (low >> 10) as u16 ;
-        // Die niedrigwertigsten 8 Bits element[0..7]
+        // Die niedrigwertigsten 8 Bits element[0..10]
         let k: u16 = (u64::from(*self) & 0x3FF) as u16;
         (i, j, k) 
     }
@@ -37,11 +37,11 @@ impl Splittable for u48 {
     fn split_integer_down(&self) -> (usize,u16,u16) {
         // TODO: Achtung funktioniert nicht korrekt mit negativen Zahlen
         let i: usize = u64::from(*self >> 24) as usize;
-        // Die niedrigwertigsten 16 Bits element[16..31]
+        // Die niedrigwertigsten 16 Bits element[20..40]
         let low = u64::from(*self) & 0xFFFFFF;
-        // Bits 16 bis 23 element[8..15]
+        // Bits 16 bis 23 element[10..20]
         let j: u16 = (low >> 12) as u16 ;
-        // Die niedrigwertigsten 8 Bits element[0..7]
+        // Die niedrigwertigsten 8 Bits element[0..10]
         let k: u16 = (u64::from(*self) & 0xFFF) as u16;
         (i, j, k) 
     }
@@ -51,11 +51,11 @@ impl Splittable for u32 {
     #[inline]
     fn split_integer_down(&self) -> (usize,u16,u16) {
         let i: usize = (*self >> 16) as usize;
-        // Die niedrigwertigsten 16 Bits element[16..31]
+        // Die niedrigwertigsten 16 Bits element[24..48]
         let low = *self & 0xFFFF;
-        // Bits 16 bis 23 element[8..15]
+        // Bits 16 bis 23 element[12..24]
         let j: u16 = (low >> 8) as u16;
-        // Die niedrigwertigsten 8 Bits element[0..7]
+        // Die niedrigwertigsten 8 Bits element[0..12]
         let k: u16 = (*self & 255) as u16;
         (i,j,k)
     }
@@ -65,11 +65,11 @@ impl Splittable for u64 {
     #[inline]
     fn split_integer_down(&self) -> (usize,u16,u16) {
         let i: usize = (*self >> 32) as usize;
-        // Die niedrigwertigsten 32 Bits element[32..63]
+        // Die niedrigwertigsten 32 Bits element[32..64]
         let low = *self & 0xFFFFFFFF;
         // Bits 16 bis 32
         let j: u16 = (low >> 16) as u16;
-        // Die niedrigwertigsten 16 Bits element[0..15]
+        // Die niedrigwertigsten 16 Bits element[0..16]
         let k: u16 = (*self & 0xFFFF) as u16;
         (i,j,k)
     }
