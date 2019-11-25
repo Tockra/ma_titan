@@ -2,13 +2,13 @@ use uint::{u40, u48};
 
 use crate::default::build::STreeBuilder;
 use crate::internal::{MphfHashMap,Splittable};
-/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf eine
+/// Die L2-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer Hashtabelle (binäre Suche) auf eine
 /// L3-Ebene zeigt.
 pub type L2Ebene<T> = LevelPointer<L3Ebene<T>,T>;
 
 
 
-/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer perfekten Hashfunktion auf 
+/// Die L3-Ebene ist eine Zwischenebene, die mittels eines u10-Integers und einer Hashtabelle (binäre Suche) auf 
 /// ein Indize der STree.element_list zeigt.
 pub type L3Ebene<T> = LevelPointer<usize,T>;
 
@@ -77,7 +77,7 @@ impl<T,E> LevelPointer<T,E> {
     }
 }
 
-/// Statische Predecessor-Datenstruktur. Sie verwendet perfektes Hashing und ein Array auf der Element-Listen-Ebene.
+/// Statische Predecessor-Datenstruktur. Sie verwendet Hashtabelle (binäre Suche) und ein Array auf der Element-Listen-Ebene.
 /// Sie kann nur sortierte und einmalige Elemente entgegennehmen.
 #[derive(Clone)]
 pub struct STree<T: 'static> {
@@ -569,18 +569,18 @@ pub struct Level<T, E> {
     pub minimum: usize,
 
     /// Speichert die L2-, bzw. L3-Top-Tabelle, welche 2^10 (Bits) besitzt. Also [u64;2^10/64]. 
-    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die perfekte Hashfunktion ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
+    /// Dabei ist ein Bit lx_top[x]=1 gesetzt, wenn x ein Schlüssel für die Hashtabelle (binäre Suche) ist und in objects[hash_function.hash(x)] mindestens ein Wert gespeichert ist.
     lx_top: TopArray<E,u16>,
 }
 
 impl<T,E> Level<T,E> {
     /// Gibt ein Level<T> mit Origin-Key j zurück. Optional kann eine Schlüsselliste übergeben werden, für welche dann
-    /// eine perfekte Hashfunktion generiert wird.
+    /// eine Hashtabelle (binäre Suche) generiert wird.
     ///
     /// # Arguments
     ///
     /// * `j` - Falls eine andere Ebene auf diese mittels Hashfunktion zeigt, muss der verwendete key gespeichert werden. 
-    /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels perfekter Hashfunktion auf die nächste Ebene zeigen.
+    /// * `keys` - Eine Liste mit allen Schlüsseln, die mittels Hashtabelle (binäre Suche) auf die nächste Ebene zeigen.
     #[inline]
     pub fn new(lx_top: TopArray<E, u16>, objects: Box<[T]>, keys: Box<[LXKey]>, minimum: usize, maximum: usize) -> Level<T,E> {
         Level {
@@ -591,7 +591,7 @@ impl<T,E> Level<T,E> {
         } 
     }
 
-    /// Mit Hilfe dieser Funktion kann die perfekte Hashfunktion verwendet werden. 
+    /// Mit Hilfe dieser Funktion kann die Hashtabelle (binäre Suche) verwendet werden. 
     /// Es muss beachtet werden, dass sichergestellt werden muss, dass der verwendete Key auch existiert!
     /// 
     /// # Arguments
@@ -633,7 +633,7 @@ mod tests {
     // u64 Tests werden ausgespart, da der STree (leer) nach Initialisierung 2^32 * 8 Byte = 34 Gbyte RAM benötigt
     // Diese Tests sind nicht auf gängigen Laptop ausführbar. (Zukunft, ich rede von 2019 :p).
 
-    /// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
+    /// Die internen Hashtabelle (binäre Suche) werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
     #[test]
     fn test_u40_new_hashfunctions() {
 
@@ -676,7 +676,7 @@ mod tests {
     }
 
 
-    /// Die internen (perfekten) Hashfunktionen werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
+    /// Die internen Hashtabelle (binäre Suche) werden nach dem Einfügen der Elemente auf die Funktionsfähigkeit geprüft.
     #[test]
     fn test_u48_new_hashfunctions() {
         // Alle u40 Werte sollten nach dem Einfügen da sein, die Hashfunktionen sollten alle dann beim "suchen" funktionieren
