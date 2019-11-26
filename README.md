@@ -13,6 +13,7 @@ In ./eval-scripts liegen Skripte, die bei der Evaluierung mittels ma_eval_speed 
 Die Branches können wie folgt zugeordnet werden:
 
 40-Bit:
+
 | Branch               | Bezeichnugn in der Arbeit (Evaluierung)|
 | -------------------- |----------------------------------------| 
 | master               | mphf_2                                 |
@@ -31,6 +32,7 @@ Die Branches können wie folgt zugeordnet werden:
 | brown_hash_16        | ahash_1                                | 
 
 48-Bit:
+
 | Branch                | Bezeichnugn in der Arbeit (Evaluierung)|
 | --------------------- |----------------------------------------| 
 | mphf_u48_1            | mphf_1                                 |
