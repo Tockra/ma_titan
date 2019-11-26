@@ -13,7 +13,7 @@ In ./eval-scripts liegen Skripte, die bei der Evaluierung mittels ma_eval_speed 
 Die Branches können wie folgt zugeordnet werden:
 
 40-Bit:
-| Branch        | Bezeichnugn in der Arbeit (Evaluierung)
+| Branch        | Bezeichnugn in der Arbeit (Evaluierung)|
 | ------------- |:-------------:| 
 | master        | mphf_2 |
 | mphf_16       | mphf_1      |
@@ -31,7 +31,7 @@ Die Branches können wie folgt zugeordnet werden:
 | brown_hash_16 | ahash_1      | 
 
 48-Bit:
-| Branch        | Bezeichnugn in der Arbeit (Evaluierung)
+| Branch        | Bezeichnugn in der Arbeit (Evaluierung)|
 | ------------- |:-------------:| 
 | mphf_u48_1       | mphf_1     |
 | mphf_u48_2       | mphf_2     |
@@ -49,21 +49,26 @@ Die Branches können wie folgt zugeordnet werden:
 | brown_hash_u48_2 | ahash_2    | 
 
 64-Bit:
-| Branch        | Bezeichnugn in der Arbeit (Evaluierung)
-| ------------- |:-------------:| 
-| mphf_u64_1       | mphf_1     |
-| mphf_u64_2       | mphf_2     |
-| original_u64_1   | original_1 | 
-| original_u64_2   | original_2 | 
-| lookup_u64_1     | lookup_1   | 
-| lookup_u64_2  | lookup_2   | 
-| threshold_u64_1  | threshold_1| 
-| threshold_u64_2  | threshold_2| 
-| space_efficient_u64_1  |  binary_1      | 
-| space_efficient_u64_2  | binary_2      | 
-| fnv_hash_u64_1   | fnv_1      | 
-| fnv_hash_u64_2   | fnv_2      | 
-| brown_hash_u64_1 | ahash_1    | 
-| brown_hash_u64_2 | ahash_2    | 
+
+| Branch                 | Bezeichnugn in der Arbeit (Evaluierung)|
+| ---------------------- |----------------------------------------| 
+| mphf_u64_1             | mphf_1                                 |
+| mphf_u64_2             | mphf_2                                 |
+| original_u64_1         | original_1                             | 
+| original_u64_2         | original_2                             | 
+| lookup_u64_1           | lookup_1                               | 
+| lookup_u64_2           | lookup_2                               | 
+| threshold_u64_1        | threshold_1                            | 
+| threshold_u64_2        | threshold_2                            | 
+| space_efficient_u64_1  |  binary_1                              | 
+| space_efficient_u64_2  | binary_2                               | 
+| fnv_hash_u64_1         | fnv_1                                  | 
+| fnv_hash_u64_2         | fnv_2                                  | 
+| brown_hash_u64_1       | ahash_1                                | 
+| brown_hash_u64_2       | ahash_2                                | 
 
 
+| First Header  | Second Header |
+| ------------- | ------------- |
+| Content Cell  | Content Cell  |
+| Content Cell  | Content Cell  |
