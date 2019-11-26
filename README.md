@@ -8,8 +8,6 @@ Achtung: Die Kommentare der 48- und 64-Bit-Implementierungen wurden nicht angepa
 
 In ./eval-scripts liegen Skripte, die bei der Evaluierung mittels ma_eval_speed und ma_eval_space helfen. 
 
-
-
 Die Branches können wie folgt zugeordnet werden:
 
 40-Bit:
@@ -68,9 +66,3 @@ Die Branches können wie folgt zugeordnet werden:
 | fnv_hash_u64_2         | fnv_2                                  | 
 | brown_hash_u64_1       | ahash_1                                | 
 | brown_hash_u64_2       | ahash_2                                | 
-
-
-| First Header  | Second Header |
-| ------------- | ------------- |
-| Content Cell  | Content Cell  |
-| Content Cell  | Content Cell  |
