@@ -14,7 +14,7 @@ Die Branches können wie folgt zugeordnet werden:
 
 40-Bit:
 | Branch        | Bezeichnugn in der Arbeit (Evaluierung)|
-| ------------- |:-------------:| 
+| -------------------- |---------------------------------| 
 | master        | mphf_2 |
 | mphf_16       | mphf_1      |
 | original      | original_2      | 
@@ -32,7 +32,7 @@ Die Branches können wie folgt zugeordnet werden:
 
 48-Bit:
 | Branch        | Bezeichnugn in der Arbeit (Evaluierung)|
-| ------------- |:-------------:| 
+| ------------------ |----------------------------------------| 
 | mphf_u48_1       | mphf_1     |
 | mphf_u48_2       | mphf_2     |
 | original_u48_1   | original_1 | 
