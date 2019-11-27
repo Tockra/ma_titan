@@ -339,20 +339,37 @@ impl<T, V> TopArray<T, V> {
 /// Dieser Trait dient als Platzhalter für u40, u48 und u64.
 /// Er stellt sicher das der generische Parameter gewisse Traits implementiert und die New-Methode besitzt.
 /// Zusätzlich wird die Größe des Root-Arrays in Form einer Funktion rückgebar gemacht.
-pub trait Int: Ord + PartialOrd + From<u64> + Into<u64> + Copy + Splittable {
-    fn new(k: u64) -> Self {
-        Self::from(k)
-    }
+pub trait Int: Ord + PartialOrd + Into<u64> + Copy + Splittable {
+    fn new(k: u64) -> Self;
+
     fn root_array_size() -> usize {
         1 << (std::mem::size_of::<Self>() * 8 - 16)
     }
 }
 
-impl Int for u40 {}
+impl Int for u32 {
+    fn new(k: u64) -> Self {
+        k as u32
+    }
+}
 
-impl Int for u48 {}
+impl Int for u40 {
+    fn new(k: u64) -> Self {
+        Self::from(k)
+    }
+}
 
-impl Int for u64 {}
+impl Int for u48 {
+    fn new(k: u64) -> Self {
+        Self::from(k)
+    }
+}
+
+impl Int for u64 {
+    fn new(k: u64) -> Self {
+        Self::from(k)
+    }
+}
 
 pub type LXKey = u8;
 impl<T: Int> STree<T> {
