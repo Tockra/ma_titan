@@ -753,7 +753,7 @@ impl<E: Clone> DynamicLookup<E> {
             shift_value: 6,
         }
     }
-
+    #[inline]
     pub fn get(&self, key: u8) -> Option<&E> {
         let mut n = Self::HASHMAP[key as usize] >> self.shift_value;
         let mut m = n >> 2;
@@ -771,7 +771,7 @@ impl<E: Clone> DynamicLookup<E> {
 
         return None;
     }
-
+    #[inline]
     pub fn get_mut(&self, key: u8) -> Option<&mut E> {
         let mut n = Self::HASHMAP[key as usize] >> self.shift_value;
         let mut m = n >> 2;
@@ -789,7 +789,7 @@ impl<E: Clone> DynamicLookup<E> {
 
         return None;
     }
-
+    #[inline]
     fn double_size(&mut self) {
         unsafe {
             debug_assert!(self.array_len <= 128);
@@ -815,7 +815,7 @@ impl<E: Clone> DynamicLookup<E> {
             }
         }
     }
-
+    #[inline]
     pub fn insert(&mut self, key: u8, elem: E) {
         unsafe {
             if (self.size as u16) < (self.array_len - ( self.array_len >> 2)) || self.array_len == 256 {
