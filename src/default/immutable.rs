@@ -100,7 +100,7 @@ pub struct STree<T> {
 /// Zur Speicherplatzreduzierung werden die Längen der Arrays weggeworfen und zum Drop-Zeitpunkt erneut berechnet
 pub struct TopArray<T, V> {
     /// 2-dimensionales Array mit
-    data: Box<[*mut u64]>,
+    data: Box<[*mut u32]>,
 
     // Länge der untersten Ebene. Kleiner Tradeoff zwischen Länge aller Ebenen Speichern und Level der tiefsten Ebene Speichern...
     lowest_len: usize,
@@ -119,7 +119,7 @@ impl<T, V> Drop for TopArray<T, V> {
 
         // Solange Länge / 2^i > 256
         for (i, &ptr) in self.data.into_iter().enumerate() {
-            length = length >> (i + 1) * 6;
+            length = length >> (i + 1) * 5;
             unsafe {
                 Box::from_raw(std::slice::from_raw_parts_mut(ptr, length));
             }
@@ -137,14 +137,14 @@ impl<T, V> Clone for TopArray<T, V> {
 
         // Solange Länge / 2^i > 256
         for (i, &ptr) in self.data.iter().enumerate() {
-            length = length >> (i + 1) * 6;
+            length = length >> (i + 1) * 5;
             let mut tmp = vec![];
             unsafe {
                 for i in 0..length {
                     tmp.push(*ptr.add(i));
                 }
             }
-            top_arrays.push(Box::into_raw(tmp.into_boxed_slice()) as *mut u64);
+            top_arrays.push(Box::into_raw(tmp.into_boxed_slice()) as *mut u32);
         }
         Self {
             data: top_arrays.into_boxed_slice(),
@@ -178,9 +178,9 @@ impl<T, V> TopArray<T, V> {
         // Lege alle Rootarrays an
         let mut top_arrays = vec![];
         // Solange Länge / 64^i > 64
-        while length >= 64 {
-            length = length >> 6;
-            top_arrays.push(Box::into_raw(vec![0_u64; length].into_boxed_slice()) as *mut u64);
+        while length >= 32 {
+            length = length >> 5;
+            top_arrays.push(Box::into_raw(vec![0_u32; length].into_boxed_slice()) as *mut u32);
         }
 
         Self {
@@ -192,15 +192,15 @@ impl<T, V> TopArray<T, V> {
     }
 
     #[inline]
-    const fn get_bit_mask(in_index: usize) -> u64 {
-        1 << 63 - in_index
+    const fn get_bit_mask(in_index: usize) -> u32 {
+        1 << 31 - in_index
     }
 
     /// Baut das Root-Top-Array mit Hilfe der sich in der Datenstruktur befindenden Werte.
     #[inline]
     pub fn set_bit(&mut self, bit: usize) {
-        let mut index = bit / 64;
-        let mut in_index = bit % 64;
+        let mut index = bit / 32;
+        let mut in_index = bit % 32;
 
         // Berechnung des Indexs (bits) im root_top array und des internen Offsets bzw. der Bitmaske mit einer 1 ander richtigen Stelle
         for i in 0..(self.data.len()) {
@@ -208,8 +208,8 @@ impl<T, V> TopArray<T, V> {
             let bit_mask = Self::get_bit_mask(in_index);
             let bit_window = unsafe { self.data.get_unchecked(i).add(index) };
 
-            in_index = index % 64;
-            index = index / 64;
+            in_index = index % 32;
+            index = index / 32;
 
             unsafe {
                 *bit_window = *bit_window | bit_mask;
@@ -219,7 +219,7 @@ impl<T, V> TopArray<T, V> {
 
     #[inline]
     pub fn is_set(&self, bit: usize) -> bool {
-        let (index, in_index) = (bit / 64, bit % 64);
+        let (index, in_index) = (bit / 32, bit % 32);
         let bit_mask = Self::get_bit_mask(in_index);
         let bit_window = unsafe { self.data.get_unchecked(0).add(index) };
 
@@ -231,7 +231,7 @@ impl<T, V> TopArray<T, V> {
         let mut index = index;
         for i in (0..(last_level)).rev() {
             let zeros_to_bit = unsafe { *self.data.get_unchecked(i).add(index) };
-            index = index * 64 + zeros_to_bit.leading_zeros() as usize;
+            index = index * 32 + zeros_to_bit.leading_zeros() as usize;
         }
         index
     }
@@ -239,12 +239,12 @@ impl<T, V> TopArray<T, V> {
     /// Diese Funktion as nächste Bit zurück, dass hinter `bit` gesetzt ist.
     #[inline]
     pub fn get_next_set_bit(&self, bit: usize) -> Option<usize> {
-        let mut index = bit / 64;
-        let mut in_index = bit % 64;
+        let mut index = bit / 32;
+        let mut in_index = bit % 32;
 
         // Steigt alle Ebenen des TopArrays herunter und prüft, ob in den 64-Bit Blöcken bereits das nachfolgende Bit liegt.
         for level in 0..(self.data.len()) {
-            let bit_mask: u64 = u64::max_value()
+            let bit_mask: u32 = u32::max_value()
                 .checked_shr(in_index as u32 + 1)
                 .unwrap_or(0);
             let zeros_to_bit = unsafe { *self.data.get_unchecked(level).add(index) & bit_mask };
@@ -252,17 +252,17 @@ impl<T, V> TopArray<T, V> {
             if zeros_to_bit != 0 {
                 let zeros = zeros_to_bit.leading_zeros() as usize;
                 if zeros != 0 {
-                    return Some(self.get_next_set_bit_translation(index * 64 + zeros, level));
+                    return Some(self.get_next_set_bit_translation(index * 32 + zeros, level));
                 }
             }
 
             if level < self.data.len() - 1 {
-                in_index = index % 64;
-                index = index / 64;
+                in_index = index % 32;
+                index = index / 32;
             }
         }
 
-        let bit_mask: u64 = u64::max_value()
+        let bit_mask: u32 = u32::max_value()
             .checked_shr(in_index as u32 + 1)
             .unwrap_or(0);
         let mut zeros_to_bit =
@@ -271,7 +271,7 @@ impl<T, V> TopArray<T, V> {
         for i in (index)..self.lowest_len {
             if zeros_to_bit != 0 {
                 return Some(self.get_next_set_bit_translation(
-                    i * 64 + zeros_to_bit.leading_zeros() as usize,
+                    i * 32 + zeros_to_bit.leading_zeros() as usize,
                     self.data.len() - 1,
                 ));
             }
@@ -288,7 +288,7 @@ impl<T, V> TopArray<T, V> {
         let mut index = index;
         for i in (0..(last_level)).rev() {
             let zeros_to_bit = unsafe { *self.data.get_unchecked(i).add(index) };
-            index = index * 64 + 63 - zeros_to_bit.trailing_zeros() as usize;
+            index = index * 32 + 63 - zeros_to_bit.trailing_zeros() as usize;
         }
         index
     }
@@ -296,13 +296,13 @@ impl<T, V> TopArray<T, V> {
     /// Diese Funktion as nächste Bit zurück, dass vor `bit` gesetzt ist.
     #[inline]
     pub fn get_prev_set_bit(&self, bit: usize) -> Option<usize> {
-        let mut index = bit / 64;
-        let mut in_index = bit % 64;
+        let mut index = bit / 32;
+        let mut in_index = bit % 32;
 
         // Steigt alle Ebenen des TopArrays herunter und prüft, ob in den 64-Bit Blöcken bereits das Vorgänger Bit liegt.
         for level in 0..self.data.len() {
-            let bit_mask: u64 = u64::max_value()
-                .checked_shl(64 - in_index as u32)
+            let bit_mask: u32 = u32::max_value()
+                .checked_shl(32 - in_index as u32)
                 .unwrap_or(0);
 
             let zeros_to_bit = unsafe { *self.data.get_unchecked(level).add(index) & bit_mask };
@@ -311,19 +311,19 @@ impl<T, V> TopArray<T, V> {
 
                 if zeros != 0 {
                     return Some(
-                        self.get_prev_set_bit_translation(index * 64 + 63 - zeros as usize, level),
+                        self.get_prev_set_bit_translation(index * 32 + 31 - zeros as usize, level),
                     );
                 }
             }
 
             if level < self.data.len() - 1 {
-                in_index = index % 64;
-                index = index / 64;
+                in_index = index % 32;
+                index = index / 32;
             }
         }
 
-        let bit_mask: u64 = u64::max_value()
-            .checked_shl(64 - in_index as u32)
+        let bit_mask: u32 = u32::max_value()
+            .checked_shl(32 - in_index as u32)
             .unwrap_or(0);
         let mut zeros_to_bit =
             unsafe { (*self.data.get_unchecked(self.data.len() - 1).add(index)) & bit_mask };
@@ -331,7 +331,7 @@ impl<T, V> TopArray<T, V> {
         for i in (0..(index + 1)).rev() {
             if zeros_to_bit != 0 {
                 return Some(self.get_prev_set_bit_translation(
-                    i * 64 + 63 - zeros_to_bit.trailing_zeros() as usize,
+                    i * 32 + 31 - zeros_to_bit.trailing_zeros() as usize,
                     self.data.len() - 1,
                 ));
             }
