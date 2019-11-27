@@ -22,6 +22,8 @@ pub struct LevelPointer<T, E> {
 }
 
 impl<T, E> LevelPointer<T, E> {
+
+    #[inline]
     pub fn minimum(&self) -> &E {
         match self.pointer.get() {
             PointerEnum::First(l) => unsafe { &*l.minimum },
@@ -30,6 +32,7 @@ impl<T, E> LevelPointer<T, E> {
         }
     }
 
+    #[inline]
     pub fn maximum(&self) -> &E {
         match self.pointer.get() {
             PointerEnum::First(l) => unsafe { &*l.maximum },
@@ -38,32 +41,38 @@ impl<T, E> LevelPointer<T, E> {
         }
     }
 
+    #[inline]
     pub fn from_level(level_box: Box<Level<T, E>>) -> Self {
         Self {
             pointer: internal::Pointer::from_first(level_box),
         }
     }
 
+    #[inline]
     pub fn get(&self) -> PointerEnum<Level<T, E>, E> {
         self.pointer.get()
     }
 
+    #[inline]
     pub fn is_null(&self) -> bool {
         self.pointer.is_null()
     }
 
+    #[inline]
     pub fn from_null() -> Self {
         Self {
             pointer: internal::Pointer::null(),
         }
     }
 
+    #[inline]
     pub fn from_usize(usize_box: *const E) -> Self {
         Self {
             pointer: internal::Pointer::from_second(usize_box),
         }
     }
 
+    #[inline]
     pub fn change_to_usize(&mut self, usize_box: *const E) {
         self.pointer = internal::Pointer::from_second(usize_box);
     }
